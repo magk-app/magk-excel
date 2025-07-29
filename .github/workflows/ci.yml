@@ -1,0 +1,136 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'apps/server/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'apps/server/**'
+      - '.github/workflows/ci.yml'
+
+jobs:
+  test-server:
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: ./apps/server
+    
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+        os: [ubuntu-latest, windows-latest]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Create virtual environment (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        python -m venv venv
+        echo "VIRTUAL_ENV=$(pwd)/venv" >> $GITHUB_ENV
+        echo "$(pwd)/venv/bin" >> $GITHUB_PATH
+    
+    - name: Create virtual environment (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        python -m venv venv
+        echo "VIRTUAL_ENV=$(pwd)/venv" >> $env:GITHUB_ENV
+        echo "$(pwd)/venv/Scripts" >> $env:GITHUB_PATH
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Lint with flake8
+      run: |
+        pip install flake8
+        # Stop build if syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Run tests with pytest
+      run: |
+        pytest tests/ -v --tb=short --cov=chalicelib --cov-report=xml
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./apps/server/coverage.xml
+        flags: backend
+        name: backend-coverage
+        fail_ci_if_error: false
+
+  deploy-dev:
+    needs: test-server
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    defaults:
+      run:
+        working-directory: ./apps/server
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.10.12
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+    
+    - name: Deploy to AWS Lambda (dev)
+      run: |
+        chalice deploy --stage dev
+
+  deploy-prod:
+    needs: test-server
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    defaults:
+      run:
+        working-directory: ./apps/server
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.10.12
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+    
+    - name: Deploy to AWS Lambda (prod)
+      run: |
+        chalice deploy --stage prod
