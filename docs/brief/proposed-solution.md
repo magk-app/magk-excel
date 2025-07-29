@@ -1,0 +1,8 @@
+# Proposed Solution
+* **Core Concept & Approach:** MAGK will be an AI assistant delivered through a simple chat interface, seamlessly integrated with Microsoft Excel. Users will describe a repetitive workflow in natural language (e.g., "Go to this website, find the quarterly reports, and extract the 'Distribution Channel' table into this spreadsheet"). MAGK will ask clarifying questions and then automatically generate a simple, standalone, one-click executable program that performs this task.
+* **Key Differentiators:**
+    * **Tool Generation, Not Code Generation:** Unlike ChatGPT, MAGK's primary output is not a block of Python code for the user to run, but a user-friendly, permanent tool (e.g., a clickable icon named "Update LIA Data").
+    * **Zero-CS-Knowledge-Required:** The entire process, from request to tool creation, is handled through a simple conversation, removing the need for any "vibe coding" or technical skills.
+    * **Deep Excel Integration:** MAGK will be able to interact directly with Excel, including acting on highlighted cells, performing calculations, and managing data across different files and sheets.
+* **High-Level Vision:** The long-term vision is for MAGK to become an indispensable "AI intern" for every analyst, capable of learning and automating any routine data-related task, dramatically increasing the research team's efficiency and data accuracy.
+
