@@ -21,6 +21,7 @@ This document defines the user experience goals, information architecture, user 
 2. **Conversational Flow:** The primary interaction should feel like a natural conversation with a helpful intern.
 3. **Immediate & Transparent Feedback:** The user should always see the result of their actions.
 4. **Clarity Over Cleverness:** Prioritize clear communication and straightforward interactions.
+5. **Target Audience:** The interface should be professional and futuristic, to draw the eyes of senior management at a bank like CGS. 
 
 ### Change Log
 
@@ -35,7 +36,7 @@ This document defines the user experience goals, information architecture, user 
 
 The application now includes a simple library to manage saved workflows.
 
-```
+```mermaid
 graph TD
     A[Main Chat Window] --> B(Define Workflow);
     B --> C(Save Workflow);
@@ -50,7 +51,7 @@ graph TD
 
 **User Goal:** To create a permanent, reusable automation tool from a simple conversation and run it with one click.
 
-```
+```mermaid
 graph TD
     subgraph "Phase 1: Workflow Creation"
         A[User opens MAGK] --> B{User describes workflow};
