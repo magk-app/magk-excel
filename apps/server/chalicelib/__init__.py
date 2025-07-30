@@ -1,1 +1,1 @@
-# Make chalicelib a package
+"""Make chalicelib a package."""
