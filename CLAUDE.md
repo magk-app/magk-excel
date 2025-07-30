@@ -107,3 +107,6 @@ This project uses the BMad methodology with specialized agents:
 - Use pytest with proper fixtures
 - Mock external services (AWS, Selenium)
 - Maintain test coverage for critical paths
+
+## Development Guidelines
+- NO EMOJIs in any .bat scripts in general

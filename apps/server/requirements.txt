@@ -1,0 +1,29 @@
+# Core framework and dependencies
+chalice==1.32.0
+selenium==4.16.0
+boto3==1.34.0
+
+# PDF processing (Story 1.2)
+PyMuPDF==1.23.0
+
+# AWS Bedrock integration
+botocore>=1.34.0
+
+# Testing dependencies
+pytest==8.0.0
+pytest-cov==4.1.0
+
+# Code quality
+flake8==6.0.0
+
+# Type hints and static analysis (optional but recommended)
+mypy==1.8.0
+types-boto3==1.39.16
+
+# Lambda deployment requirements:
+# The following layers are required for Lambda deployment:
+# - Chrome binary layer (provides /opt/chrome/chrome)
+# - ChromeDriver layer (provides /opt/chromedriver)
+# Environment variables:
+# - CHROME_BINARY_PATH=/opt/chrome/chrome
+# - CHROMEDRIVER_PATH=/opt/chromedriver
