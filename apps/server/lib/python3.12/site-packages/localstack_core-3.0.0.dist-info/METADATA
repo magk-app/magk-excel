@@ -1,0 +1,116 @@
+Metadata-Version: 2.1
+Name: localstack-core
+Version: 3.0.0
+Summary: The core library and runtime of LocalStack
+Home-page: https://github.com/localstack/localstack
+Author: LocalStack Contributors
+Author-email: info@localstack.cloud
+License: Apache License 2.0
+Classifier: Programming Language :: Python :: 3.11
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Topic :: Internet
+Classifier: Topic :: Software Development :: Testing
+Classifier: Topic :: System :: Emulators
+Requires-Python: >=3.8
+License-File: LICENSE.txt
+Requires-Dist: click >=7.0
+Requires-Dist: cachetools >=5.0
+Requires-Dist: cryptography
+Requires-Dist: dill ==0.3.6
+Requires-Dist: dnslib >=0.9.10
+Requires-Dist: dnspython >=1.16.0
+Requires-Dist: plux >=1.3.1
+Requires-Dist: psutil <6.0.0,>=5.4.8
+Requires-Dist: python-dotenv >=0.19.1
+Requires-Dist: pyyaml >=5.1
+Requires-Dist: rich >=12.3.0
+Requires-Dist: requests >=2.20.0
+Requires-Dist: semver >=2.10
+Requires-Dist: stevedore >=3.4.0
+Requires-Dist: tailer >=0.4.1
+Provides-Extra: dev
+Requires-Dist: black ==23.10.0 ; extra == 'dev'
+Requires-Dist: coveralls >=3.3.1 ; extra == 'dev'
+Requires-Dist: Cython ; extra == 'dev'
+Requires-Dist: networkx >=2.8.4 ; extra == 'dev'
+Requires-Dist: pandoc ; extra == 'dev'
+Requires-Dist: pre-commit ==3.5.0 ; extra == 'dev'
+Requires-Dist: pypandoc ; extra == 'dev'
+Requires-Dist: ruff ==0.1.0 ; extra == 'dev'
+Requires-Dist: rstr >=3.2.0 ; extra == 'dev'
+Provides-Extra: full
+Requires-Dist: airspeed-ext >=0.6.3 ; extra == 'full'
+Requires-Dist: amazon-kclpy !=2.1.0,>=2.0.6 ; extra == 'full'
+Requires-Dist: antlr4-python3-runtime ==4.13.1 ; extra == 'full'
+Requires-Dist: apispec >=5.1.1 ; extra == 'full'
+Requires-Dist: aws-sam-translator >=1.15.1 ; extra == 'full'
+Requires-Dist: awscli >=1.22.90 ; extra == 'full'
+Requires-Dist: awscrt >=0.13.14 ; extra == 'full'
+Requires-Dist: boto3 >=1.26.121 ; extra == 'full'
+Requires-Dist: botocore ==1.31.85 ; extra == 'full'
+Requires-Dist: cbor2 >=5.2.0 ; extra == 'full'
+Requires-Dist: crontab >=0.22.6 ; extra == 'full'
+Requires-Dist: dnspython >=1.16.0 ; extra == 'full'
+Requires-Dist: docker >=6.1.1 ; extra == 'full'
+Requires-Dist: hypercorn >=0.14.4 ; extra == 'full'
+Requires-Dist: json5 ==0.9.11 ; extra == 'full'
+Requires-Dist: jsonpatch <2.0,>=1.24 ; extra == 'full'
+Requires-Dist: jsonpath-ng ==1.5.3 ; extra == 'full'
+Requires-Dist: jsonpath-rw <2.0.0,>=1.4.0 ; extra == 'full'
+Requires-Dist: jsonschema <=4.19.0 ; extra == 'full'
+Requires-Dist: localstack-client >=2.0 ; extra == 'full'
+Requires-Dist: moto-ext[all] ==4.2.7.post1 ; extra == 'full'
+Requires-Dist: opensearch-py <2.4,>=2.3.2 ; extra == 'full'
+Requires-Dist: pymongo >=4.2.0 ; extra == 'full'
+Requires-Dist: pyopenssl >=23.0.0 ; extra == 'full'
+Requires-Dist: Quart >=0.19.2 ; extra == 'full'
+Requires-Dist: readerwriterlock >=1.0.7 ; extra == 'full'
+Requires-Dist: requests-aws4auth >=1.0 ; extra == 'full'
+Requires-Dist: urllib3 >=2.0.7 ; extra == 'full'
+Requires-Dist: Werkzeug >=3.0.0 ; extra == 'full'
+Requires-Dist: xmltodict >=0.13.0 ; extra == 'full'
+Provides-Extra: runtime
+Requires-Dist: airspeed-ext >=0.6.3 ; extra == 'runtime'
+Requires-Dist: amazon-kclpy !=2.1.0,>=2.0.6 ; extra == 'runtime'
+Requires-Dist: antlr4-python3-runtime ==4.13.1 ; extra == 'runtime'
+Requires-Dist: apispec >=5.1.1 ; extra == 'runtime'
+Requires-Dist: aws-sam-translator >=1.15.1 ; extra == 'runtime'
+Requires-Dist: awscli >=1.22.90 ; extra == 'runtime'
+Requires-Dist: awscrt >=0.13.14 ; extra == 'runtime'
+Requires-Dist: boto3 >=1.26.121 ; extra == 'runtime'
+Requires-Dist: botocore ==1.31.85 ; extra == 'runtime'
+Requires-Dist: cbor2 >=5.2.0 ; extra == 'runtime'
+Requires-Dist: crontab >=0.22.6 ; extra == 'runtime'
+Requires-Dist: dnspython >=1.16.0 ; extra == 'runtime'
+Requires-Dist: docker >=6.1.1 ; extra == 'runtime'
+Requires-Dist: hypercorn >=0.14.4 ; extra == 'runtime'
+Requires-Dist: json5 ==0.9.11 ; extra == 'runtime'
+Requires-Dist: jsonpatch <2.0,>=1.24 ; extra == 'runtime'
+Requires-Dist: jsonpath-ng ==1.5.3 ; extra == 'runtime'
+Requires-Dist: jsonpath-rw <2.0.0,>=1.4.0 ; extra == 'runtime'
+Requires-Dist: jsonschema <=4.19.0 ; extra == 'runtime'
+Requires-Dist: localstack-client >=2.0 ; extra == 'runtime'
+Requires-Dist: moto-ext[all] ==4.2.7.post1 ; extra == 'runtime'
+Requires-Dist: opensearch-py <2.4,>=2.3.2 ; extra == 'runtime'
+Requires-Dist: pymongo >=4.2.0 ; extra == 'runtime'
+Requires-Dist: pyopenssl >=23.0.0 ; extra == 'runtime'
+Requires-Dist: Quart >=0.19.2 ; extra == 'runtime'
+Requires-Dist: readerwriterlock >=1.0.7 ; extra == 'runtime'
+Requires-Dist: requests-aws4auth >=1.0 ; extra == 'runtime'
+Requires-Dist: urllib3 >=2.0.7 ; extra == 'runtime'
+Requires-Dist: Werkzeug >=3.0.0 ; extra == 'runtime'
+Requires-Dist: xmltodict >=0.13.0 ; extra == 'runtime'
+Provides-Extra: test
+Requires-Dist: coverage[toml] >=5.5 ; extra == 'test'
+Requires-Dist: deepdiff >=6.4.1 ; extra == 'test'
+Requires-Dist: jsonpath-ng >=1.5.3 ; extra == 'test'
+Requires-Dist: pluggy >=1.3.0 ; extra == 'test'
+Requires-Dist: pytest ==7.4.2 ; extra == 'test'
+Requires-Dist: pytest-split >=0.8.0 ; extra == 'test'
+Requires-Dist: pytest-httpserver >=1.0.1 ; extra == 'test'
+Requires-Dist: pytest-rerunfailures ==12.0 ; extra == 'test'
+Requires-Dist: pytest-tinybird >=0.2.0 ; extra == 'test'
+Requires-Dist: aws-cdk-lib >=2.88.0 ; extra == 'test'
+Provides-Extra: typehint
+Requires-Dist: boto3-stubs[acm,amplify,apigateway,apigatewayv2,appconfig,appsync,athena,autoscaling,backup,batch,ce,cloudcontrol,cloudformation,cloudfront,cloudtrail,cloudwatch,codecommit,cognito-identity,cognito-idp,dms,docdb,dynamodb,dynamodbstreams,ec2,ecr,ecs,efs,eks,elasticache,elasticbeanstalk,elbv2,emr,emr-serverless,es,events,firehose,fis,glacier,glue,iam,iot,iot-data,iotanalytics,iotwireless,kafka,kinesis,kinesisanalytics,kinesisanalyticsv2,kms,lakeformation,lambda,logs,mediaconvert,mediastore,mq,mwaa,neptune,opensearch,organizations,pi,qldb,qldb-session,rds,rds-data,redshift,redshift-data,resource-groups,resourcegroupstaggingapi,route53,route53resolver,s3,s3control,sagemaker,sagemaker-runtime,secretsmanager,serverlessrepo,servicediscovery,ses,sesv2,sns,sqs,ssm,stepfunctions,sts,timestream-query,timestream-write,transcribe,xray] ; extra == 'typehint'
+

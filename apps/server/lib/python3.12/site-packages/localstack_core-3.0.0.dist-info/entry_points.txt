@@ -1,0 +1,166 @@
+[localstack.aws.provider]
+acm:default = localstack.services.providers:acm
+apigateway:default = localstack.services.providers:apigateway
+cloudformation:default = localstack.services.providers:cloudformation
+cloudwatch:default = localstack.services.providers:cloudwatch
+config:default = localstack.services.providers:awsconfig
+dynamodb:default = localstack.services.providers:dynamodb
+dynamodbstreams:default = localstack.services.providers:dynamodbstreams
+ec2:default = localstack.services.providers:ec2
+es:default = localstack.services.providers:es
+events:default = localstack.services.providers:events
+firehose:default = localstack.services.providers:firehose
+iam:default = localstack.services.providers:iam
+kinesis:default = localstack.services.providers:kinesis
+kms:default = localstack.services.providers:kms
+lambda:asf = localstack.services.providers:lambda_asf
+lambda:default = localstack.services.providers:lambda_
+lambda:v2 = localstack.services.providers:lambda_v2
+logs:default = localstack.services.providers:logs
+opensearch:default = localstack.services.providers:opensearch
+redshift:default = localstack.services.providers:redshift
+resource-groups:default = localstack.services.providers:resource_groups
+resourcegroupstaggingapi:default = localstack.services.providers:resourcegroupstaggingapi
+route53:default = localstack.services.providers:route53
+route53resolver:default = localstack.services.providers:route53resolver
+s3:asf = localstack.services.providers:s3_asf
+s3:default = localstack.services.providers:s3
+s3:legacy_v2 = localstack.services.providers:s3_legacy_v2
+s3:stream = localstack.services.providers:s3_stream
+s3:v2 = localstack.services.providers:s3_v2
+s3:v3 = localstack.services.providers:s3_v3
+s3control:default = localstack.services.providers:s3control
+scheduler:default = localstack.services.providers:scheduler
+secretsmanager:default = localstack.services.providers:secretsmanager
+ses:default = localstack.services.providers:ses
+sns:default = localstack.services.providers:sns
+sqs-query:default = localstack.services.providers:sqs_query
+sqs:default = localstack.services.providers:sqs
+ssm:default = localstack.services.providers:ssm
+stepfunctions:default = localstack.services.providers:stepfunctions
+stepfunctions:legacy = localstack.services.providers:stepfunctions_v1
+stepfunctions:v1 = localstack.services.providers:stepfunctions_legacy
+stepfunctions:v2 = localstack.services.providers:stepfunctions_v2
+sts:default = localstack.services.providers:sts
+support:default = localstack.services.providers:support
+swf:default = localstack.services.providers:swf
+transcribe:default = localstack.services.providers:transcribe
+
+[localstack.cloudformation.resource_providers]
+AWS::ApiGateway::Account = localstack.services.apigateway.resource_providers.aws_apigateway_account_plugin:ApiGatewayAccountProviderPlugin
+AWS::ApiGateway::ApiKey = localstack.services.apigateway.resource_providers.aws_apigateway_apikey_plugin:ApiGatewayApiKeyProviderPlugin
+AWS::ApiGateway::BasePathMapping = localstack.services.apigateway.resource_providers.aws_apigateway_basepathmapping_plugin:ApiGatewayBasePathMappingProviderPlugin
+AWS::ApiGateway::Deployment = localstack.services.apigateway.resource_providers.aws_apigateway_deployment_plugin:ApiGatewayDeploymentProviderPlugin
+AWS::ApiGateway::DomainName = localstack.services.apigateway.resource_providers.aws_apigateway_domainname_plugin:ApiGatewayDomainNameProviderPlugin
+AWS::ApiGateway::GatewayResponse = localstack.services.apigateway.resource_providers.aws_apigateway_gatewayresponse_plugin:ApiGatewayGatewayResponseProviderPlugin
+AWS::ApiGateway::Method = localstack.services.apigateway.resource_providers.aws_apigateway_method_plugin:ApiGatewayMethodProviderPlugin
+AWS::ApiGateway::Model = localstack.services.apigateway.resource_providers.aws_apigateway_model_plugin:ApiGatewayModelProviderPlugin
+AWS::ApiGateway::RequestValidator = localstack.services.apigateway.resource_providers.aws_apigateway_requestvalidator_plugin:ApiGatewayRequestValidatorProviderPlugin
+AWS::ApiGateway::Resource = localstack.services.apigateway.resource_providers.aws_apigateway_resource_plugin:ApiGatewayResourceProviderPlugin
+AWS::ApiGateway::RestApi = localstack.services.apigateway.resource_providers.aws_apigateway_restapi_plugin:ApiGatewayRestApiProviderPlugin
+AWS::ApiGateway::Stage = localstack.services.apigateway.resource_providers.aws_apigateway_stage_plugin:ApiGatewayStageProviderPlugin
+AWS::ApiGateway::UsagePlan = localstack.services.apigateway.resource_providers.aws_apigateway_usageplan_plugin:ApiGatewayUsagePlanProviderPlugin
+AWS::ApiGateway::UsagePlanKey = localstack.services.apigateway.resource_providers.aws_apigateway_usageplankey_plugin:ApiGatewayUsagePlanKeyProviderPlugin
+AWS::CertificateManager::Certificate = localstack.services.certificatemanager.resource_providers.aws_certificatemanager_certificate_plugin:CertificateManagerCertificateProviderPlugin
+AWS::CloudWatch::Alarm = localstack.services.cloudwatch.resource_providers.aws_cloudwatch_alarm_plugin:CloudWatchAlarmProviderPlugin
+AWS::CloudWatch::CompositeAlarm = localstack.services.cloudwatch.resource_providers.aws_cloudwatch_compositealarm_plugin:CloudWatchCompositeAlarmProviderPlugin
+AWS::DynamoDB::Table = localstack.services.dynamodb.resource_providers.aws_dynamodb_table_plugin:DynamoDBTableProviderPlugin
+AWS::EC2::DHCPOptions = localstack.services.ec2.resource_providers.aws_ec2_dhcpoptions_plugin:EC2DHCPOptionsProviderPlugin
+AWS::EC2::Instance = localstack.services.ec2.resource_providers.aws_ec2_instance_plugin:EC2InstanceProviderPlugin
+AWS::EC2::InternetGateway = localstack.services.ec2.resource_providers.aws_ec2_internetgateway_plugin:EC2InternetGatewayProviderPlugin
+AWS::EC2::NatGateway = localstack.services.ec2.resource_providers.aws_ec2_natgateway_plugin:EC2NatGatewayProviderPlugin
+AWS::EC2::NetworkAcl = localstack.services.ec2.resource_providers.aws_ec2_networkacl_plugin:EC2NetworkAclProviderPlugin
+AWS::EC2::Route = localstack.services.ec2.resource_providers.aws_ec2_route_plugin:EC2RouteProviderPlugin
+AWS::EC2::RouteTable = localstack.services.ec2.resource_providers.aws_ec2_routetable_plugin:EC2RouteTableProviderPlugin
+AWS::EC2::SecurityGroup = localstack.services.ec2.resource_providers.aws_ec2_securitygroup_plugin:EC2SecurityGroupProviderPlugin
+AWS::EC2::Subnet = localstack.services.ec2.resource_providers.aws_ec2_subnet_plugin:EC2SubnetProviderPlugin
+AWS::EC2::SubnetRouteTableAssociation = localstack.services.ec2.resource_providers.aws_ec2_subnetroutetableassociation_plugin:EC2SubnetRouteTableAssociationProviderPlugin
+AWS::EC2::VPC = localstack.services.ec2.resource_providers.aws_ec2_vpc_plugin:EC2VPCProviderPlugin
+AWS::EC2::VPCGatewayAttachment = localstack.services.ec2.resource_providers.aws_ec2_vpcgatewayattachment_plugin:EC2VPCGatewayAttachmentProviderPlugin
+AWS::ECR::Repository = localstack.services.ecr.resource_providers.aws_ecr_repository_plugin:ECRRepositoryProviderPlugin
+AWS::Events::Connection = localstack.services.events.resource_providers.aws_events_connection_plugin:EventsConnectionProviderPlugin
+AWS::Events::EventBus = localstack.services.events.resource_providers.aws_events_eventbus_plugin:EventsEventBusProviderPlugin
+AWS::Events::EventBusPolicy = localstack.services.events.resource_providers.aws_events_eventbuspolicy_plugin:EventsEventBusPolicyProviderPlugin
+AWS::Events::Rule = localstack.services.events.resource_providers.aws_events_rule_plugin:EventsRuleProviderPlugin
+AWS::IAM::AccessKey = localstack.services.iam.resource_providers.aws_iam_accesskey_plugin:IAMAccessKeyProviderPlugin
+AWS::IAM::Group = localstack.services.iam.resource_providers.aws_iam_group_plugin:IAMGroupProviderPlugin
+AWS::IAM::InstanceProfile = localstack.services.iam.resource_providers.aws_iam_instanceprofile_plugin:IAMInstanceProfileProviderPlugin
+AWS::IAM::ManagedPolicy = localstack.services.iam.resource_providers.aws_iam_managedpolicy_plugin:IAMManagedPolicyProviderPlugin
+AWS::IAM::Policy = localstack.services.iam.resource_providers.aws_iam_policy_plugin:IAMPolicyProviderPlugin
+AWS::IAM::Role = localstack.services.iam.resource_providers.aws_iam_role_plugin:IAMRoleProviderPlugin
+AWS::IAM::ServiceLinkedRole = localstack.services.iam.resource_providers.aws_iam_servicelinkedrole_plugin:IAMServiceLinkedRoleProviderPlugin
+AWS::IAM::User = localstack.services.iam.resource_providers.aws_iam_user_plugin:IAMUserProviderPlugin
+AWS::KMS::Alias = localstack.services.kms.resource_providers.aws_kms_alias_plugin:KMSAliasProviderPlugin
+AWS::KMS::Key = localstack.services.kms.resource_providers.aws_kms_key_plugin:KMSKeyProviderPlugin
+AWS::Kinesis::Stream = localstack.services.kinesis.resource_providers.aws_kinesis_stream_plugin:KinesisStreamProviderPlugin
+AWS::Kinesis::StreamConsumer = localstack.services.kinesis.resource_providers.aws_kinesis_streamconsumer_plugin:KinesisStreamConsumerProviderPlugin
+AWS::KinesisFirehose::DeliveryStream = localstack.services.kinesisfirehose.resource_providers.aws_kinesisfirehose_deliverystream_plugin:KinesisFirehoseDeliveryStreamProviderPlugin
+AWS::Lambda::Alias = localstack.services.lambda_.resource_providers.lambda_alias_plugin:LambdaAliasProviderPlugin
+AWS::Logs::LogGroup = localstack.services.logs.resource_providers.aws_logs_loggroup_plugin:LogsLogGroupProviderPlugin
+AWS::Logs::LogStream = localstack.services.logs.resource_providers.aws_logs_logstream_plugin:LogsLogStreamProviderPlugin
+AWS::Logs::SubscriptionFilter = localstack.services.logs.resource_providers.aws_logs_subscriptionfilter_plugin:LogsSubscriptionFilterProviderPlugin
+AWS::OpenSearchService::Domain = localstack.services.opensearch.resource_providers.aws_opensearchservice_domain_plugin:OpenSearchServiceDomainProviderPlugin
+AWS::Redshift::Cluster = localstack.services.redshift.resource_providers.aws_redshift_cluster_plugin:RedshiftClusterProviderPlugin
+AWS::Route53::HealthCheck = localstack.services.route53.resource_providers.aws_route53_healthcheck_plugin:Route53HealthCheckProviderPlugin
+AWS::Route53::RecordSet = localstack.services.route53.resource_providers.aws_route53_recordset_plugin:Route53RecordSetProviderPlugin
+AWS::S3::Bucket = localstack.services.s3.resource_providers.aws_s3_bucket_plugin:S3BucketProviderPlugin
+AWS::S3::BucketPolicy = localstack.services.s3.resource_providers.aws_s3_bucketpolicy_plugin:S3BucketPolicyProviderPlugin
+AWS::SNS::Topic = localstack.services.sns.resource_providers.aws_sns_topic_plugin:SNSTopicProviderPlugin
+AWS::SQS::Queue = localstack.services.sqs.resource_providers.aws_sqs_queue_plugin:SQSQueueProviderPlugin
+AWS::SQS::QueuePolicy = localstack.services.sqs.resource_providers.aws_sqs_queuepolicy_plugin:SQSQueuePolicyProviderPlugin
+AWS::SSM::MaintenanceWindow = localstack.services.ssm.resource_providers.aws_ssm_maintenancewindow_plugin:SSMMaintenanceWindowProviderPlugin
+AWS::SSM::MaintenanceWindowTarget = localstack.services.ssm.resource_providers.aws_ssm_maintenancewindowtarget_plugin:SSMMaintenanceWindowTargetProviderPlugin
+AWS::SSM::MaintenanceWindowTask = localstack.services.ssm.resource_providers.aws_ssm_maintenancewindowtask_plugin:SSMMaintenanceWindowTaskProviderPlugin
+AWS::SSM::Parameter = localstack.services.ssm.resource_providers.aws_ssm_parameter_plugin:SSMParameterProviderPlugin
+AWS::SSM::PatchBaseline = localstack.services.ssm.resource_providers.aws_ssm_patchbaseline_plugin:SSMPatchBaselineProviderPlugin
+AWS::Scheduler::Schedule = localstack.services.scheduler.resource_providers.aws_scheduler_schedule_plugin:SchedulerScheduleProviderPlugin
+AWS::Scheduler::ScheduleGroup = localstack.services.scheduler.resource_providers.aws_scheduler_schedulegroup_plugin:SchedulerScheduleGroupProviderPlugin
+AWS::SecretsManager::ResourcePolicy = localstack.services.secretsmanager.resource_providers.aws_secretsmanager_resourcepolicy_plugin:SecretsManagerResourcePolicyProviderPlugin
+AWS::SecretsManager::RotationSchedule = localstack.services.secretsmanager.resource_providers.aws_secretsmanager_rotationschedule_plugin:SecretsManagerRotationScheduleProviderPlugin
+AWS::SecretsManager::Secret = localstack.services.secretsmanager.resource_providers.aws_secretsmanager_secret_plugin:SecretsManagerSecretProviderPlugin
+AWS::SecretsManager::SecretTargetAttachment = localstack.services.secretsmanager.resource_providers.aws_secretsmanager_secrettargetattachment_plugin:SecretsManagerSecretTargetAttachmentProviderPlugin
+AWS::StepFunctions::Activity = localstack.services.stepfunctions.resource_providers.aws_stepfunctions_activity_plugin:StepFunctionsActivityProviderPlugin
+AWS::StepFunctions::StateMachine = localstack.services.stepfunctions.resource_providers.aws_stepfunctions_statemachine_plugin:StepFunctionsStateMachineProviderPlugin
+
+[localstack.hooks.configure_localstack_container]
+_mount_machine_file = localstack.utils.analytics.metadata:_mount_machine_file
+
+[localstack.hooks.on_infra_ready]
+_run_init_scripts_on_ready = localstack.runtime.init:_run_init_scripts_on_ready
+register_virtual_host_routes = localstack.services.s3.virtual_host:register_virtual_host_routes
+
+[localstack.hooks.on_infra_shutdown]
+_run_init_scripts_on_shutdown = localstack.runtime.init:_run_init_scripts_on_shutdown
+run_on_after_service_shutdown_handlers = localstack.runtime.shutdown:run_on_after_service_shutdown_handlers
+run_shutdown_handlers = localstack.runtime.shutdown:run_shutdown_handlers
+shutdown_services = localstack.runtime.shutdown:shutdown_services
+
+[localstack.hooks.on_infra_start]
+_patch_botocore_json_parser = localstack.aws.client:_patch_botocore_json_parser
+_publish_config_as_analytics_event = localstack.runtime.analytics:_publish_config_as_analytics_event
+_publish_container_info = localstack.runtime.analytics:_publish_container_info
+_run_init_scripts_on_start = localstack.runtime.init:_run_init_scripts_on_start
+deprecation_warnings = localstack.plugins:deprecation_warnings
+register_partition_adjusting_proxy_listener = localstack.plugins:register_partition_adjusting_proxy_listener
+setup_dns_configuration_on_host = localstack.dns.plugins:setup_dns_configuration_on_host
+start_dns_server = localstack.dns.plugins:start_dns_server
+validate_configuration = localstack.services.lambda_.plugins:validate_configuration
+
+[localstack.hooks.prepare_host]
+prepare_host_machine_id = localstack.utils.analytics.metadata:prepare_host_machine_id
+
+[localstack.lambda.runtime_executor]
+docker = localstack.services.lambda_.invocation.plugins:DockerRuntimeExecutorPlugin
+
+[localstack.packages]
+cloudformation-libs/community = localstack.services.cloudformation.plugins:cloudformation_package
+dynamodb-local/community = localstack.services.dynamodb.plugins:dynamodb_local_package
+elasticsearch/community = localstack.services.es.plugins:elasticsearch_package
+ffmpeg/community = localstack.packages.plugins:ffmpeg_package
+kinesis-mock/community = localstack.services.kinesis.plugins:kinesismock_package
+lambda-java-libs/community = localstack.services.lambda_.plugins:lambda_java_libs
+lambda-runtime/community = localstack.services.lambda_.plugins:lambda_runtime_package
+opensearch/community = localstack.services.opensearch.plugins:opensearch_package
+stepfunctions-local/community = localstack.services.stepfunctions.plugins:stepfunctions_local_packages
+terraform/community = localstack.packages.plugins:terraform_package
+vosk/community = localstack.services.transcribe.plugins:vosk_package

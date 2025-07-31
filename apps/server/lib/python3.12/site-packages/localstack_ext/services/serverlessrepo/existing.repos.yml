@@ -1,0 +1,230 @@
+- Name: SecretsManagerRDSPostgreSQLRotationMultiUser
+  LicenseUrl: https://awsserverlessrepo-applications-eji6x7x4bodi.s3.amazonaws.com/297356227824/SecretsManagerRDSPostgreSQLRotationMultiUser/assets/license.txt
+  SpdxLicenseId: MIT
+  ApplicationId: arn:aws:serverlessrepo:us-east-1:297356227824:applications/SecretsManagerRDSPostgreSQLRotationMultiUser
+  Author: AWS Secrets Manager
+  IsVerifiedAuthor: true
+  Description: Conducts an AWS SecretsManager secret rotation for RDS PostgreSQL using
+    the multiple user rotation scheme
+  Labels: []
+  VerifiedAuthorUrl: https://aws.amazon.com/secrets-manager/
+  CreationTime: '2018-03-23T02:40:47.622Z'
+  Version:
+    RequiredCapabilities:
+    - CAPABILITY_IAM
+    - CAPABILITY_RESOURCE_POLICY
+    SemanticVersion: 1.1.129
+    ApplicationId: arn:aws:serverlessrepo:us-east-1:297356227824:applications/SecretsManagerRDSPostgreSQLRotationMultiUser
+    SourceCodeUrl: https://github.com/aws-samples/aws-secrets-manager-rotation-lambdas
+    TemplateBody: |
+      AWSTemplateFormatVersion: '2010-09-09'
+      Transform: AWS::Serverless-2016-10-31
+      Parameters:
+        endpoint:
+          Type: String
+          Description: The Secrets Manager endpoint to hit
+        functionName:
+          Type: String
+          Description: The name of the lambda function
+        invokingServicePrincipal:
+          Type: String
+          Description: The Service Principal of the invoking service
+          Default: secretsmanager.amazonaws.com
+        vpcSubnetIds:
+          Type: CommaDelimitedList
+          Description: List of VPC subnet IDs
+          Default: ''
+        vpcSecurityGroupIds:
+          Type: CommaDelimitedList
+          Description: List of VPC security grouop IDs
+          Default: ''
+        masterSecretArn:
+          Type: String
+          Description: The master secret's ARN that is used for rotation
+          Default: ''
+        kmsKeyArn:
+          Type: String
+          Description: The kms key used to encrypt the secret being rotated
+          Default: ''
+        masterSecretKmsKeyArn:
+          Type: String
+          Description: The kms key used to encrypt the master secret
+          Default: ''
+        excludeCharacters:
+          Type: String
+          Description: A string that includes characters that should not be included in the generated password
+          Default: :/@"'\
+      Conditions:
+        AddVpcConfig:
+          Fn::And:
+          - Fn::Not:
+            - Fn::Equals:
+              - ''
+              - Fn::Join:
+                - ''
+                - Ref: vpcSubnetIds
+          - Fn::Not:
+            - Fn::Equals:
+              - ''
+              - Fn::Join:
+                - ''
+                - Ref: vpcSecurityGroupIds
+        MasterSecretArnExists:
+          Fn::Not:
+          - Fn::Equals:
+            - ''
+            - Ref: masterSecretArn
+        KmsKeyArnExists:
+          Fn::Not:
+          - Fn::Equals:
+            - ''
+            - Ref: kmsKeyArn
+        MasterSecretKmsKeyArnExists:
+          Fn::And:
+          - Fn::Not:
+            - Fn::Equals:
+              - ''
+              - Ref: masterSecretKmsKeyArn
+          - Fn::Not:
+            - Fn::Equals:
+              - Ref: kmsKeyArn
+              - Ref: masterSecretKmsKeyArn
+      Resources:
+        SecretsManagerRDSPostgreSQLRotationMultiUser:
+          Type: AWS::Serverless::Function
+          Properties:
+            FunctionName:
+              Ref: functionName
+            Description: Conducts an AWS SecretsManager secret rotation for RDS PostgreSQL using the multiple user rotation scheme
+            Handler: lambda_function.lambda_handler
+            Runtime: python3.7
+            CodeUri:
+              Bucket: <%REPO_BUCKET%>
+              Key: 5f850569-f2fb-4ada-a8a4-4db9a4688605
+            Timeout: 30
+            Policies:
+            - VPCAccessPolicy: {}
+            - AWSSecretsManagerRotationPolicy:
+                FunctionName:
+                  Ref: functionName
+            - Fn::If:
+              - MasterSecretArnExists
+              - AWSSecretsManagerGetSecretValuePolicy:
+                  SecretArn:
+                    Ref: masterSecretArn
+              - Ref: AWS::NoValue
+            - Fn::If:
+              - KmsKeyArnExists
+              - Version: '2012-10-17'
+                Statement:
+                - Effect: Allow
+                  Action:
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                  - kms:GenerateDataKey
+                  Resource:
+                    Ref: kmsKeyArn
+              - Ref: AWS::NoValue
+            - Fn::If:
+              - MasterSecretKmsKeyArnExists
+              - Version: '2012-10-17'
+                Statement:
+                - Effect: Allow
+                  Action:
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                  - kms:GenerateDataKey
+                  Resource:
+                    Ref: masterSecretKmsKeyArn
+              - Ref: AWS::NoValue
+            Environment:
+              Variables:
+                SECRETS_MANAGER_ENDPOINT:
+                  Ref: endpoint
+                EXCLUDE_CHARACTERS:
+                  Ref: excludeCharacters
+            VpcConfig:
+              Fn::If:
+              - AddVpcConfig
+              - SubnetIds:
+                  Ref: vpcSubnetIds
+                SecurityGroupIds:
+                  Ref: vpcSecurityGroupIds
+              - Ref: AWS::NoValue
+            Tags:
+              SecretsManagerLambda: Rotation
+        LambdaPermission:
+          Type: AWS::Lambda::Permission
+          Properties:
+            Action: lambda:InvokeFunction
+            FunctionName:
+              Fn::GetAtt:
+              - SecretsManagerRDSPostgreSQLRotationMultiUser
+              - Arn
+            Principal:
+              Ref: invokingServicePrincipal
+      Outputs:
+        RotationLambdaARN:
+          Description: The ARN of the rotation lambda
+          Value:
+            Fn::GetAtt:
+            - SecretsManagerRDSPostgreSQLRotationMultiUser
+            - Arn
+
+    ResourcesSupported: true
+    CreationTime: '2021-04-20T16:08:14.052Z'
+    ParameterDefinitions:
+    - Description: The Secrets Manager endpoint to hit
+      Name: endpoint
+      Type: String
+      ReferencedByResources:
+      - SecretsManagerRDSPostgreSQLRotationMultiUser
+    - Description: A string that includes characters that should not be included in
+        the generated password
+      Name: excludeCharacters
+      DefaultValue: ':/@"''\'
+      Type: String
+      ReferencedByResources:
+      - SecretsManagerRDSPostgreSQLRotationMultiUser
+    - Description: The name of the lambda function
+      Name: functionName
+      Type: String
+      ReferencedByResources:
+      - SecretsManagerRDSPostgreSQLRotationMultiUser
+      - SecretsManagerRDSPostgreSQLRotationMultiUser
+    - Description: The Service Principal of the invoking service
+      Name: invokingServicePrincipal
+      DefaultValue: secretsmanager.amazonaws.com
+      Type: String
+      ReferencedByResources:
+      - LambdaPermission
+    - Description: The kms key used to encrypt the secret being rotated
+      Name: kmsKeyArn
+      DefaultValue: ''
+      Type: String
+      ReferencedByResources:
+      - SecretsManagerRDSPostgreSQLRotationMultiUser
+    - Description: The master secret's ARN that is used for rotation
+      Name: masterSecretArn
+      DefaultValue: ''
+      Type: String
+      ReferencedByResources:
+      - SecretsManagerRDSPostgreSQLRotationMultiUser
+    - Description: The kms key used to encrypt the master secret
+      Name: masterSecretKmsKeyArn
+      DefaultValue: ''
+      Type: String
+      ReferencedByResources:
+      - SecretsManagerRDSPostgreSQLRotationMultiUser
+    - Description: List of VPC security grouop IDs
+      Name: vpcSecurityGroupIds
+      DefaultValue: ''
+      Type: CommaDelimitedList
+      ReferencedByResources:
+      - SecretsManagerRDSPostgreSQLRotationMultiUser
+    - Description: List of VPC subnet IDs
+      Name: vpcSubnetIds
+      DefaultValue: ''
+      Type: CommaDelimitedList
+      ReferencedByResources:
+      - SecretsManagerRDSPostgreSQLRotationMultiUser

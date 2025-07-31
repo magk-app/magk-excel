@@ -2,6 +2,10 @@ import pytest
 import os
 from unittest.mock import Mock, patch
 from selenium.common.exceptions import TimeoutException, WebDriverException
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+
 from chalicelib.web_extractor import (
     WebExtractor, extract_web_table, WebExtractionError, 
     TimeoutError, ElementNotFoundError
