@@ -1,4 +1,4 @@
-export ANTHROPIC_MODEL=‘us.anthropic.claude-sonnet-4-20250514-v1:0’
+<!-- export ANTHROPIC_MODEL=‘us.anthropic.claude-sonnet-4-20250514-v1:0’ -->
 export CLAUDE_CODE_MAX_OUTPUT_TOKENS=32000
 export MAX_THINKING_TOKENS=131072
 export CLAUDE_CODE_USE_BEDROCK=1

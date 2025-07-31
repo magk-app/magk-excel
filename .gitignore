@@ -22,6 +22,8 @@ build/
 .chalice/deployments/
 .chalice/venv/
 .chalice/*.out
+apps/server/bin/
+apps/server/lib/
 
 # IDE
 .vscode/
