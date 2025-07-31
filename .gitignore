@@ -17,6 +17,8 @@ pip-delete-this-directory.txt
 *.egg-info/
 dist/
 build/
+apps/server/lib/
+apps/server/bin/
 
 # Chalice
 .chalice/deployments/
