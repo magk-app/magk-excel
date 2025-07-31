@@ -4,7 +4,7 @@ A comprehensive collection of specialized AI subagents for [Claude Code](https:/
 
 ## Overview
 
-This repository contains 44 specialized subagents that extend Claude Code's capabilities. Each subagent is an expert in a specific domain, automatically invoked based on context or explicitly called when needed.
+This repository contains 46 specialized subagents that extend Claude Code's capabilities. Each subagent is an expert in a specific domain, automatically invoked based on context or explicitly called when needed. All agents are configured with specific Claude models based on task complexity for optimal performance and cost-effectiveness.
 
 ## Available Subagents
 
@@ -22,6 +22,7 @@ This repository contains 44 specialized subagents that extend Claude Code's capa
 - **[c-pro](c-pro.md)** - Write efficient C code with proper memory management and system calls
 - **[cpp-pro](cpp-pro.md)** - Write idiomatic C++ code with modern features, RAII, smart pointers, and STL algorithms
 - **[javascript-pro](javascript-pro.md)** - Master modern JavaScript with ES6+, async patterns, and Node.js APIs
+- **[php-pro](php-pro.md)** - Write idiomatic PHP code with modern features and performance optimizations
 - **[sql-pro](sql-pro.md)** - Write complex SQL queries, optimize execution plans, and design normalized schemas
 
 ### Infrastructure & Operations
@@ -65,6 +66,74 @@ This repository contains 44 specialized subagents that extend Claude Code's capa
 - **[content-marketer](content-marketer.md)** - Write blog posts, social media content, and email newsletters
 - **[sales-automator](sales-automator.md)** - Draft cold emails, follow-ups, and proposal templates
 - **[customer-support](customer-support.md)** - Handle support tickets, FAQ responses, and customer emails
+<<<<<<< HEAD
+- **[legal-advisor](legal-advisor.md)** - Draft privacy policies, terms of service, disclaimers, and legal notices
+=======
+- **[legal-advisor](legal-advisor.md)** - Draft privacy policies, terms of service, and compliance documents
+
+## Model Assignments
+
+All 46 subagents are configured with specific Claude models based on task complexity:
+
+### 🚀 Claude Haiku 3.5 (Fast & Cost-Effective) - 8 agents
+**Model:** `claude-3-5-haiku-20241022`
+- `data-scientist` - SQL queries and data analysis
+- `api-documenter` - OpenAPI/Swagger documentation
+- `business-analyst` - Metrics and KPI tracking
+- `content-marketer` - Blog posts and social media
+- `customer-support` - Support tickets and FAQs
+- `sales-automator` - Cold emails and proposals
+- `search-specialist` - Web research and information gathering
+- `legal-advisor` - Privacy policies and compliance documents
+
+### ⚡ Claude Sonnet 4 (Balanced Performance) - 26 agents
+**Model:** `claude-sonnet-4-20250514`
+
+**Development & Languages:**
+- `python-pro` - Python development with advanced features
+- `javascript-pro` - Modern JavaScript and Node.js
+- `golang-pro` - Go concurrency and idiomatic patterns
+- `rust-pro` - Rust memory safety and systems programming
+- `c-pro` - C programming and embedded systems
+- `cpp-pro` - Modern C++ with STL and templates
+- `frontend-developer` - React components and UI
+- `backend-architect` - API design and microservices
+- `mobile-developer` - React Native/Flutter apps
+- `sql-pro` - Complex SQL optimization
+- `graphql-architect` - GraphQL schemas and resolvers
+
+**Infrastructure & Operations:**
+- `devops-troubleshooter` - Production debugging
+- `deployment-engineer` - CI/CD pipelines
+- `database-optimizer` - Query optimization
+- `database-admin` - Database operations
+- `terraform-specialist` - Infrastructure as Code
+- `network-engineer` - Network configuration
+- `dx-optimizer` - Developer experience
+- `data-engineer` - ETL pipelines
+
+**Quality & Support:**
+- `test-automator` - Test suite creation
+- `code-reviewer` - Code quality analysis
+- `debugger` - Error investigation
+- `error-detective` - Log analysis
+- `ml-engineer` - ML model deployment
+- `legacy-modernizer` - Framework migrations
+- `payment-integration` - Payment processing
+
+### 🧠 Claude Opus 4 (Maximum Capability) - 11 agents
+**Model:** `claude-opus-4-20250514`
+- `ai-engineer` - LLM applications and RAG systems
+- `security-auditor` - Vulnerability analysis
+- `performance-engineer` - Application optimization
+- `incident-responder` - Production incident handling
+- `mlops-engineer` - ML infrastructure
+- `architect-reviewer` - Architectural consistency
+- `cloud-architect` - Cloud infrastructure design
+- `prompt-engineer` - LLM prompt optimization
+- `context-manager` - Multi-agent coordination
+- `quant-analyst` - Financial modeling
+- `risk-manager` - Portfolio risk management
 
 ## Installation
 
@@ -177,11 +246,27 @@ Each subagent follows this structure:
 ---
 name: subagent-name
 description: When this subagent should be invoked
+model: claude-3-5-haiku-20241022  # Optional - specify which model to use
 tools: tool1, tool2  # Optional - defaults to all tools
 ---
 
 System prompt defining the subagent's role and capabilities
 ```
+
+### Model Configuration
+
+As of Claude Code v1.0.64, subagents can specify which Claude model they should use. This allows for cost-effective task delegation based on complexity:
+
+- **Low Complexity (Haiku 3.5)**: Simple tasks like basic data analysis, documentation generation, and standard responses
+- **Medium Complexity (Sonnet 4)**: Development tasks, code review, testing, and standard engineering work  
+- **High Complexity (Opus 4)**: Critical tasks like security auditing, architecture review, incident response, and AI/ML engineering
+
+Available models:
+- `claude-3-5-haiku-20241022` - Fast and cost-effective for simple tasks
+- `claude-sonnet-4-20250514` - Balanced performance for most development work
+- `claude-opus-4-20250514` - Most capable for complex analysis and critical tasks
+
+If no model is specified, the subagent will use the system's default model.
 
 ## Agent Orchestration Patterns
 
@@ -262,6 +347,7 @@ payment-integration → security-auditor → Validated implementation
 - **content-marketer**: SEO content, blog posts, social media, email campaigns
 - **sales-automator**: Cold emails, follow-ups, proposals, lead nurturing
 - **customer-support**: Support tickets, FAQs, help documentation, troubleshooting
+- **legal-advisor** - Draft privacy policies, terms of service, disclaimers, and legal notices 
 
 ## Best Practices
 
