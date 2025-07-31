@@ -124,7 +124,7 @@ Equity researchers at firms like China Galaxy Securities International currently
 - **As a** developer, **I want** the generated executable to have a simple UI with context-aware controls, **so that** the tool is customizable.
 - **Acceptance Criteria:** 1. A small AI model analyzes the workflow context. 2. Based on the context, it selects appropriate pre-built UI controls. 3. The selected controls are included in the final packaged UI.
 
-**Story 2.5: Interaction with the AI to create my ideal tool**
+**Story 2.5: Interaction with the AI to create my ideal tool** (ref)
 
 - As an analyst, I want to be able to have a variety of control on the tool I make.
 - Acceptance Criteria: 1. The AI is able to interact and ask questions if it has difficulty understanding the user’s vision for creating a workflow automation tool. 2. The user can choose how much tinkering it wants to do with the tool. If they leave the tool very general, edge cases/confusion may be flagged to the user. 3. (optional for demo as it is difficult) the user should be able to see a demo of the tool as it is being created, to make sure it is obtaining the right data/doing the right tasks.
