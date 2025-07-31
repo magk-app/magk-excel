@@ -17,9 +17,158 @@ MAGK Excel is a desktop automation platform that enables users to define data ex
 
 ### Linux/macOS-Specific Requirements
 - **Docker** (for LocalStack S3 emulation)
-- **Chrome browser** (for web scraping)
 - **AWS CLI** (optional, for deployment)
 - Python available as `python3` command
+
+## Chrome and ChromeDriver Setup
+
+**Critical**: Chrome browser and ChromeDriver are required for web scraping functionality. This setup is mandatory for development and testing.
+
+### 1. Chrome Browser Installation
+
+#### Windows
+1. **Download Chrome**: Visit [chrome.google.com](https://www.google.com/chrome/)
+2. **Install Chrome**: Run the installer and follow the setup wizard
+3. **Verify installation**: Open Command Prompt and run:
+   ```cmd
+   "C:\Program Files\Google\Chrome\Application\chrome.exe" --version
+   ```
+
+#### Linux/macOS
+1. **Ubuntu/Debian**:
+   ```bash
+   wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+   sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+   sudo apt update
+   sudo apt install google-chrome-stable
+   ```
+
+2. **macOS**:
+   ```bash
+   # Using Homebrew
+   brew install --cask google-chrome
+   
+   # Or download from chrome.google.com
+   ```
+
+3. **Verify installation**:
+   ```bash
+   google-chrome --version  # Linux
+   /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --version  # macOS
+   ```
+
+### 2. ChromeDriver Installation
+
+ChromeDriver must match your Chrome browser version. Follow these steps:
+
+#### Step 1: Check Chrome Version
+```bash
+# Windows
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --version
+
+# Linux
+google-chrome --version
+
+# macOS
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --version
+```
+
+#### Step 2: Download ChromeDriver
+
+1. **Visit**: [chromedriver.chromium.org](https://chromedriver.chromium.org/downloads)
+2. **Download** the version that matches your Chrome version
+3. **Extract** the downloaded file
+
+#### Step 3: Install ChromeDriver
+
+**Windows**:
+```cmd
+# Create directory for ChromeDriver
+mkdir "C:\Program Files\ChromeDriver"
+
+# Copy chromedriver.exe to the directory
+copy "path\to\extracted\chromedriver.exe" "C:\Program Files\ChromeDriver\"
+
+# Add to PATH (run as Administrator)
+setx PATH "%PATH%;C:\Program Files\ChromeDriver"
+```
+
+**Linux**:
+```bash
+# Move to system PATH
+sudo mv chromedriver /usr/local/bin/
+
+# Set permissions
+sudo chmod +x /usr/local/bin/chromedriver
+
+# Verify installation
+chromedriver --version
+```
+
+**macOS**:
+```bash
+# Move to system PATH
+sudo mv chromedriver /usr/local/bin/
+
+# Set permissions
+sudo chmod +x /usr/local/bin/chromedriver
+
+# Verify installation
+chromedriver --version
+```
+
+### 3. Environment Configuration
+
+Create or update your `.env` file in the `apps/server/` directory:
+
+```bash
+# Chrome Configuration
+CHROME_BINARY_PATH="C:\Program Files\Google\Chrome\Application\chrome.exe"  # Windows
+# CHROME_BINARY_PATH="/usr/bin/google-chrome"  # Linux
+# CHROME_BINARY_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"  # macOS
+
+CHROMEDRIVER_PATH="C:\Program Files\ChromeDriver\chromedriver.exe"  # Windows
+# CHROMEDRIVER_PATH="/usr/local/bin/chromedriver"  # Linux/macOS
+
+# Chrome Options
+USE_LOCAL_CHROME=true
+CHROME_HEADLESS=false  # Set to true for production
+CHROME_NO_SANDBOX=false  # Set to true for Linux Docker environments
+```
+
+### 4. Verification
+
+Test your Chrome/ChromeDriver setup:
+
+```bash
+# Activate virtual environment
+source venv/bin/activate  # Linux/macOS
+venv\Scripts\activate     # Windows
+
+# Test Chrome and ChromeDriver
+python -c "
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+import os
+
+# Set up Chrome options
+chrome_options = Options()
+chrome_options.add_argument('--headless')  # Run in background
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument('--disable-dev-shm-usage')
+
+# Create driver
+service = Service(os.getenv('CHROMEDRIVER_PATH', 'chromedriver'))
+driver = webdriver.Chrome(service=service, options=chrome_options)
+
+# Test navigation
+driver.get('https://www.google.com')
+print('✅ Chrome and ChromeDriver working correctly!')
+print(f'Page title: {driver.title}')
+driver.quit()
+"
+```
 
 ## Quick Setup
 
@@ -53,6 +202,7 @@ The automated setup will:
 - ✅ Create a virtual environment in `apps/server/venv/`
 - ✅ Install all dependencies from `requirements.txt`
 - ✅ Validate installation of key packages (pytest, chalice, selenium, boto3)
+- ✅ Verify Chrome and ChromeDriver setup
 
 ## Manual Setup
 
@@ -108,6 +258,8 @@ pip install -r requirements.txt
    
    # Chrome Configuration
    USE_LOCAL_CHROME=true
+   CHROME_BINARY_PATH="C:\Program Files\Google\Chrome\Application\chrome.exe"  # Windows
+   CHROMEDRIVER_PATH="C:\Program Files\ChromeDriver\chromedriver.exe"  # Windows
    
    # Logging
    LOG_LEVEL=DEBUG
@@ -182,6 +334,28 @@ python -c "import chalice; print('✅ Chalice OK')"
 python -c "import selenium; print('✅ Selenium OK')"
 python -c "import pytest; print('✅ Pytest OK')"
 python -c "import boto3; print('✅ Boto3 OK')"
+
+# Test Chrome and ChromeDriver
+python -c "
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+import os
+
+try:
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    
+    service = Service(os.getenv('CHROMEDRIVER_PATH', 'chromedriver'))
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+    driver.get('https://www.google.com')
+    print('✅ Chrome and ChromeDriver OK')
+    driver.quit()
+except Exception as e:
+    print(f'❌ Chrome/ChromeDriver Error: {e}')
+"
 ```
 
 ### Run Tests
@@ -203,6 +377,9 @@ pytest tests/ -v
 ✅ **All setup scripts complete without errors**  
 ✅ **Virtual environment activated successfully**  
 ✅ **All Python packages import without errors**  
+✅ **Chrome browser installed and accessible**  
+✅ **ChromeDriver installed and matches Chrome version**  
+✅ **Selenium can launch Chrome successfully**  
 ✅ **Development server starts on http://localhost:8000**  
 ✅ **Health endpoint returns 200 OK**  
 ✅ **All tests pass**
@@ -246,13 +423,68 @@ pytest tests/ -v
    pip install pytest==8.0.0
    ```
 
-#### Issue 5: Chrome/ChromeDriver issues (Linux/macOS)
-**Solutions**:
-1. Install Chrome browser
-2. Install compatible ChromeDriver version
-3. Update Chrome binary path in environment variables
+#### Issue 5: Chrome/ChromeDriver issues
+**Error**: `ChromeDriver version mismatch` or `Chrome not found`
 
-#### Issue 6: LocalStack connection issues
+**Solutions**:
+1. **Check Chrome version**:
+   ```bash
+   # Windows
+   "C:\Program Files\Google\Chrome\Application\chrome.exe" --version
+   
+   # Linux
+   google-chrome --version
+   
+   # macOS
+   /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --version
+   ```
+
+2. **Download matching ChromeDriver**:
+   - Visit [chromedriver.chromium.org](https://chromedriver.chromium.org/downloads)
+   - Download version that matches your Chrome version
+
+3. **Verify ChromeDriver installation**:
+   ```bash
+   chromedriver --version
+   ```
+
+4. **Check environment variables**:
+   ```bash
+   # Windows
+   echo %CHROMEDRIVER_PATH%
+   
+   # Linux/macOS
+   echo $CHROMEDRIVER_PATH
+   ```
+
+5. **Test ChromeDriver manually**:
+   ```bash
+   chromedriver --version
+   ```
+
+#### Issue 6: Selenium WebDriver errors
+**Error**: `WebDriverException` or `SessionNotCreatedException`
+
+**Solutions**:
+1. **Update Chrome and ChromeDriver** to latest versions
+2. **Check Chrome binary path** in environment variables
+3. **Run Chrome in headless mode** for testing:
+   ```python
+   chrome_options.add_argument('--headless')
+   chrome_options.add_argument('--no-sandbox')
+   chrome_options.add_argument('--disable-dev-shm-usage')
+   ```
+
+4. **Check for Chrome processes**:
+   ```bash
+   # Windows
+   tasklist | findstr chrome
+   
+   # Linux/macOS
+   ps aux | grep chrome
+   ```
+
+#### Issue 7: LocalStack connection issues
 **Solutions**:
 1. Ensure Docker is running
 2. Check port 4566 is available
@@ -261,7 +493,7 @@ pytest tests/ -v
    docker restart localstack
    ```
 
-#### Issue 7: Port already in use
+#### Issue 8: Port already in use
 **Solutions**:
 1. Kill process using port 8000:
    ```bash
@@ -280,8 +512,10 @@ pytest tests/ -v
 # Check Python version
 python --version
 
-# Check Chrome version (Linux/macOS)
-google-chrome --version
+# Check Chrome version
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --version  # Windows
+google-chrome --version  # Linux
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --version  # macOS
 
 # Check ChromeDriver version
 chromedriver --version
@@ -294,6 +528,25 @@ chalice describe
 
 # Check virtual environment
 which python  # Should show venv path when activated
+
+# Test Selenium setup
+python -c "
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+import os
+
+chrome_options = Options()
+chrome_options.add_argument('--headless')
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument('--disable-dev-shm-usage')
+
+service = Service(os.getenv('CHROMEDRIVER_PATH', 'chromedriver'))
+driver = webdriver.Chrome(service=service, options=chrome_options)
+driver.get('https://www.google.com')
+print(f'Chrome test successful: {driver.title}')
+driver.quit()
+"
 ```
 
 ### Getting Help
@@ -302,11 +555,14 @@ If you encounter issues not covered in this guide:
 
 1. **Check error messages carefully**
 2. **Ensure you're running Command Prompt as Administrator (Windows)**
-3. **Try the manual setup method**
-4. **Check system compatibility** (Windows 10/11, Python 3.10+)
-5. **Create an issue** in the project repository with:
+3. **Verify Chrome and ChromeDriver versions match**
+4. **Try the manual setup method**
+5. **Check system compatibility** (Windows 10/11, Python 3.10+)
+6. **Create an issue** in the project repository with:
    - Operating system and version
    - Python version
+   - Chrome version
+   - ChromeDriver version
    - Full error message
    - Steps you've tried
 
