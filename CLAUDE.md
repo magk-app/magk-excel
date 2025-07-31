@@ -110,3 +110,14 @@ This project uses the BMad methodology with specialized agents:
 
 ## Development Guidelines
 - NO EMOJIs in any .bat scripts in general
+
+## Code Documentation and Quality Guidelines
+- Always document your code effectively when you code in whatever language that needs documentation so that it's more human readable
+- Always write test cases with real data that make sense
+- Only use Heuristic data if it matches the real-world use case
+- Always organize your documentation effectively
+- Always organize your code effectively so that it's easily trackable by humans
+- Always write code rigorously and review the code over and over again to find hidden issues
+
+## AI Agent Guidelines
+- I want the ai agents to always write detailed documentations when they code
