@@ -20,7 +20,7 @@ moto[s3]==4.2.0
 flake8==6.0.0
 
 # Local development dependencies
-localstack==3.0.0
+# localstack==3.0.0
 python-dotenv==1.0.0
 
 # # Story 3.4 Real-Time Excel Update Dependencies
