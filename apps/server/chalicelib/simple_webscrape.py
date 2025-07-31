@@ -202,35 +202,76 @@ def scrape_first_table(url: str, headless: bool = True, timeout: int = 10) -> Li
 
 # Example usage
 if __name__ == "__main__":
-    # Example 1: Scrape all tables from a Wikipedia page
-    url = "https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(nominal)"
+    # test case urls
+    urls_1_1_1 = [
+        "https://www.immd.gov.hk/eng/facts/control.html",
+        "https://worldostats.com/country-stats/tiger-population-by-country/",
+        "https://tablebuilder.singstat.gov.sg/table/TS/M550241",
+        "https://quickfs.net/company/META:US",
+    ]
+
+    urls_1_1_2 = [
+        "https://www.singstat.gov.sg/find-data/search-by-theme/population/births-and-fertility/latest-data",
+        "https://en.wikipedia.org/wiki/2024%E2%80%9325_Premier_League",
+    ]
+
+    urls_1_1_3 = [
+        "https://www.immd.gov.hk/eng/facts/control.html",
+        "https://worldostats.com/country-stats/tiger-population-by-country/",
+        "https://tablebuilder.singstat.gov.sg/table/TS/M550241",
+        "https://quickfs.net/company/META:US",
+    ]
+
+    urls_1_1_4 = [
+        "https://en.wikipedia.org/wiki/List_of_Chinese_administrative_divisions_by_population",
+        "https://www.barnsleyfc.co.uk/tickets/match-tickets/pricing-65abc17a",
+        "https://analysisfunction.civilservice.gov.uk/policy-store/data-visualisation-tables/",
+        "https://www.bloomberg.com/markets/rates-bonds/government-bonds/us",
+    ]
+
+    urls_1_1_5 = [
+        "https://www.immd.gov.hk/eng/facts/passenger-statistics.html?d=20250730",
+        "https://www.censtatd.gov.hk/en/web_table.html?id=310-30001",
+    ]
     
-    try:
-        print("Scraping tables from Wikipedia...")
-        tables = scrape_tables(url)
+    # Test all URLs in the arrays
+    all_url_arrays = [
+        ("1.1.1 - Basic Table Extraction", urls_1_1_1),
+        ("1.1.2 - Tables with References", urls_1_1_2),
+        ("1.1.3 - Complex Table Structures", urls_1_1_3),
+        ("1.1.4 - Multiple Tables on One Page", urls_1_1_4),
+        ("1.1.5 - Confusing Table Formats", urls_1_1_5),
+    ]
+    
+    for test_name, urls in all_url_arrays:
+        print(f"\n{'='*60}")
+        print(f"TESTING: {test_name}")
+        print(f"{'='*60}")
         
-        print(f"Found {len(tables)} tables")
-        
-        if tables:
-            # Print info about the first table
-            first_table = tables[0]
-            print(f"First table has {len(first_table)} rows")
-            
-            # Print first few rows
-            for i, row in enumerate(first_table[:3]):
-                print(f"Row {i + 1}: {row}")
+        for i, url in enumerate(urls, 1):
+            print(f"\n--- Test {i}: {url} ---")
+            try:
+                print("Scraping all tables...")
+                tables = scrape_tables(url)
                 
-    except Exception as e:
-        print(f"Error: {e}")
-    
-    # Example 2: Scrape just the first table
-    try:
-        print("\nScraping first table only...")
-        table = scrape_first_table(url)
-        
-        if table:
-            print(f"Table has {len(table)} rows and {len(table[0])} columns")
-            print("Headers:", table[0])
+                print(f"Found {len(tables)} tables")
+                
+                if tables:
+                    for table_idx, table in enumerate(tables):
+                        print(f"\nTable {table_idx + 1}:")
+                        print(f"  Rows: {len(table)}")
+                        print(f"  Columns: {len(table[0]) if table else 0}")
+                        
+                        # Print first few rows
+                        for row_idx, row in enumerate(table[:3]):
+                            print(f"  Row {row_idx + 1}: {row}")
+                        
+                        if len(table) > 3:
+                            print(f"  ... and {len(table) - 3} more rows")
+                else:
+                    print("No tables found")
+                    
+            except Exception as e:
+                print(f"Error: {e}")
             
-    except Exception as e:
-        print(f"Error: {e}")
+            print(f"\n--- End Test {i} ---")
