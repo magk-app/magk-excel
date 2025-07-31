@@ -15,14 +15,14 @@ MAGK Excel is a desktop automation platform that enables users to define data ex
 - **Data Sources**: Web pages, PDFs, and Excel files
 
 ### Core Technologies
-- **Frontend**: Python 3.10.x + PyQt 6.x
-- **Backend**: Python 3.10.x + AWS Chalice 1.31.x  
+- **Frontend**: Python 3.13.x + PyQt 6.x
+- **Backend**: Python 3.13.x + AWS Chalice 1.31.x  
 - **Web Scraping**: Selenium 4.x
 - **PDF Parsing**: PyMuPDF 1.23.x
 - **Excel Manipulation**: openpyxl 3.1.x
 - **Testing**: pytest 8.x
 
-## Project Structure
+## Project Structure (approximate and subject to change)
 
 ```
 magk-demo/
@@ -119,5 +119,5 @@ This project uses the BMad methodology with specialized agents:
 - Always organize your code effectively so that it's easily trackable by humans
 - Always write code rigorously and review the code over and over again to find hidden issues
 
-## AI Agent Guidelines
-- I want the ai agents to always write detailed documentations when they code
+## AI Agesnt Guidelines
+- I want the ai agents to always write detailed documentations when they codes
