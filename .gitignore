@@ -19,6 +19,7 @@ dist/
 build/
 apps/server/lib/
 apps/server/bin/
+.env
 
 # Chalice
 .chalice/deployments/

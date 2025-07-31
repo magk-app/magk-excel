@@ -16,6 +16,12 @@ from selenium.common.exceptions import (
 from selenium.webdriver.chrome.service import Service
 from .extraction_strategies import StrategyFactory
 
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
+
 logger = logging.getLogger(__name__)
 
 # Global registry for WebDriver cleanup
@@ -313,7 +319,7 @@ class WebExtractor:
                 self.driver = None
             raise WebExtractionError(f"Failed to initialize WebDriver: {str(e)}")
 
-    @retry_with_backoff(max_retries=3, base_delay=2.0)
+    @retry_with_backoff(max_retries=2, base_delay=1.0)
     def _navigate_to_url(self, url: str):
         """Navigate to the specified URL with error handling."""
         try:
