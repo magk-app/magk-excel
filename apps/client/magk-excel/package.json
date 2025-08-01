@@ -1,7 +1,9 @@
 {
-  "name": "-magk-excel",
+  "name": "magk-excel-electron",
+  "description": "MAGK Excel Desktop Client - Modern Electron frontend with open-source chat & workflow visualization",
+  "author": "MAGK Team",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
