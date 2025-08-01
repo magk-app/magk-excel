@@ -134,6 +134,7 @@ For detailed information about each agent's capabilities and usage examples, see
 - Use pytest with proper fixtures
 - Maintain test coverage for critical paths
 - **Use real data only** - never use fake or mock data in tests
+- **Always write unit tests for typescript projects, javascript and other things**
 
 ## Development Guidelines
 
