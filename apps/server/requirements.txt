@@ -8,6 +8,11 @@ xlwt==1.3.0
 PyMuPDF==1.26.3
 requests==2.32.4
 
+# Lambda-compatible web scraping and PDF processing
+playwright==1.54.0
+pdfplumber==0.11.7
+beautifulsoup4==4.13.4
+
 # Story 2.3 Executable Packaging Dependencies
 # pyinstaller==6.14.2
 
@@ -32,9 +37,8 @@ mypy==1.8.0
 types-boto3==1.39.16
 
 # Lambda deployment requirements:
-# The following layers are required for Lambda deployment:
-# - Chrome binary layer (provides /opt/chrome/chrome)
-# - ChromeDriver layer (provides /opt/chromedriver)
+# All dependencies are now Lambda-compatible and will be automatically packaged
+# No additional layers required for basic functionality
 # Environment variables:
-# - CHROME_BINARY_PATH=/opt/chrome/chrome
-# - CHROMEDRIVER_PATH=/opt/chromedriver
+# - MAGK_ENVIRONMENT=development|production
+# - MAGK_LOG_LEVEL=INFO|WARNING|ERROR

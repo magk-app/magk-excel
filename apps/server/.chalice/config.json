@@ -5,7 +5,22 @@
     "dev": {
       "api_gateway_stage": "api",
       "lambda_memory_size": 512,
-      "lambda_timeout": 300
+      "lambda_timeout": 60,
+      "automatic_layer": false,
+      "environment_variables": {
+        "MAGK_ENVIRONMENT": "development",
+        "MAGK_LOG_LEVEL": "INFO"
+      }
+    },
+    "prod": {
+      "api_gateway_stage": "prod",
+      "lambda_memory_size": 1024,
+      "lambda_timeout": 120,
+      "automatic_layer": false,
+      "environment_variables": {
+        "MAGK_ENVIRONMENT": "production",
+        "MAGK_LOG_LEVEL": "WARNING"
+      }
     }
   }
 }

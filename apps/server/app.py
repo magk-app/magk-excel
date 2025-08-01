@@ -1,6 +1,6 @@
 import logging
 from chalice import Chalice, Response, BadRequestError, ChaliceViewError
-from chalicelib.web_extractor import extract_web_table
+from chalicelib.lambda_web_extractor import extract_web_table
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
