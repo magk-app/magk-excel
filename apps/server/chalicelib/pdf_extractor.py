@@ -363,37 +363,69 @@ class PDFExtractor:
     
     def _normalize_number_format(self, cell: str) -> str:
         """
-        Normalize number format in a cell.
+        Normalize number format in a cell by removing symbols and formatting.
+        Enhanced to handle percentages, dashes as zeros, and other formats.
         
         Args:
             cell: Cell value to normalize
             
         Returns:
-            Normalized cell value
+            Normalized cell value with symbols removed
         """
         try:
             if not cell or not cell.strip():
                 return cell
             
-            cell = cell.strip()
+            original_cell = cell.strip()
             
-            # Handle accounting negative format: (123.45) -> -123.45
-            if cell.startswith('(') and cell.endswith(')'):
-                number_part = cell[1:-1]  # Remove parentheses
-                if self._is_number(number_part):
-                    return f"-{number_part}"
+            # Handle dash as zero
+            if original_cell == '-':
+                return '0'
             
-            # Handle comma-separated numbers: 1,234.56 -> 1234.56
-            if ',' in cell and self._is_number_with_commas(cell):
-                # Remove commas from numbers
-                cell = re.sub(r',(?=\d)', '', cell)
-                # Remove currency symbols for comma-separated numbers
-                cell = re.sub(r'[\$€£¥]', '', cell)
+            # Handle percentages FIRST - preserve % and handle parentheses specially for percentages
+            if '%' in original_cell:
+                # Handle negative percentages in parentheses: (25.5%) -> (25.5%)
+                if original_cell.startswith('(') and original_cell.endswith(')') and '%' in original_cell:
+                    return original_cell  # Preserve negative percentages in parentheses as-is
+                
+                # Extract the numeric part before %
+                percent_match = re.search(r'([\d,]+\.?\d*)%', original_cell)
+                if percent_match:
+                    number_part = percent_match.group(1)
+                    # Remove commas from the number part
+                    cleaned_number = re.sub(r',', '', number_part)
+                    return f"{cleaned_number}%"
+                # If no clear numeric pattern, return as-is
+                return original_cell
             
-            # Preserve units and currency symbols
-            # This is a simplified approach - in production, you might want more sophisticated parsing
+            # Handle accounting negative format: (123.45) -> -123.45 (but not for percentages)
+            if original_cell.startswith('(') and original_cell.endswith(')'):
+                number_part = original_cell[1:-1]  # Remove parentheses
+                # Remove currency symbols and commas from the number part
+                cleaned_number = re.sub(r'[\$€£¥,]', '', number_part)
+                if self._is_number(cleaned_number):
+                    return f"-{cleaned_number}"
             
-            return cell
+            # Check if this looks like a number (with or without symbols)
+            if self._contains_number(original_cell):
+                # Remove currency symbols, commas, and million indicators (but preserve percentages handled above)
+                cleaned_cell = re.sub(r'[\$€£¥,]', '', original_cell)
+                
+                # Handle million indicators: 123m, 123M, 123 million
+                if re.search(r'\b\d+\.?\d*\s*m\b', cleaned_cell, re.IGNORECASE):
+                    cleaned_cell = re.sub(r'\s*m\b', '', cleaned_cell, flags=re.IGNORECASE)
+                elif 'million' in cleaned_cell.lower():
+                    cleaned_cell = re.sub(r'\s*million\b', '', cleaned_cell, flags=re.IGNORECASE)
+                
+                # If after cleaning it's still a valid number, return cleaned version
+                if self._is_number(cleaned_cell):
+                    return cleaned_cell
+                
+                # If not a pure number after cleaning, return original
+                return original_cell
+            
+            # For non-numeric text, return as-is
+            return original_cell
             
         except Exception as e:
             logger.error(f"Error normalizing number format for '{cell}': {str(e)}")
@@ -437,6 +469,244 @@ class PDFExtractor:
             return bool(re.match(pattern, cleaned_text))
         except Exception:
             return False
+    
+    def _contains_number(self, text: str) -> bool:
+        """
+        Check if text contains numeric content.
+        
+        Args:
+            text: Text to check
+            
+        Returns:
+            True if text contains numbers
+        """
+        try:
+            # Check if text contains digits
+            return bool(re.search(r'\d', text))
+        except Exception:
+            return False
+    
+    def extract_table_data_with_headers(self, source_uri: str, table_identifier: str, include_headers: bool = True) -> List[List[str]]:
+        """
+        Extract table data with optional header inclusion.
+        
+        Args:
+            source_uri: File path or URL to the PDF document
+            table_identifier: String to identify the specific table
+            include_headers: Whether to attempt to include table headers
+            
+        Returns:
+            List of lists representing table data with optional headers
+        """
+        try:
+            logger.info(f"Extracting table with headers from PDF: {source_uri}")
+            
+            # Open PDF document
+            pdf_document = self._open_pdf(source_uri)
+            
+            if not pdf_document:
+                raise ValueError(f"Could not open PDF: {source_uri}")
+            
+            try:
+                # Extract text from all pages
+                text_content = self._extract_text_from_pdf(pdf_document)
+                
+                # Find table using identifier
+                if include_headers:
+                    table_data = self._find_table_with_headers(text_content, table_identifier)
+                else:
+                    table_data = self._find_table_by_identifier(text_content, table_identifier)
+                
+                if not table_data:
+                    raise ValueError(f"Table with identifier '{table_identifier}' not found in PDF")
+                
+                # Process number formats
+                processed_data = self._process_number_formats(table_data)
+                
+                logger.info(f"Successfully extracted {len(processed_data)} rows from PDF table")
+                return processed_data
+                
+            finally:
+                pdf_document.close()
+                
+        except Exception as e:
+            logger.error(f"Error extracting table from PDF {source_uri}: {str(e)}")
+            raise
+    
+    def _find_table_with_headers(self, text_content: str, table_identifier: str) -> Optional[List[List[str]]]:
+        """
+        Find table data including potential headers.
+        
+        Args:
+            text_content: Full text content from PDF
+            table_identifier: String to identify the specific table
+            
+        Returns:
+            List of lists representing table data with headers or None if not found
+        """
+        try:
+            # Split text into lines
+            lines = text_content.split('\n')
+            
+            # Find the section containing the table identifier
+            table_start_idx = None
+            for i, line in enumerate(lines):
+                if table_identifier.lower() in line.lower():
+                    table_start_idx = i
+                    break
+            
+            if table_start_idx is None:
+                logger.warning(f"Table identifier '{table_identifier}' not found in PDF text")
+                return None
+            
+            # Look backwards for potential headers (up to 5 lines before identifier)
+            header_start_idx = max(0, table_start_idx - 5)
+            
+            # Extract table data starting from potential header area
+            extended_lines = lines[header_start_idx:]
+            table_data = self._parse_table_lines_with_headers(extended_lines)
+            
+            return table_data
+            
+        except Exception as e:
+            logger.error(f"Error finding table with headers '{table_identifier}': {str(e)}")
+            return None
+    
+    def _parse_table_lines_with_headers(self, lines: List[str]) -> List[List[str]]:
+        """
+        Parse lines of text to extract tabular data including headers.
+        
+        Args:
+            lines: List of text lines to parse
+            
+        Returns:
+            List of lists representing table data with headers
+        """
+        try:
+            table_data = []
+            potential_headers = []
+            in_table_data = False
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Parse line into columns
+                row_data = self._parse_table_row(line)
+                
+                if row_data:
+                    # Check if this looks like a header row
+                    if not in_table_data and self._is_potential_header(row_data):
+                        potential_headers.append(row_data)
+                    elif len(row_data) > 1:  # Multi-column data row
+                        # If we haven't started collecting data yet, include recent headers
+                        if not in_table_data and potential_headers:
+                            table_data.extend(potential_headers[-2:])  # Include last 2 potential headers
+                            in_table_data = True
+                        
+                        table_data.append(row_data)
+                        in_table_data = True
+                
+                # Stop parsing if we encounter a clear end of table
+                if in_table_data and self._is_table_end(line):
+                    break
+            
+            return table_data
+            
+        except Exception as e:
+            logger.error(f"Error parsing table lines with headers: {str(e)}")
+            return []
+    
+    def _is_potential_header(self, row: List[str]) -> bool:
+        """
+        Determine if a row is likely a table header.
+        
+        Args:
+            row: Table row to analyze
+            
+        Returns:
+            True if row appears to be a header
+        """
+        try:
+            if not row:
+                return False
+            
+            row_text = ' '.join(row).lower()
+            
+            # Header indicators
+            header_patterns = [
+                # Time periods
+                r'\b(year|quarter|month)\b',
+                r'\b(2024|2023|2022|2021|2020)\b',
+                r'\bmarch|june|september|december\b',
+                # Financial statement headers
+                r'\b(amount|value|total|balance)\b',
+                r'\b(thousand|million|billion)\b',
+                r'\b(assets|liabilities|equity)\b',
+                r'\b(level [123])\b',
+                # Common table headers
+                r'\b(description|type|category)\b',
+                r'\b(fair value|book value|market value)\b',
+            ]
+            
+            # Check for header patterns
+            for pattern in header_patterns:
+                if re.search(pattern, row_text):
+                    return True
+            
+            # Check if row has mostly text (not numbers) - common for headers
+            text_cells = sum(1 for cell in row if not self._contains_number(cell))
+            return text_cells > len(row) * 0.6  # More than 60% text
+            
+        except Exception as e:
+            logger.error(f"Error checking if potential header: {str(e)}")
+            return False
+    
+    def _distinguish_dates_from_data(self, row: List[str]) -> bool:
+        """
+        Distinguish between row headers containing dates and actual data.
+        
+        Args:
+            row: Table row to analyze
+            
+        Returns:
+            True if this appears to be a date header rather than data
+        """
+        try:
+            if not row:
+                return False
+            
+            first_cell = str(row[0]).strip().lower()
+            
+            # Date header patterns
+            date_patterns = [
+                r'as of \d{4}',
+                r'december 31, \d{4}',
+                r'march 31, \d{4}',
+                r'for the year ended',
+                r'three months ended',
+                r'year ended december',
+                r'\d{4} annual report',
+                r'fiscal year \d{4}'
+            ]
+            
+            # Check if first cell contains date patterns
+            for pattern in date_patterns:
+                if re.search(pattern, first_cell):
+                    return True
+            
+            # Check if row has only 1-2 cells and contains dates AND looks like a date header
+            if (len(row) <= 2 and re.search(r'\b\d{4}\b', first_cell) and 
+                not any(keyword in first_cell for keyword in ['cash', 'flow', 'revenue', 'income', 'assets', 'cost'])):
+                return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error distinguishing dates from data: {str(e)}")
+            return False
+    
     
     def close(self):
         """Close the PDFExtractor (no-op for PDFExtractor)."""
