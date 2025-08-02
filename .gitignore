@@ -1,5 +1,7 @@
 /.bmad-core
 /node_modules
+/.claude/
+/.cursor/
 
 # Python
 __pycache__/
@@ -40,3 +42,4 @@ Thumbs.db
 
 # AWS
 .aws-sam/
+

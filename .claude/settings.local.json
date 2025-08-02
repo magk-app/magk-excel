@@ -3,7 +3,8 @@
   "permissions": {
     "allow": [
       "Bash(ls:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": []
   }
