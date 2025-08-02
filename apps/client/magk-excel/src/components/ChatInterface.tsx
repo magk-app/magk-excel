@@ -1,4 +1,5 @@
 import { AiChat } from '@nlux/react';
+import '@nlux/themes/nova.css';
 
 // Mock adapter - returns dummy responses for now
 const mockAdapter = {
