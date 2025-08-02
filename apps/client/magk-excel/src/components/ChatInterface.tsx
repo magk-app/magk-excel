@@ -1,26 +1,76 @@
 import { AiChat } from '@nlux/react';
+import '@nlux/themes/nova.css';
 
-// Mock adapter - returns dummy responses for now
-const mockAdapter = {
-  streamText: async function* (_message: string) {
-    // Simulate typing delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+// Real adapter - connects to our Hono.js backend with Claude
+// Using correct @nlux observer pattern interface
+const realAdapter = {
+  streamText: (message: string, observer: any) => {
+    console.log('🚀 Frontend: Starting chat request for message:', message);
     
-    const responses = [
-      "I understand you want to work with Excel workflows. Let me help you create a data extraction workflow.",
-      "I can help you extract data from web pages, PDFs, or Excel files. What would you like to work with?",
-      "Great! I'll create a workflow to extract that data and export it to Excel for you.",
-      "Let me analyze your request and generate a workflow plan..."
-    ];
-    
-    const response = responses[Math.floor(Math.random() * responses.length)];
-    
-    // Stream the response word by word
-    const words = response.split(' ');
-    for (const word of words) {
-      yield word + ' ';
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
+    // Make the async request
+    (async () => {
+      try {
+        console.log('📡 Frontend: Making fetch request to backend...');
+        
+        const response = await fetch('http://localhost:3001/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message,
+            history: [] // TODO: Implement proper history tracking
+          })
+        });
+
+        console.log('📨 Frontend: Received response with status:', response.status);
+
+        if (!response.ok) {
+          console.error('❌ Frontend: HTTP error:', response.status, response.statusText);
+          observer.error(new Error(`HTTP Error ${response.status}: ${response.statusText}`));
+          return;
+        }
+
+        const data = await response.json();
+        console.log('📋 Frontend: Parsed response data:', data);
+        
+        if (data.status === 'error') {
+          console.error('❌ Frontend: Backend returned error:', data.error);
+          observer.error(new Error(`Backend Error: ${data.error || 'Unknown error occurred'}`));
+          return;
+        }
+
+        if (!data.response) {
+          console.error('❌ Frontend: No response field in data:', data);
+          observer.error(new Error('Backend did not return a response field'));
+          return;
+        }
+
+        console.log('✅ Frontend: Successfully got response, starting to stream...');
+        
+        // Stream the response word by word for better UX
+        const words = data.response.split(' ');
+        console.log(`📝 Frontend: Streaming ${words.length} words...`);
+        
+        for (const word of words) {
+          observer.next(word + ' ');
+          await new Promise(resolve => setTimeout(resolve, 30)); // Faster streaming
+        }
+        
+        console.log('✅ Frontend: Finished streaming response');
+        observer.complete();
+
+      } catch (error) {
+        console.error('❌ Frontend: Chat adapter error:', error);
+        console.error('❌ Frontend: Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
+        
+        observer.error(new Error(`Connection Error: ${error.message}. Please make sure the workflow engine is running on http://localhost:3001`));
+      }
+    })();
   }
 };
 
@@ -28,7 +78,7 @@ export function ChatInterface() {
   return (
     <div className="h-full w-full">
       <AiChat
-        adapter={mockAdapter}
+        adapter={realAdapter}
         displayOptions={{
           colorScheme: 'auto',
           width: '100%',
