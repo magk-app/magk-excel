@@ -40,3 +40,15 @@ Thumbs.db
 
 # AWS
 .aws-sam/
+
+# Claude Flow
+.claude-flow/
+.claude/
+.hive-mind/
+.swarm/
+.mcp.json
+claude-flow
+claude-flow.bat
+claude-flow.config.json
+claude-flow.ps1
+memory/
