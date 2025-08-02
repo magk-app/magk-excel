@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "src/index.ts": {
+      "runtime": "@vercel/node@3.0.7"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/src/index.ts"
+    }
+  ]
+}
