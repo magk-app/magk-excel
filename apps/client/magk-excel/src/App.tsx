@@ -1,34 +1,53 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/electron-vite.animate.svg'
+import { ChatInterface } from './components/ChatInterface'
+import { WorkflowDemo } from './components/workflow'
+import { Button } from './components/ui/button'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [activeTab, setActiveTab] = useState<'chat' | 'workflow'>('workflow')
 
   return (
-    <>
-      <div>
-        <a href="https://electron-vite.github.io" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div className="h-screen w-screen flex flex-col bg-background">
+      {/* Header */}
+      <header className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-semibold text-foreground">MAGK Excel</h1>
+          <span className="text-sm text-muted-foreground">Workflow Builder</span>
+        </div>
+        
+        {/* Tab Navigation */}
+        <div className="flex gap-2">
+          <Button
+            variant={activeTab === 'chat' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTab('chat')}
+          >
+            💬 Chat
+          </Button>
+          <Button
+            variant={activeTab === 'workflow' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTab('workflow')}
+          >
+            🔄 Workflow Demo
+          </Button>
+        </div>
+        
+        <div className="text-sm text-muted-foreground">
+          v0.1.1
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-hidden">
+        {activeTab === 'chat' ? (
+          <ChatInterface />
+        ) : (
+          <WorkflowDemo />
+        )}
+      </main>
+    </div>
   )
 }
 
