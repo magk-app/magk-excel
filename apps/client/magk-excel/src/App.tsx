@@ -1,7 +1,12 @@
+import { useState } from 'react'
 import { ChatInterface } from './components/ChatInterface'
+import { WorkflowDemo } from './components/workflow'
+import { Button } from './components/ui/button'
 import './App.css'
 
 function App() {
+  const [activeTab, setActiveTab] = useState<'chat' | 'workflow'>('workflow')
+
   return (
     <div className="h-screen w-screen flex flex-col bg-background">
       {/* Header */}
@@ -10,22 +15,37 @@ function App() {
           <h1 className="text-xl font-semibold text-foreground">MAGK Excel</h1>
           <span className="text-sm text-muted-foreground">Workflow Builder</span>
         </div>
+        
+        {/* Tab Navigation */}
+        <div className="flex gap-2">
+          <Button
+            variant={activeTab === 'chat' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTab('chat')}
+          >
+            💬 Chat
+          </Button>
+          <Button
+            variant={activeTab === 'workflow' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTab('workflow')}
+          >
+            🔄 Workflow Demo
+          </Button>
+        </div>
+        
         <div className="text-sm text-muted-foreground">
           v0.1.1
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex overflow-hidden">
-        {/* Chat Panel */}
-        <div className="flex-1 min-w-0">
+      <main className="flex-1 overflow-hidden">
+        {activeTab === 'chat' ? (
           <ChatInterface />
-        </div>
-        
-        {/* Future: Workflow Visualization Panel */}
-        {/* <div className="w-1/2 border-l border-border">
-          <WorkflowCanvas />
-        </div> */}
+        ) : (
+          <WorkflowDemo />
+        )}
       </main>
     </div>
   )

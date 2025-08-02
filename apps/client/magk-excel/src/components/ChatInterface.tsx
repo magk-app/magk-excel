@@ -2,7 +2,7 @@ import { AiChat } from '@nlux/react';
 
 // Mock adapter - returns dummy responses for now
 const mockAdapter = {
-  streamText: async function* (message: string) {
+  streamText: async function* (_message: string) {
     // Simulate typing delay
     await new Promise(resolve => setTimeout(resolve, 500));
     
@@ -35,12 +35,11 @@ export function ChatInterface() {
           height: '100%'
         }}
         conversationOptions={{
-          historyPayloadSize: 'max',
-          systemMessage: 'You are MAGK Excel Assistant. Help users create Excel workflows for data extraction, transformation, and export. Be friendly and specific about what you can help with.'
+          historyPayloadSize: 'max'
         }}
         messageOptions={{
           showCodeBlockCopyButton: true,
-          markdownLinkTarget: '_blank'
+          markdownLinkTarget: 'blank'
         }}
         composerOptions={{
           placeholder: 'Ask me to create an Excel workflow...',
@@ -49,7 +48,8 @@ export function ChatInterface() {
         personaOptions={{
           assistant: {
             name: 'MAGK Assistant',
-            tagline: 'Excel Workflow Expert'
+            tagline: 'Excel Workflow Expert',
+            avatar: '🤖'
           }
         }}
       />
