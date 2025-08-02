@@ -1,4 +1,4 @@
-"""
+git """
 Unit tests for AWS Bedrock Client Module
 
 Tests the BedrockClient class and get_bedrock_client function

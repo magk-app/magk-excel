@@ -8,9 +8,10 @@ using PyMuPDF for text extraction and table parsing.
 import logging
 import re
 import os
+import json
 import urllib.request
 import tempfile
-from typing import List, Optional, Any, Union
+from typing import List, Optional, Any, Union, Dict
 from pathlib import Path
 
 try:
@@ -83,6 +84,78 @@ class PDFExtractor:
                 
         except Exception as e:
             logger.error(f"Error extracting table from PDF {source_uri}: {str(e)}")
+            raise
+    
+    def extract_tables_with_llm(self, source_uri: str, prompt: str, bedrock_client=None) -> List[Dict[str, Any]]:
+        """
+        Extract tables from a PDF document using LLM-based analysis.
+        
+        Args:
+            source_uri: File path or URL to the PDF document
+            prompt: Natural language description of what tables to find
+            bedrock_client: Optional bedrock client instance
+            
+        Returns:
+            List of dictionaries containing extracted table information
+            
+        Raises:
+            ValueError: If PDF cannot be opened or no tables found
+            FileNotFoundError: If PDF file doesn't exist
+            urllib.error.URLError: If PDF URL is invalid
+        """
+        try:
+            from .bedrock_client import get_bedrock_client
+            
+            logger.info(f"Extracting tables from PDF using LLM: {source_uri}")
+            
+            # Open PDF document
+            pdf_document = self._open_pdf(source_uri)
+            
+            if not pdf_document:
+                raise ValueError(f"Could not open PDF: {source_uri}")
+            
+            try:
+                # Extract text from all pages
+                text_content = self._extract_text_from_pdf(pdf_document)
+                
+                # Initialize bedrock client if not provided
+                if bedrock_client is None:
+                    bedrock_client = get_bedrock_client()
+                
+                # Use LLM to analyze PDF content and identify tables
+                analysis_result = self._analyze_pdf_content_with_llm(text_content, prompt, bedrock_client)
+                
+                if not analysis_result or not analysis_result.get('tables'):
+                    raise ValueError(f"No tables found matching prompt: '{prompt}'")
+                
+                # Extract and process each identified table
+                extracted_tables = []
+                for table_info in analysis_result['tables']:
+                    table_data = self._extract_table_by_llm_analysis(text_content, table_info)
+                    if table_data:
+                        # Process number formats
+                        processed_data = self._process_number_formats(table_data)
+                        
+                        extracted_tables.append({
+                            'title': table_info.get('title', 'Unknown Table'),
+                            'description': table_info.get('description', ''),
+                            'data': processed_data,
+                            'row_count': len(processed_data),
+                            'column_count': len(processed_data[0]) if processed_data else 0,
+                            'confidence': table_info.get('confidence', 0.5)
+                        })
+                
+                if not extracted_tables:
+                    raise ValueError(f"Failed to extract table data matching prompt: '{prompt}'")
+                
+                logger.info(f"Successfully extracted {len(extracted_tables)} tables from PDF")
+                return extracted_tables
+                
+            finally:
+                pdf_document.close()
+                
+        except Exception as e:
+            logger.error(f"Error extracting tables from PDF {source_uri} with LLM: {str(e)}")
             raise
     
     def _open_pdf(self, source_uri: str) -> Optional[Any]:
@@ -215,7 +288,7 @@ class PDFExtractor:
                 # Parse line into columns
                 row_data = self._parse_table_row(line)
                 
-                if row_data and len(row_data) > 1:  # At least 2 columns to be considered a table row
+                if row_data and len(row_data) > 0:  # Any non-empty row is considered table data
                     table_data.append(row_data)
                 
                 # Stop parsing if we encounter a clear end of table
@@ -599,7 +672,7 @@ class PDFExtractor:
                     # Check if this looks like a header row
                     if not in_table_data and self._is_potential_header(row_data):
                         potential_headers.append(row_data)
-                    elif len(row_data) > 1:  # Multi-column data row
+                    elif len(row_data) > 0:  # Data row (single or multi-column)
                         # If we haven't started collecting data yet, include recent headers
                         if not in_table_data and potential_headers:
                             table_data.extend(potential_headers[-2:])  # Include last 2 potential headers
@@ -707,6 +780,146 @@ class PDFExtractor:
             logger.error(f"Error distinguishing dates from data: {str(e)}")
             return False
     
+    def _analyze_pdf_content_with_llm(self, text_content: str, prompt: str, bedrock_client) -> Dict[str, Any]:
+        """
+        Analyze PDF text content using LLM to identify tables matching the prompt.
+        
+        Args:
+            text_content: Full text content from PDF
+            prompt: Natural language description of what tables to find
+            bedrock_client: Bedrock client instance
+            
+        Returns:
+            Dictionary containing table analysis results
+        """
+        try:
+            # Truncate content if too long (Claude has token limits)
+            max_content_length = 50000  # Approximate character limit
+            if len(text_content) > max_content_length:
+                text_content = text_content[:max_content_length] + "...[truncated]"
+            
+            analysis_prompt = f"""
+            You are an expert at analyzing PDF documents and extracting tabular data. 
+            
+            User Request: "{prompt}"
+            
+            PDF Content:
+            {text_content}
+            
+            Please analyze the PDF content and identify all tables that match the user's request. For each matching table:
+            
+            1. Identify the table title/name
+            2. Provide a brief description of what the table contains
+            3. Identify the approximate location markers (key text that appears before the table)
+            4. Assess how well it matches the user's request (confidence 0.0-1.0)
+            5. Identify key characteristics of the table structure
+            
+            Respond with a JSON object in this exact format:
+            {{
+                "tables": [
+                    {{
+                        "title": "Table title from PDF",
+                        "description": "Brief description of table contents",
+                        "location_markers": ["text that appears before table", "table header text"],
+                        "confidence": 0.95,
+                        "structure_hints": {{
+                            "has_headers": true,
+                            "estimated_columns": 4,
+                            "numeric_data": true
+                        }}
+                    }}
+                ],
+                "analysis_summary": "Brief summary of what was found"
+            }}
+            
+            Only include tables that genuinely match the user's request. If no matching tables are found, return an empty tables array.
+            """
+            
+            response = bedrock_client.invoke_claude(analysis_prompt)
+            
+            if not response:
+                logger.warning("No response from LLM analysis")
+                return {"tables": [], "analysis_summary": "LLM analysis failed"}
+            
+            # Parse JSON from response
+            try:
+                # Extract JSON from response (Claude might wrap it in markdown)
+                json_start = response.find('{')
+                json_end = response.rfind('}') + 1
+                if json_start != -1 and json_end != 0:
+                    json_str = response[json_start:json_end]
+                    analysis_result = json.loads(json_str)
+                    
+                    logger.info(f"LLM identified {len(analysis_result.get('tables', []))} matching tables")
+                    return analysis_result
+                    
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse JSON from LLM response: {e}")
+                logger.debug(f"Raw LLM response: {response[:1000]}...")
+            
+            # Fallback: no tables found
+            return {"tables": [], "analysis_summary": "Failed to parse LLM response"}
+            
+        except Exception as e:
+            logger.error(f"Error analyzing PDF content with LLM: {str(e)}")
+            return {"tables": [], "analysis_summary": f"Analysis error: {str(e)}"}
+    
+    def _extract_table_by_llm_analysis(self, text_content: str, table_info: Dict[str, Any]) -> Optional[List[List[str]]]:
+        """
+        Extract specific table data based on LLM analysis results.
+        
+        Args:
+            text_content: Full text content from PDF
+            table_info: Table information from LLM analysis
+            
+        Returns:
+            List of lists representing table data or None if extraction fails
+        """
+        try:
+            location_markers = table_info.get('location_markers', [])
+            
+            # Try to find table using location markers
+            lines = text_content.split('\n')
+            table_start_idx = None
+            
+            # Look for any of the location markers
+            for marker in location_markers:
+                if marker and marker.strip():
+                    for i, line in enumerate(lines):
+                        if marker.lower() in line.lower():
+                            table_start_idx = i
+                            break
+                    if table_start_idx is not None:
+                        break
+            
+            # If no location markers found, try using the table title
+            if table_start_idx is None:
+                table_title = table_info.get('title', '')
+                if table_title:
+                    for i, line in enumerate(lines):
+                        if table_title.lower() in line.lower():
+                            table_start_idx = i
+                            break
+            
+            if table_start_idx is None:
+                logger.warning(f"Could not locate table: {table_info.get('title', 'Unknown')}")
+                return None
+            
+            # Extract table data based on structure hints
+            structure_hints = table_info.get('structure_hints', {})
+            has_headers = structure_hints.get('has_headers', True)
+            
+            if has_headers:
+                table_data = self._parse_table_lines_with_headers(lines[table_start_idx:])
+            else:
+                table_data = self._parse_table_lines(lines[table_start_idx:])
+            
+            return table_data
+            
+        except Exception as e:
+            logger.error(f"Error extracting table by LLM analysis: {str(e)}")
+            return None
+    
     
     def close(self):
         """Close the PDFExtractor (no-op for PDFExtractor)."""
@@ -732,5 +945,30 @@ def extract_pdf_table(source_uri: str, table_identifier: str) -> List[List[str]]
     extractor = PDFExtractor()
     try:
         return extractor.extract_table_data(source_uri, table_identifier)
+    finally:
+        extractor.close()
+
+
+def extract_pdf_tables_with_prompt(source_uri: str, prompt: str) -> List[Dict[str, Any]]:
+    """
+    Convenience function to extract tables from a PDF document using natural language prompts.
+    
+    Args:
+        source_uri: File path or URL to the PDF document
+        prompt: Natural language description of what tables to find
+        
+    Returns:
+        List of dictionaries containing extracted table information
+        
+    Raises:
+        ValueError: If PDF cannot be opened or no matching tables found
+        ImportError: If PyMuPDF is not installed
+    """
+    from .bedrock_client import get_bedrock_client
+    
+    extractor = PDFExtractor()
+    try:
+        bedrock_client = get_bedrock_client()
+        return extractor.extract_tables_with_llm(source_uri, prompt, bedrock_client)
     finally:
         extractor.close()
