@@ -34,12 +34,15 @@ class TestLLMBasedPDFTableExtraction:
         
         try:
             tables = extract_pdf_tables_with_prompt(pdf_url, prompt)
-            
+            print(tables)
             # Verify extraction worked
             assert len(tables) > 0, "Should find at least one balance sheet table"
             
             # Verify table structure
             balance_sheet = tables[0]
+            print("balance_sheet")
+            print(balance_sheet)
+            print("\n")
             assert 'data' in balance_sheet
             assert balance_sheet['row_count'] > 0
             assert balance_sheet['column_count'] > 0
@@ -47,6 +50,9 @@ class TestLLMBasedPDFTableExtraction:
             # Verify financial data formatting
             table_data = balance_sheet['data']
             self._verify_financial_formatting(table_data)
+            print("table_data")
+            print(table_data)
+            print("\n")
             
         except Exception as e:
             pytest.skip(f"Network-dependent test failed: {str(e)}")
@@ -68,6 +74,7 @@ class TestLLMBasedPDFTableExtraction:
             
             # Verify financial formatting
             self._verify_financial_formatting(income_statement['data'])
+            print(tables)
             
         except Exception as e:
             pytest.skip(f"Network-dependent test failed: {str(e)}")
@@ -89,6 +96,7 @@ class TestLLMBasedPDFTableExtraction:
             
             # Verify financial formatting
             self._verify_financial_formatting(cash_flow['data'])
+            print(tables)
             
         except Exception as e:
             pytest.skip(f"Network-dependent test failed: {str(e)}")
@@ -101,14 +109,19 @@ class TestLLMBasedPDFTableExtraction:
         
         try:
             tables = extract_pdf_tables_with_prompt(pdf_url, prompt)
-            
+            print("tables")
+            print(tables)
+            print("\n")
             assert len(tables) > 0, "Should find income statement in annual report"
             
             income_statement = tables[0]
             assert income_statement['row_count'] > 0
-            
+            print("income_statement")
+            print(income_statement)
+            print("\n")
             # Verify financial formatting
             self._verify_financial_formatting(income_statement['data'])
+            print(tables)
             
         except Exception as e:
             pytest.skip(f"Network-dependent test failed: {str(e)}")
@@ -121,6 +134,9 @@ class TestLLMBasedPDFTableExtraction:
         
         try:
             tables = extract_pdf_tables_with_prompt(pdf_url, prompt)
+            print("tables")
+            print(tables)
+            print("\n")
             
             assert len(tables) > 0, "Should find revenues table"
             
@@ -129,6 +145,9 @@ class TestLLMBasedPDFTableExtraction:
             
             # Should contain revenue data
             table_data = revenues_table['data']
+            print("table_data")
+            print(table_data)
+            print("\n")
             found_revenue_data = False
             for row in table_data:
                 for cell in row:
@@ -137,6 +156,9 @@ class TestLLMBasedPDFTableExtraction:
                         break
             
             assert found_revenue_data, "Should contain revenue-related content"
+            print("tables")
+            print(tables)
+            print("\n")
             
         except Exception as e:
             pytest.skip(f"Network-dependent test failed: {str(e)}")
@@ -165,6 +187,7 @@ class TestLLMBasedPDFTableExtraction:
                         break
                         
             assert found_lease_data, "Should contain lease-related content"
+            print(tables)
             
         except Exception as e:
             pytest.skip(f"Network-dependent test failed: {str(e)}")
@@ -193,6 +216,7 @@ class TestLLMBasedPDFTableExtraction:
                         break
                         
             assert found_goodwill_data, "Should contain goodwill-related content"
+            print(tables)
             
         except Exception as e:
             pytest.skip(f"Network-dependent test failed: {str(e)}")
@@ -223,6 +247,7 @@ class TestLLMBasedPDFTableExtraction:
                         break
                         
             assert found_percentage, "Should contain percentage data"
+            print(tables)
             
         except Exception as e:
             pytest.skip(f"Network-dependent test failed: {str(e)}")
