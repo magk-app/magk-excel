@@ -7,7 +7,7 @@ import { logger, generateRequestId } from './utils/logger';
  * Request logger middleware - logs all incoming requests and responses
  * Adds a unique request ID to each request for tracing
  */
-export async function requestLogger(c: Context, next: Next) {
+export async function requestLogger(c: Context<{ Variables: { requestId: string } }>, next: Next) {
   const requestId = generateRequestId();
   const startTime = Date.now();
   
@@ -62,7 +62,7 @@ export async function requestLogger(c: Context, next: Next) {
  * Global error handler middleware - catches all errors and formats responses
  * Must be registered first in the middleware chain
  */
-export async function errorHandler(c: Context, next: Next): Promise<Response> {
+export async function errorHandler(c: Context<{ Variables: { requestId: string } }>, next: Next): Promise<Response> {
   try {
     await next();
     return c.res;

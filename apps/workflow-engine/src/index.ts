@@ -5,11 +5,11 @@ import { requestLogger } from './middleware';
 import { logger as appLogger } from './utils/logger';
 import { ValidationError, ExecutionError } from './utils/errors';
 
-const app = new Hono();
+const app = new Hono<{ Variables: { requestId: string } }>();
 
 // Global error handler
 app.onError((err, c) => {
-  const requestId = c.get('requestId');
+  const requestId = c.get('requestId') || 'unknown';
   
   // Log the error
   appLogger.error(`Request failed: ${err.message}`, err, { 
@@ -27,7 +27,7 @@ app.onError((err, c) => {
         details: err.details,
         timestamp: new Date().toISOString()
       }
-    }, err.statusCode);
+    }, err.statusCode as any);
   }
   
   if (err instanceof ExecutionError) {
@@ -39,7 +39,7 @@ app.onError((err, c) => {
         details: err.details,
         timestamp: new Date().toISOString()
       }
-    }, err.statusCode);
+    }, err.statusCode as any);
   }
 
   // Generic error response
