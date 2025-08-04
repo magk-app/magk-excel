@@ -36,6 +36,7 @@ class TableData(BaseModel):
     title: str = Field(..., description="Table title or identifier")
     description: str = Field(..., description="Brief description of table contents")
     data: List[List[str]] = Field(..., description="Table data as rows and columns")
+    headers: Optional[List[str]] = Field(None, description="Column headers for the table")
     row_count: int = Field(..., description="Number of rows in the table")
     column_count: int = Field(..., description="Number of columns in the table")
     confidence: float = Field(..., description="Confidence score for table extraction")
@@ -95,36 +96,37 @@ async def extract_tables(request: PDFExtractionRequest):
                 try:
                     # Use LLM-based extraction for natural language prompts
                     bedrock_client = get_bedrock_client()
-                    extracted_tables = extractor.extract_tables_with_llm(
+                    extraction_result = extractor.extract_tables_with_llm(
                         request.pdf_source, request.prompt.strip(), bedrock_client
                     )
                     
-                    if not extracted_tables:
+                    # Check if extraction failed
+                    if not extraction_result.get('success', False):
                         raise HTTPException(
                             status_code=status.HTTP_404_NOT_FOUND,
                             detail=ErrorResponse(
-                                error=f"No tables found matching prompt: '{request.prompt}'",
+                                error=extraction_result.get('error', f"No tables found matching prompt: '{request.prompt}'"),
                                 suggestion="Try refining your prompt or check if the table exists in the PDF. Examples: 'financial data table', 'revenue by quarter', 'balance sheet assets'"
                             ).dict()
                         )
                     
-                    # Convert to response format
-                    tables_data = []
-                    for table in extracted_tables:
-                        tables_data.append(TableData(
-                            title=table.get('title', 'Unknown Table'),
-                            description=table.get('description', ''),
-                            data=table.get('data', []),
-                            row_count=table.get('row_count', 0),
-                            column_count=table.get('column_count', 0),
-                            confidence=table.get('confidence', 0.5)
-                        ))
+                    # Convert to response format (single table result)
+                    table_data = TableData(
+                        title=extraction_result.get('title', 'Unknown Table'),
+                        description=extraction_result.get('match_reasoning', ''),
+                        data=extraction_result.get('table_data', []),
+                        headers=extraction_result.get('headers', None),
+                        row_count=extraction_result.get('row_count', 0),
+                        column_count=extraction_result.get('column_count', 0),
+                        confidence=extraction_result.get('match_confidence', 0.5)
+                    )
+                    tables_data = [table_data]
                     
                     return PDFExtractionResponse(
                         status="success",
-                        message=f"Successfully found {len(extracted_tables)} table(s) matching your prompt",
+                        message=f"Successfully found {len(tables_data)} table(s) matching your prompt",
                         tables=tables_data,
-                        total_tables=len(extracted_tables)
+                        total_tables=len(tables_data)
                     )
                     
                 except ValueError as e:
@@ -151,14 +153,10 @@ async def extract_tables(request: PDFExtractionRequest):
                 logger.info("Extracting all tables from PDF")
                 
                 try:
-                    # For all tables extraction, we'll use a generic prompt
-                    bedrock_client = get_bedrock_client()
-                    all_tables_prompt = "find all tables and tabular data in this document"
-                    extracted_tables = extractor.extract_tables_with_llm(
-                        request.pdf_source, all_tables_prompt, bedrock_client
-                    )
+                    # For all tables extraction, we'll use extract_all_tables_from_pdf directly
+                    all_tables = extractor.extract_all_tables_from_pdf(request.pdf_source)
                     
-                    if not extracted_tables:
+                    if not all_tables:
                         raise HTTPException(
                             status_code=status.HTTP_404_NOT_FOUND,
                             detail=ErrorResponse(
@@ -169,21 +167,22 @@ async def extract_tables(request: PDFExtractionRequest):
                     
                     # Convert to response format
                     tables_data = []
-                    for table in extracted_tables:
+                    for table in all_tables:
                         tables_data.append(TableData(
                             title=table.get('title', 'Unknown Table'),
-                            description=table.get('description', ''),
+                            description=f"Table with {table.get('row_count', 0)} rows and {table.get('column_count', 0)} columns",
                             data=table.get('data', []),
+                            headers=table.get('headers', None),
                             row_count=table.get('row_count', 0),
                             column_count=table.get('column_count', 0),
-                            confidence=table.get('confidence', 0.5)
+                            confidence=0.9  # High confidence for direct extraction
                         ))
                     
                     return PDFExtractionResponse(
                         status="success",
-                        message=f"Successfully extracted {len(extracted_tables)} table(s) from the PDF",
+                        message=f"Successfully extracted {len(tables_data)} table(s) from the PDF",
                         tables=tables_data,
-                        total_tables=len(extracted_tables)
+                        total_tables=len(tables_data)
                     )
                     
                 except ValueError as e:
