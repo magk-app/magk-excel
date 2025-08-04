@@ -6,6 +6,7 @@
 // Core components
 export { default as WorkflowCanvas } from './WorkflowCanvas';
 export { default as BaseWorkflowNode } from './BaseWorkflowNode';
+export { default as RealtimeWorkflowNode } from './RealtimeWorkflowNode';
 
 // Node types
 export { default as WebScrapingNode } from './nodes/WebScrapingNode';
