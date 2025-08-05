@@ -1,0 +1,50 @@
+{
+  "mcpServers": {
+    "excel": {
+      "command": "node",
+      "args": ["./src/services/mock-mcp/mockServerLauncher.js"],
+      "capabilities": ["excel", "spreadsheet"],
+      "timeout": 30000,
+      "retries": 3,
+      "enabled": true,
+      "healthCheckInterval": 30000
+    },
+    "pdf": {
+      "command": "echo",
+      "args": ["Mock PDF server is available through the mock launcher"],
+      "capabilities": ["pdf"],
+      "timeout": 30000,
+      "retries": 3,
+      "enabled": false
+    },
+    "firecrawl": {
+      "command": "echo",
+      "args": ["Mock Firecrawl server is available through the mock launcher"],
+      "capabilities": ["web", "scrape", "crawl"],
+      "timeout": 60000,
+      "retries": 2,
+      "enabled": false
+    },
+    "puppeteer": {
+      "command": "echo",
+      "args": ["Mock Puppeteer server is available through the mock launcher"],
+      "capabilities": ["browser", "screenshot", "render"],
+      "timeout": 60000,
+      "retries": 2,
+      "enabled": false
+    },
+    "fetch": {
+      "command": "echo",
+      "args": ["Mock Fetch server is available through the mock launcher"],
+      "capabilities": ["api", "request"],
+      "timeout": 30000,
+      "retries": 3,
+      "enabled": false
+    }
+  },
+  "global": {
+    "autoRestart": true,
+    "maxRestartAttempts": 3,
+    "heartbeatInterval": 30000
+  }
+}
