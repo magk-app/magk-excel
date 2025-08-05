@@ -10,16 +10,18 @@
     "lint": "eslint . --max-warnings 0"
   },
   "dependencies": {
-    "hono": "^4.0.0",
-    "@hono/node-server": "^1.8.0",
-    "zod": "^3.22.0",
     "@anthropic-ai/sdk": "^0.27.0",
-    "dotenv": "^16.3.0"
+    "@hono/node-server": "^1.8.0",
+    "dotenv": "^16.3.0",
+    "exceljs": "^4.4.0",
+    "hono": "^4.0.0",
+    "playwright": "^1.40.0",
+    "zod": "^3.22.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "eslint": "^8.57.1",
     "tsx": "^4.7.0",
-    "typescript": "^5.2.2",
-    "eslint": "^8.57.1"
+    "typescript": "^5.2.2"
   }
 }
