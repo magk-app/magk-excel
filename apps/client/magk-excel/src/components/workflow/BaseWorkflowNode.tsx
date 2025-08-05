@@ -33,6 +33,7 @@ import {
   Settings
 } from 'lucide-react';
 import { WorkflowNodeData, NodeStatus, NODE_THEMES, NodeType } from '@/types/workflow';
+import { STATUS_COLORS } from './animations/nodeAnimations';
 import { cn } from '@/lib/utils';
 
 interface BaseWorkflowNodeProps extends NodeProps {
@@ -463,33 +464,33 @@ export const BaseWorkflowNode: React.FC<BaseWorkflowNodeProps> = ({
   selected
 }) => {
   const theme = NODE_THEMES[data.type];
-  const statusColor = theme.statusColors[data.status];
+  const statusColor = STATUS_COLORS[data.status];
   const NodeTypeIcon = getNodeTypeIcon(data.type);
   
   // Enhanced animation variants for status changes with better visual feedback
   const nodeVariants = {
     pending: { 
       scale: 1, 
-      opacity: 0.75,
-      filter: 'grayscale(0.3)'
+      opacity: 0.85,
+      filter: 'grayscale(0.2)'
     },
     running: { 
       scale: 1.02, 
       opacity: 1,
       filter: 'grayscale(0)',
-      boxShadow: '0 0 20px rgba(59, 130, 246, 0.3)'
+      boxShadow: `0 0 20px ${STATUS_COLORS.running}30`
     },
     completed: { 
       scale: 1, 
       opacity: 1,
       filter: 'grayscale(0)',
-      boxShadow: '0 0 15px rgba(34, 197, 94, 0.3)'
+      boxShadow: `0 0 15px ${STATUS_COLORS.completed}30`
     },
     error: { 
       scale: 1, 
       opacity: 1,
       filter: 'grayscale(0)',
-      boxShadow: '0 0 20px rgba(239, 68, 68, 0.3)'
+      boxShadow: `0 0 20px ${STATUS_COLORS.error}30`
     },
     paused: { 
       scale: 1, 
@@ -513,16 +514,10 @@ export const BaseWorkflowNode: React.FC<BaseWorkflowNodeProps> = ({
           >
             <Card 
               className={cn(
-                'border-2 shadow-lg hover:shadow-xl transition-all duration-300',
-                'backdrop-blur-sm bg-background/95',
-                data.status === 'running' && 'border-blue-400',
-                data.status === 'completed' && 'border-green-400',
-                data.status === 'error' && 'border-red-400',
-                data.status === 'paused' && 'border-orange-400',
-                data.status === 'pending' && 'border-gray-300'
+                'border-2 border-gray-800 shadow-lg hover:shadow-xl transition-all duration-300',
+                'backdrop-blur-sm bg-background/95'
               )}
               style={{ 
-                borderColor: statusColor,
                 backgroundColor: `${theme.backgroundColor}08` // 3% opacity for subtle background
               }}
             >
@@ -641,10 +636,10 @@ export const BaseWorkflowNode: React.FC<BaseWorkflowNodeProps> = ({
                 'w-3 h-3 border-2 border-white shadow-md transition-all',
                 'hover:w-4 hover:h-4 hover:border-blue-400',
                 data.status === 'running' && 'bg-blue-500 animate-pulse',
-                data.status === 'completed' && 'bg-green-500',
+                data.status === 'completed' && 'bg-emerald-500',
                 data.status === 'error' && 'bg-red-500',
-                data.status === 'pending' && 'bg-gray-400',
-                data.status === 'paused' && 'bg-orange-500'
+                data.status === 'pending' && 'bg-slate-400',
+                data.status === 'paused' && 'bg-amber-500'
               )}
             />
             <Handle
@@ -654,10 +649,10 @@ export const BaseWorkflowNode: React.FC<BaseWorkflowNodeProps> = ({
                 'w-3 h-3 border-2 border-white shadow-md transition-all',
                 'hover:w-4 hover:h-4 hover:border-blue-400',
                 data.status === 'running' && 'bg-blue-500 animate-pulse',
-                data.status === 'completed' && 'bg-green-500',
+                data.status === 'completed' && 'bg-emerald-500',
                 data.status === 'error' && 'bg-red-500',
-                data.status === 'pending' && 'bg-gray-400',
-                data.status === 'paused' && 'bg-orange-500'
+                data.status === 'pending' && 'bg-slate-400',
+                data.status === 'paused' && 'bg-amber-500'
               )}
             />
           </motion.div>

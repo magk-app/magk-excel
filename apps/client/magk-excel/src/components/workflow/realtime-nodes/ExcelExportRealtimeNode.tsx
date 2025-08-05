@@ -11,7 +11,7 @@
  * - Write speed and performance metrics
  */
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { NodeProps } from 'reactflow';
 import { motion } from 'framer-motion';
 import { 
@@ -21,15 +21,12 @@ import {
   Save,
   Columns,
   BarChart3,
-  FileCheck,
-  Loader2,
   CheckCircle2,
-  AlertTriangle,
   HardDrive,
   Gauge,
   Clock,
   Hash,
-  Freeze,
+  Lock,
   Settings
 } from 'lucide-react';
 
@@ -39,7 +36,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 import { useNodeState } from '@/stores/nodeExecutionStore';
-import { WorkflowNodeData, ExcelExportConfig, NODE_THEMES } from '@/types/workflow';
+import { WorkflowNodeData, ExcelExportConfig } from '@/types/workflow';
 import { cn } from '@/lib/utils';
 
 export interface ExcelExportRealtimeNodeProps extends NodeProps {
@@ -75,7 +72,7 @@ const ExcelStageIndicator: React.FC<{
   stage: ExcelExportStage; 
   isActive: boolean;
   config: ExcelExportConfig;
-}> = ({ stage, isActive, config }) => {
+}> = ({ stage, isActive, config: _config }) => {
   const getStageIcon = () => {
     switch (stage.name) {
       case 'creating-workbook':
@@ -91,7 +88,7 @@ const ExcelStageIndicator: React.FC<{
       case 'setting-auto-width':
         return <Settings className="h-3 w-3" />;
       case 'applying-freeze-panes':
-        return <Freeze className="h-3 w-3" />;
+        return <Lock className="h-3 w-3" />;
       case 'saving-file':
         return <Save className="h-3 w-3" />;
       default:
@@ -126,7 +123,7 @@ const ExcelStageIndicator: React.FC<{
         <TooltipTrigger asChild>
           <motion.div
             className={cn(
-              'flex items-center gap-2 text-xs py-1 px-2 rounded-md',
+              'flex items-center gap-2 text-xs py-1 px-2.5 rounded-md',
               isActive && 'bg-blue-50 border border-blue-200',
               stage.status === 'completed' && 'bg-green-50 border border-green-200',
               stage.status === 'error' && 'bg-red-50 border border-red-200'
@@ -196,7 +193,6 @@ const FileProgressIndicator: React.FC<{
 }> = ({ filePath, sizeBytes, rowsWritten, totalRows, writeSpeed }) => {
   const fileName = filePath.split('/').pop() || 'export.xlsx';
   const sizeDisplay = sizeBytes ? `${(sizeBytes / 1024).toFixed(1)}KB` : '--';
-  const progressPercent = totalRows && rowsWritten ? (rowsWritten / totalRows) * 100 : 0;
 
   return (
     <div className="flex items-center gap-2 text-xs">
@@ -256,7 +252,7 @@ const FormattingProgress: React.FC<{
   if (config.formatting.freeze) {
     features.push({
       name: `Freeze ${config.formatting.freeze}`,
-      icon: <Freeze className="h-3 w-3" />,
+      icon: <Lock className="h-3 w-3" />,
       applied: metrics?.freezePanesApplied ?? false
     });
   }
@@ -272,7 +268,7 @@ const FormattingProgress: React.FC<{
           <div
             key={index}
             className={cn(
-              'flex items-center gap-2 text-xs py-1 px-2 rounded-md border',
+              'flex items-center gap-2 text-xs py-1 px-2.5 rounded-md border',
               feature.applied ? 'bg-green-50 border-green-200 text-green-700' : 
               isActive ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-gray-50 border-gray-200'
             )}
@@ -315,13 +311,13 @@ export const ExcelExportRealtimeNode: React.FC<ExcelExportRealtimeNodeProps> = (
   const exportData = useMemo(() => {
     if (!realtimeNodeState?.metadata) return null;
 
-    const metadata = realtimeNodeState.metadata;
+    const metadata = realtimeNodeState.metadata as any;
     return {
-      stages: metadata.exportStages as ExcelExportStage[] || [],
-      metrics: metadata.exportMetrics as ExcelExportMetrics || {},
+      stages: (metadata?.exportStages as ExcelExportStage[]) || [],
+      metrics: (metadata?.exportMetrics as ExcelExportMetrics) || {},
       fileInfo: {
-        sizeBytes: metadata.fileSizeBytes as number,
-        lastModified: metadata.lastModified as Date,
+        sizeBytes: metadata?.fileSizeBytes as number,
+        lastModified: metadata?.lastModified as Date,
       }
     };
   }, [realtimeNodeState?.metadata]);
@@ -374,9 +370,9 @@ export const ExcelExportRealtimeNode: React.FC<ExcelExportRealtimeNodeProps> = (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="absolute top-12 left-2 right-2 bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg z-10"
+          className="absolute top-10 left-1.5 right-1.5 bg-background/95 backdrop-blur-sm border rounded-lg p-2.5 shadow-lg z-10"
         >
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {/* File Progress */}
             {exportProgress && (
               <FileProgressIndicator
@@ -464,38 +460,7 @@ export const ExcelExportRealtimeNode: React.FC<ExcelExportRealtimeNodeProps> = (
         </motion.div>
       )}
 
-      {/* Enhanced status indicators */}
-      <div className="absolute -top-1 -right-1 flex gap-1">
-        {/* Append mode indicator with animation */}
-        {config.append && data.status === 'running' && (
-          <motion.div
-            animate={{ scale: [1, 1.1, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            <Badge variant="secondary" className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-800">
-              + Append
-            </Badge>
-          </motion.div>
-        )}
-        
-        {/* Sheet name with progress */}
-        <Badge 
-          variant="outline" 
-          className="text-xs px-1.5 py-0.5"
-          style={{ 
-            backgroundColor: NODE_THEMES['excel-export'].backgroundColor,
-            color: NODE_THEMES['excel-export'].textColor,
-            borderColor: NODE_THEMES['excel-export'].borderColor
-          }}
-        >
-          📋 {config.sheetName}
-          {exportProgress && (
-            <span className="ml-1">
-              ({Math.round((exportProgress.rowsWritten / exportProgress.totalRows) * 100)}%)
-            </span>
-          )}
-        </Badge>
-      </div>
+
 
       {/* Live export pulse animation */}
       {data.status === 'running' && activeStage && (

@@ -55,6 +55,7 @@ import 'reactflow/dist/style.css';
 
 import { WorkflowNode, WorkflowEdge, NodeStatus, NODE_THEMES } from '@/types/workflow';
 import { nodeTypes } from './NodeRegistry';
+import { STATUS_COLORS } from './animations/nodeAnimations';
 
 interface WorkflowCanvasProps {
   nodes: WorkflowNode[];
@@ -84,18 +85,18 @@ interface WorkflowCanvasProps {
 const getEnhancedEdgeStyle = (edge: WorkflowEdge, isExecuting: boolean = false) => {
   const hasData = edge.data?.sampleData;
   const baseStyle = {
-    stroke: hasData ? '#10b981' : '#64748b',
+    stroke: hasData ? STATUS_COLORS.completed : STATUS_COLORS.pending,
     strokeWidth: hasData ? 3 : 2,
     strokeDasharray: hasData ? undefined : '8,4',
-    filter: hasData ? 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.3))' : undefined,
+    filter: hasData ? `drop-shadow(0 0 6px ${STATUS_COLORS.completed}30)` : undefined,
   };
 
   if (isExecuting && hasData) {
     return {
       ...baseStyle,
-      stroke: '#3b82f6',
+      stroke: STATUS_COLORS.running,
       strokeWidth: 4,
-      filter: 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.4))',
+      filter: `drop-shadow(0 0 8px ${STATUS_COLORS.running}40)`,
     };
   }
 
@@ -113,15 +114,8 @@ const getEnhancedMinimapNodeColor = (node: Node): string => {
     return theme.statusColors[status] || theme.backgroundColor;
   }
   
-  // Fallback colors
-  switch (status) {
-    case 'pending': return '#64748b';
-    case 'running': return '#3b82f6';
-    case 'completed': return '#10b981';
-    case 'error': return '#ef4444';
-    case 'paused': return '#f59e0b';
-    default: return '#64748b';
-  }
+  // Fallback colors using centralized STATUS_COLORS
+  return STATUS_COLORS[status] || STATUS_COLORS.pending;
 };
 
 // Workflow execution status panel
@@ -497,7 +491,7 @@ const WorkflowCanvasContent: React.FC<WorkflowCanvasProps> = ({
         type: MarkerType.ArrowClosed,
         width: 22,
         height: 22,
-        color: edge.data?.sampleData ? '#10b981' : '#64748b',
+        color: edge.data?.sampleData ? STATUS_COLORS.completed : STATUS_COLORS.pending,
       },
       animated: isExecuting && Boolean(edge.data?.sampleData),
       labelStyle: {

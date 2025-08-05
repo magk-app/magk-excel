@@ -398,36 +398,7 @@ export const WebScrapingRealtimeNode: React.FC<WebScrapingRealtimeNodeProps> = (
         </motion.div>
       )}
 
-      {/* Enhanced status indicators */}
-      <div className="absolute -top-1 -right-1 flex gap-1">
-        {/* Firecrawl indicator with pulse */}
-        {config.useFirecrawl && data.status === 'running' && (
-          <motion.div
-            animate={{ scale: [1, 1.1, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            <Badge variant="secondary" className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-800">
-              🔥 Live
-            </Badge>
-          </motion.div>
-        )}
-        
-        {/* Extract format with count */}
-        <Badge 
-          variant="outline" 
-          className="text-xs px-1.5 py-0.5"
-          style={{ 
-            backgroundColor: NODE_THEMES['web-scraping'].backgroundColor,
-            color: NODE_THEMES['web-scraping'].textColor,
-            borderColor: NODE_THEMES['web-scraping'].borderColor
-          }}
-        >
-          {config.extractFormat}
-          {extractionProgress && (
-            <span className="ml-1">({extractionProgress.dataExtracted})</span>
-          )}
-        </Badge>
-      </div>
+
 
       {/* Live activity pulse for active scraping */}
       {data.status === 'running' && activeStage && (

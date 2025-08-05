@@ -6,12 +6,6 @@
 import React from 'react';
 import { NodeProps } from 'reactflow';
 import { 
-  Filter, 
-  ArrowUpDown, 
-  Group, 
-  Calculator, 
-  MapPin,
-  Shuffle,
   Activity,
   Eye,
   Cog
@@ -29,25 +23,7 @@ interface TransformNodeProps extends NodeProps {
   data: TransformNodeData;
 }
 
-// Operation type icons
-const OperationIcon: React.FC<{ type: TransformConfig['operations'][0]['type'] }> = ({ type }) => {
-  const iconProps = { className: 'h-3 w-3' };
-  
-  switch (type) {
-    case 'map':
-      return <MapPin {...iconProps} />;
-    case 'filter':
-      return <Filter {...iconProps} />;
-    case 'sort':
-      return <ArrowUpDown {...iconProps} />;
-    case 'group':
-      return <Group {...iconProps} />;
-    case 'aggregate':
-      return <Calculator {...iconProps} />;
-    default:
-      return <Shuffle {...iconProps} />;
-  }
-};
+
 
 export const TransformNode: React.FC<TransformNodeProps> = (props) => {
   const { data } = props;
@@ -91,52 +67,26 @@ export const TransformNode: React.FC<TransformNodeProps> = (props) => {
     <div className="relative">
       <BaseWorkflowNode {...props} data={enhancedData} />
       
-      {/* Operation indicators */}
-      <div className="absolute -top-2 -right-2 flex gap-1 flex-wrap max-w-[120px]">
-        {config.operations.slice(0, 3).map((operation, index) => (
-          <Badge 
-            key={index}
-            variant="outline" 
-            className="text-xs px-1.5 py-0.5 flex items-center gap-1"
-            title={`${operation.type}${operation.field ? ` on ${operation.field}` : ''}`}
-          >
-            <OperationIcon type={operation.type} />
-            {operation.type}
-          </Badge>
-        ))}
-        
-        {config.operations.length > 3 && (
-          <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
-            +{config.operations.length - 3} more
-          </Badge>
-        )}
-      </div>
+
 
       {/* Operation details at bottom */}
-      <div className="absolute -bottom-8 left-0 right-0 text-xs text-muted-foreground">
-        <div className="flex flex-wrap gap-1 justify-center">
+      <div className="absolute -bottom-9 left-0 right-0 text-xs text-muted-foreground">
+        <div className="flex flex-wrap gap-2 justify-center">
           {config.operations.slice(0, 2).map((operation, index) => (
-            <span key={index} className="bg-purple-100 text-purple-800 px-1 py-0.5 rounded text-xs">
+            <span key={index} className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-medium">
               {operation.field && `${operation.field}: `}
               {operation.type}
             </span>
           ))}
           {config.operations.length > 2 && (
-            <span className="text-muted-foreground">
+            <span className="text-muted-foreground px-1">
               +{config.operations.length - 2} more
             </span>
           )}
         </div>
       </div>
 
-      {/* Field mapping indicator */}
-      {config.operations.some(op => op.newField) && (
-        <div className="absolute top-2 left-2">
-          <Badge variant="outline" className="text-xs px-1 py-0.5" title="Creates new fields">
-            🔄 Mapping
-          </Badge>
-        </div>
-      )}
+
 
       {/* Real-time transformation progress overlay */}
       {transformProgress && (
