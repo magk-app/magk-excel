@@ -309,7 +309,7 @@ export const WebScrapingRealtimeNode: React.FC<WebScrapingRealtimeNodeProps> = (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="absolute top-12 left-2 right-2 bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg z-10"
+          className="absolute top-24 left-2 right-2 bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg z-10"
         >
           <div className="space-y-3">
             {/* URL Status */}
@@ -331,23 +331,9 @@ export const WebScrapingRealtimeNode: React.FC<WebScrapingRealtimeNodeProps> = (
               />
             )}
 
-            {/* Scraping Stages */}
-            {scrapingData?.stages && scrapingData.stages.length > 0 && (
-              <div className="space-y-2">
-                <div className="text-xs font-medium text-muted-foreground">Scraping Progress</div>
-                <div className="grid grid-cols-1 gap-1">
-                  {scrapingData.stages.map((stage, index) => (
-                    <ScrapingStageIndicator
-                      key={`${stage.name}-${index}`}
-                      stage={stage}
-                      isActive={stage.status === 'running'}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Scraping stages completely removed */}
 
-            {/* Extraction Progress */}
+            {/* Extraction Status (no duplicate progress bar) */}
             {extractionProgress && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs">
@@ -363,11 +349,6 @@ export const WebScrapingRealtimeNode: React.FC<WebScrapingRealtimeNodeProps> = (
                     </Badge>
                   </div>
                 </div>
-                
-                <Progress 
-                  value={(extractionProgress.current / extractionProgress.total) * 100} 
-                  className="h-1.5" 
-                />
                 
                 {extractionProgress.throughputRate > 0 && (
                   <div className="text-xs text-muted-foreground">

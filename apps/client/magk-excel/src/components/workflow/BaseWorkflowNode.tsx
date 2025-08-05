@@ -4,12 +4,11 @@
  * comprehensive metadata display, and smooth animations
  */
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
@@ -34,6 +33,7 @@ import {
 } from 'lucide-react';
 import { WorkflowNodeData, NodeStatus, NODE_THEMES, NodeType } from '@/types/workflow';
 import { STATUS_COLORS } from './animations/nodeAnimations';
+import { ProgressAnimation } from './animations/ProgressAnimation';
 import { cn } from '@/lib/utils';
 
 interface BaseWorkflowNodeProps extends NodeProps {
@@ -115,39 +115,13 @@ const StatusIcon: React.FC<{ status: NodeStatus; nodeType: NodeType; className?:
   }
 };
 
-// Enhanced progress indicator with better ETA and throughput
+// Unified progress indicator using ProgressAnimation with node-optimized variant
 const NodeProgress: React.FC<{ 
   progress?: WorkflowNodeData['progress']; 
   status: NodeStatus;
 }> = ({ progress, status }) => {
-  // Calculate more precise ETA based on throughput - hooks must be called unconditionally
-  const etaText = useMemo(() => {
-    if (!progress?.estimatedTimeRemaining && !progress?.estimatedCompletion) return null;
-    
-    if (progress.estimatedTimeRemaining) {
-      const minutes = Math.floor(progress.estimatedTimeRemaining / 60);
-      const seconds = Math.round(progress.estimatedTimeRemaining % 60);
-      if (minutes > 0) {
-        return `${minutes}m ${seconds}s`;
-      }
-      return `${seconds}s`;
-    }
-    if (progress.estimatedCompletion) {
-      return new Date(progress.estimatedCompletion).toLocaleTimeString([], { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      });
-    }
-    return null;
-  }, [progress?.estimatedTimeRemaining, progress?.estimatedCompletion]);
-
-  // Early return after hooks
+  // Show progress only for running nodes with progress data
   if (!progress || status !== 'running') return null;
-
-  const percentage = Math.round((progress.current / progress.total) * 100);
-  const throughputText = progress.throughputRate 
-    ? `${progress.throughputRate.toFixed(1)}/s`
-    : null;
   
   return (
     <AnimatePresence>
@@ -155,79 +129,18 @@ const NodeProgress: React.FC<{
         initial={{ opacity: 0, height: 0 }}
         animate={{ opacity: 1, height: 'auto' }}
         exit={{ opacity: 0, height: 0 }}
-        className="space-y-2 bg-muted/30 rounded-lg p-3"
+        className="bg-muted/30 rounded-lg p-3"
       >
-        {/* Progress stages if available */}
-        {progress.stages && progress.stages.length > 0 && (
-          <div className="space-y-1">
-            <div className="text-xs font-medium text-muted-foreground">Progress Stages</div>
-            {progress.stages.map((stage, index) => (
-              <div key={index} className="flex items-center gap-2 text-xs">
-                <div className={cn(
-                  'w-2 h-2 rounded-full',
-                  stage.status === 'completed' ? 'bg-green-500' :
-                  stage.status === 'running' ? 'bg-blue-500 animate-pulse' :
-                  stage.status === 'error' ? 'bg-red-500' :
-                  'bg-gray-300'
-                )} />
-                <span className={cn(
-                  stage.status === 'completed' ? 'text-green-600' :
-                  stage.status === 'running' ? 'text-blue-600' :
-                  stage.status === 'error' ? 'text-red-600' :
-                  'text-muted-foreground'
-                )}>
-                  {stage.name}
-                  {stage.message && ` - ${stage.message}`}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Main progress */}
-        <div className="space-y-2">
-          <div className="flex justify-between items-center text-xs">
-            <div className="flex items-center gap-2">
-              <Activity className="h-3 w-3 animate-pulse text-blue-500" />
-              <span className="font-medium">{progress.message || 'Processing...'}</span>
-            </div>
-            <Badge variant="secondary" className="text-xs font-mono">
-              {percentage}%
-            </Badge>
-          </div>
-          
-          <motion.div
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            className="origin-left"
-          >
-            <Progress 
-              value={percentage} 
-              className="h-2 bg-muted" 
-            />
-          </motion.div>
-          
-          <div className="flex justify-between items-center text-xs text-muted-foreground">
-            <div className="flex items-center gap-3">
-              <span className="font-mono">
-                {progress.current.toLocaleString()} / {progress.total.toLocaleString()}
-              </span>
-              {throughputText && (
-                <div className="flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3" />
-                  <span>{throughputText}</span>
-                </div>
-              )}
-            </div>
-            
-            {etaText && (
-              <div className="flex items-center gap-1">
-                <Timer className="h-3 w-3" />
-                <span>ETA: {etaText}</span>
-              </div>
-            )}
-          </div>
-        </div>
+        <ProgressAnimation
+          progress={progress}
+          variant="node-compact"
+          size="sm"
+          showPercentage={true}
+          showEta={true}
+          showThroughput={true}
+          animated={true}
+          className="space-y-1"
+        />
       </motion.div>
     </AnimatePresence>
   );
@@ -598,19 +511,7 @@ export const BaseWorkflowNode: React.FC<BaseWorkflowNodeProps> = ({
                 {/* Metadata */}
                 <NodeMetadata metadata={data.metadata} status={data.status} />
 
-                {/* Real-time activity indicator for running nodes */}
-                {data.status === 'running' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200"
-                  >
-                    <Activity className="h-3 w-3 animate-pulse text-blue-600" />
-                    <span className="text-xs text-blue-700 font-medium">
-                      {data.progress?.message || 'Processing workflow step...'}
-                    </span>
-                  </motion.div>
-                )}
+                {/* Real-time activity indicator removed - now handled by NodeProgress component */}
 
                 {/* Success indicator for completed nodes */}
                 {data.status === 'completed' && data.result && (

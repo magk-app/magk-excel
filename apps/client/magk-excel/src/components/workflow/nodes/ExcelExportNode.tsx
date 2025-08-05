@@ -69,50 +69,7 @@ export const ExcelExportNode: React.FC<ExcelExportNodeProps> = (props) => {
 
 
 
-      {/* Real-time export progress overlay */}
-      {exportProgress && (
-        <div className="absolute top-8 left-2 right-2 bg-background/95 backdrop-blur-sm border rounded-lg p-2 shadow-lg">
-          <div className="space-y-2">
-            {/* Writing progress */}
-            <div className={cn(
-              "flex items-center gap-2 text-xs",
-              exportProgress.writing ? "text-blue-600" : "text-muted-foreground"
-            )}>
-              <Download className={cn(
-                "h-3 w-3",
-                exportProgress.writing && "animate-bounce"
-              )} />
-              <span>Writing rows</span>
-              <Badge variant="outline" className="text-xs px-1 py-0.5">
-                {exportProgress.rowsWritten.toLocaleString()}/{exportProgress.totalRows.toLocaleString()}
-              </Badge>
-            </div>
-            
-            {/* Formatting progress */}
-            {config.formatting && (
-              <div className={cn(
-                "flex items-center gap-2 text-xs",
-                exportProgress.formatting ? "text-green-600" : "text-muted-foreground"
-              )}>
-                <Palette className={cn(
-                  "h-3 w-3",
-                  exportProgress.formatting && "animate-pulse"
-                )} />
-                <span>Applying formatting</span>
-                {exportProgress.formatting && (
-                  <FileCheck className="h-3 w-3 animate-pulse" />
-                )}
-              </div>
-            )}
-            
-            {/* Mini progress bar */}
-            <Progress 
-              value={(exportProgress.rowsWritten / exportProgress.totalRows) * 100} 
-              className="h-1" 
-            />
-          </div>
-        </div>
-      )}
+      {/* Export progress overlay completely removed - handled by base node */}
     </div>
   );
 };

@@ -463,7 +463,7 @@ export const ApiRealtimeNode: React.FC<ApiRealtimeNodeProps> = ({
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="absolute top-12 left-2 right-2 bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg z-10"
+          className="absolute top-24 left-2 right-2 bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg z-10"
         >
           <div className="space-y-3">
             {/* Connection Status */}
@@ -520,10 +520,7 @@ export const ApiRealtimeNode: React.FC<ApiRealtimeNodeProps> = ({
                   </div>
                 </div>
                 
-                <Progress 
-                  value={(apiProgress.recordsExtracted / apiProgress.total) * 100} 
-                  className="h-1.5" 
-                />
+                {/* Progress bar removed - handled by base node */}
                 
                 <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                   <div>Avg response: {apiProgress.averageResponseTime.toFixed(0)}ms</div>

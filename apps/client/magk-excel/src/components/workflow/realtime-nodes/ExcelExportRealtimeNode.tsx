@@ -370,7 +370,7 @@ export const ExcelExportRealtimeNode: React.FC<ExcelExportRealtimeNodeProps> = (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="absolute top-10 left-1.5 right-1.5 bg-background/95 backdrop-blur-sm border rounded-lg p-2.5 shadow-lg z-10"
+          className="absolute top-24 left-1.5 right-1.5 bg-background/95 backdrop-blur-sm border rounded-lg p-2.5 shadow-lg z-10"
         >
           <div className="space-y-2.5">
             {/* File Progress */}
@@ -420,10 +420,7 @@ export const ExcelExportRealtimeNode: React.FC<ExcelExportRealtimeNodeProps> = (
                   </div>
                 </div>
                 
-                <Progress 
-                  value={(exportProgress.rowsWritten / exportProgress.totalRows) * 100} 
-                  className="h-1.5" 
-                />
+                {/* Progress bar removed - handled by base node */}
                 
                 <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                   <div>Rows: {exportProgress.rowsWritten.toLocaleString()}/{exportProgress.totalRows.toLocaleString()}</div>

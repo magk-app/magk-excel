@@ -23,7 +23,7 @@ const createSampleNodes = (): WorkflowNode[] => [
   {
     id: 'web-scraping-1',
     type: 'web-scraping',
-    position: { x: 100, y: 100 },
+    position: { x: 150, y: 150 },
     data: {
       type: 'web-scraping',
       status: 'pending',
@@ -45,7 +45,7 @@ const createSampleNodes = (): WorkflowNode[] => [
   {
     id: 'transform-1',
     type: 'transform',
-    position: { x: 400, y: 100 },
+    position: { x: 550, y: 150 },
     data: {
       type: 'transform',
       status: 'pending',
@@ -64,7 +64,7 @@ const createSampleNodes = (): WorkflowNode[] => [
   {
     id: 'excel-export-1',
     type: 'excel-export',
-    position: { x: 700, y: 100 },
+    position: { x: 950, y: 150 },
     data: {
       type: 'excel-export',
       status: 'pending',
@@ -86,7 +86,7 @@ const createSampleNodes = (): WorkflowNode[] => [
   {
     id: 'pdf-extraction-1',
     type: 'pdf-extraction',
-    position: { x: 100, y: 300 },
+    position: { x: 150, y: 450 },
     data: {
       type: 'pdf-extraction',
       status: 'completed',
@@ -109,7 +109,7 @@ const createSampleNodes = (): WorkflowNode[] => [
   {
     id: 'api-fetch-1',
     type: 'api-fetch',
-    position: { x: 100, y: 500 },
+    position: { x: 150, y: 750 },
     data: {
       type: 'api-fetch',
       status: 'error',

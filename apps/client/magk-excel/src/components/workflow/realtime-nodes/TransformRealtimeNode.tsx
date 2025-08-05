@@ -324,10 +324,7 @@ const TransformProgressSummary: React.FC<{
         </div>
       </div>
       
-      <Progress 
-        value={((metrics.operationsCompleted || 0) / totalOperations) * 100} 
-        className="h-1.5" 
-      />
+      {/* Progress bar removed - handled by base node */}
       
       <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
         <div className="flex items-center gap-1">
@@ -412,7 +409,7 @@ export const TransformRealtimeNode: React.FC<TransformRealtimeNodeProps> = ({
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="absolute top-12 left-2 right-2 bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg z-10"
+          className="absolute top-24 left-2 right-2 bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg z-10"
         >
           <div className="space-y-3">
             {/* Transform Progress Summary */}

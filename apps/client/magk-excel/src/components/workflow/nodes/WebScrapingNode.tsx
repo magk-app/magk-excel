@@ -83,47 +83,7 @@ export const WebScrapingNode: React.FC<WebScrapingNodeProps> = (props) => {
 
 
 
-      {/* Real-time scraping progress overlay */}
-      {scrapingProgress && (
-        <div className="absolute top-8 left-2 right-2 bg-background/95 backdrop-blur-sm border rounded-lg p-2 shadow-lg">
-          <div className="space-y-2">
-            {/* Page loading indicator */}
-            <div className={cn(
-              "flex items-center gap-2 text-xs",
-              scrapingProgress.pageLoading ? "text-blue-600" : "text-muted-foreground"
-            )}>
-              <Activity className={cn(
-                "h-3 w-3",
-                scrapingProgress.pageLoading && "animate-pulse"
-              )} />
-              <span>Loading page</span>
-              {scrapingProgress.pageLoading && (
-                <Clock className="h-3 w-3 animate-spin" />
-              )}
-            </div>
-            
-            {/* Data extraction indicator */}
-            <div className={cn(
-              "flex items-center gap-2 text-xs",
-              scrapingProgress.dataExtraction ? "text-green-600" : "text-muted-foreground"
-            )}>
-              <FormatIcon format={config.extractFormat} />
-              <span>Extracting {config.extractFormat} data</span>
-              {scrapingProgress.dataExtraction && (
-                <Activity className="h-3 w-3 animate-pulse" />
-              )}
-            </div>
-            
-            {/* Mini progress bar */}
-            {scrapingProgress.progress && (
-              <Progress 
-                value={(scrapingProgress.progress.current / scrapingProgress.progress.total) * 100} 
-                className="h-1" 
-              />
-            )}
-          </div>
-        </div>
-      )}
+      {/* Progress overlay completely removed - handled by base node */}
     </div>
   );
 };
