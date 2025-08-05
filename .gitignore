@@ -61,3 +61,5 @@ memory.db
 *.swarm
 
 
+# Ignore all Excel files
+*.xlsx

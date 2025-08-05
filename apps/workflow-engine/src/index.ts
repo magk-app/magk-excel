@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { serve } from '@hono/node-server';
 import { chatRoute } from './routes/chat.js';
+import { extractRoute } from './routes/extract.js';
 
 const app = new Hono();
 
@@ -28,8 +29,9 @@ app.get('/health', (c) => {
   return c.json({ status: 'healthy', service: 'magk-workflow-engine' });
 });
 
-// Mount chat routes - try root level mounting with chat route defining /chat
+// Mount routes
 app.route('', chatRoute);
+app.route('', extractRoute);
 
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 console.log(`🚀 MAGK Workflow Engine starting on http://localhost:${port}`);
