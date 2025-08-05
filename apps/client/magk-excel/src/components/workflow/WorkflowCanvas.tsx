@@ -550,8 +550,6 @@ const WorkflowCanvasContent: React.FC<WorkflowCanvasProps> = ({
     selectionMode: SelectionMode.Partial,
     nodesConnectable: !isReadOnly,
     nodesDraggable: !isReadOnly,
-    nodesSelectable: true,
-    edgesSelectable: !isReadOnly,
     elementsSelectable: true,
     minZoom: 0.1,
     maxZoom: 4,

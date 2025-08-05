@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { ChatInterface } from './components/ChatInterface'
 import { WorkflowDemo } from './components/workflow'
+import { MCPServerToggle } from './components/MCPServerToggle'
 import { Button } from './components/ui/button'
 import './App.css'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'chat' | 'workflow'>('workflow')
+  const [activeTab, setActiveTab] = useState<'chat' | 'workflow' | 'mcp'>('workflow')
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background">
@@ -32,6 +33,13 @@ function App() {
           >
             🔄 Workflow Demo
           </Button>
+          <Button
+            variant={activeTab === 'mcp' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTab('mcp')}
+          >
+            🔧 MCP Servers
+          </Button>
         </div>
         
         <div className="text-sm text-muted-foreground">
@@ -43,6 +51,10 @@ function App() {
       <main className="flex-1 overflow-hidden">
         {activeTab === 'chat' ? (
           <ChatInterface />
+        ) : activeTab === 'mcp' ? (
+          <div className="p-6">
+            <MCPServerToggle />
+          </div>
         ) : (
           <WorkflowDemo />
         )}
