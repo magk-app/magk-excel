@@ -11,7 +11,7 @@
   # Extract specific table (with prompt)  
   curl -X POST "http://localhost:8000/extract-tables" \
     -H "Content-Type: application/json" \
-    -d '{"pdf_source": "https://example.com/file.pdf", "prompt": "financial data table"}'
+    -d '{"pdf_source": "https://abc.xyz/assets/51/e1/bf43f01041f6a8882a29d7e89cae/goog-10-q-q1-2025.pdf", "prompt": "financial data table"}'
 
   The API is fully functional and meets all your requirements. The only remaining issue is a dependency compatibility problem with the test framework
   (TestClient), which doesn't affect the core functionality.
