@@ -5,8 +5,8 @@
 
 import React from 'react';
 import { NodeProps } from 'reactflow';
-import { Globe, Search, Table, FileText, Layout, Activity, Clock } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Globe, Table, FileText, Layout, Activity, Clock, Search } from 'lucide-react';
+
 import { Progress } from '@/components/ui/progress';
 import { WebScrapingConfig, WorkflowNodeData } from '@/types/workflow';
 import { BaseWorkflowNode } from '../BaseWorkflowNode';
@@ -73,21 +73,7 @@ export const WebScrapingNode: React.FC<WebScrapingNodeProps> = (props) => {
     <div className="relative">
       <BaseWorkflowNode {...props} data={enhancedData} />
       
-      {/* Web scraping specific overlays */}
-      <div className="absolute -top-2 -right-2 flex gap-1">
-        {/* Firecrawl indicator */}
-        {config.useFirecrawl && (
-          <Badge variant="secondary" className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-800">
-            🔥 Firecrawl
-          </Badge>
-        )}
-        
-        {/* Extract format indicator */}
-        <Badge variant="outline" className="text-xs px-1.5 py-0.5 flex items-center gap-1">
-          <FormatIcon format={config.extractFormat} />
-          {config.extractFormat}
-        </Badge>
-      </div>
+
 
       {/* URL display at bottom */}
       <div className="absolute -bottom-6 left-0 right-0 text-xs text-muted-foreground text-center truncate">
@@ -95,14 +81,7 @@ export const WebScrapingNode: React.FC<WebScrapingNodeProps> = (props) => {
         {new URL(config.url).hostname}
       </div>
 
-      {/* Selector indicator */}
-      {config.selector && (
-        <div className="absolute top-2 left-2">
-          <Badge variant="outline" className="text-xs px-1 py-0.5" title={`CSS Selector: ${config.selector}`}>
-            <Search className="h-3 w-3" />
-          </Badge>
-        </div>
-      )}
+
 
       {/* Real-time scraping progress overlay */}
       {scrapingProgress && (

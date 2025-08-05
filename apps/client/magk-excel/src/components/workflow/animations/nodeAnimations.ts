@@ -373,11 +373,11 @@ export const breatheVariants: Variants = {
 
 // Status color mappings for animations
 export const STATUS_COLORS = {
-  pending: '#6b7280',
-  running: '#3b82f6',
-  completed: '#22c55e',
-  error: '#ef4444',
-  paused: '#f59e0b',
+  pending: '#94a3b8',     // Lighter slate for better visibility
+  running: '#3b82f6',     // Keep vibrant blue
+  completed: '#10b981',   // More vibrant emerald green
+  error: '#ef4444',       // Keep red
+  paused: '#f59e0b',      // Keep amber
 } as const;
 
 // Animation timing presets

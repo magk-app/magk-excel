@@ -470,40 +470,7 @@ export const TransformRealtimeNode: React.FC<TransformRealtimeNodeProps> = ({
         </motion.div>
       )}
 
-      {/* Enhanced status indicators */}
-      <div className="absolute -top-1 -right-1 flex gap-1">
-        {/* Current operation indicator */}
-        {activeStage && (
-          <motion.div
-            animate={{ scale: [1, 1.1, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            <Badge variant="secondary" className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-800 flex items-center gap-1">
-              <OperationIcon type={activeStage.operation.type} className="h-2 w-2" />
-              {activeStage.operation.type}
-            </Badge>
-          </motion.div>
-        )}
-        
-        {/* Operations count */}
-        <Badge 
-          variant="outline" 
-          className="text-xs px-1.5 py-0.5"
-          style={{ 
-            backgroundColor: NODE_THEMES['transform'].backgroundColor,
-            color: NODE_THEMES['transform'].textColor,
-            borderColor: NODE_THEMES['transform'].borderColor
-          }}
-        >
-          <Cog className="h-2 w-2 mr-1" />
-          {config.operations.length} ops
-          {transformProgress && (
-            <span className="ml-1">
-              ({transformProgress.operationsCompleted}/{transformProgress.totalOperations})
-            </span>
-          )}
-        </Badge>
-      </div>
+
 
       {/* Live transformation pulse animation */}
       {data.status === 'running' && activeStage && (

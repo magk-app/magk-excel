@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { NodeProps } from 'reactflow';
-import { FileSpreadsheet, Palette, Columns, FileCheck, Download } from 'lucide-react';
+import { FileSpreadsheet, FileCheck, Download, Palette } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ExcelExportConfig, WorkflowNodeData } from '@/types/workflow';
@@ -57,23 +57,7 @@ export const ExcelExportNode: React.FC<ExcelExportNodeProps> = (props) => {
     <div className="relative">
       <BaseWorkflowNode {...props} data={enhancedData} />
       
-      {/* Excel specific indicators */}
-      <div className="absolute -top-2 -right-2 flex gap-1">
-        {/* Append mode indicator */}
-        {config.append && (
-          <Badge variant="secondary" className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-800">
-            + Append
-          </Badge>
-        )}
-        
-        {/* Formatting indicator */}
-        {config.formatting && (
-          <Badge variant="outline" className="text-xs px-1.5 py-0.5 flex items-center gap-1">
-            <Palette className="h-3 w-3" />
-            Styled
-          </Badge>
-        )}
-      </div>
+
 
       {/* File path display at bottom */}
       <div className="absolute -bottom-6 left-0 right-0 text-xs text-muted-foreground text-center truncate">
@@ -81,27 +65,9 @@ export const ExcelExportNode: React.FC<ExcelExportNodeProps> = (props) => {
         {config.outputPath.split('/').pop()}
       </div>
 
-      {/* Advanced features indicators */}
-      <div className="absolute top-2 left-2 flex gap-1">
-        {config.formatting?.freeze && (
-          <Badge variant="outline" className="text-xs px-1 py-0.5" title={`Freeze panes at ${config.formatting.freeze}`}>
-            <Columns className="h-3 w-3" />
-          </Badge>
-        )}
-        
-        {config.formatting?.autoWidth && (
-          <Badge variant="outline" className="text-xs px-1 py-0.5" title="Auto-width columns">
-            ↔️
-          </Badge>
-        )}
-      </div>
 
-      {/* Sheet name overlay */}
-      <div className="absolute bottom-2 right-2">
-        <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
-          📋 {config.sheetName}
-        </Badge>
-      </div>
+
+
 
       {/* Real-time export progress overlay */}
       {exportProgress && (

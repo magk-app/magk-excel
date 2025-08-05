@@ -94,7 +94,7 @@ const ConnectionIndicator: React.FC<ConnectionIndicatorProps> = ({
               opacity: [0.5, 1, 0.5]
             } : {}}
             transition={{ duration: 1.5, repeat: Infinity }}
-            className="absolute top-2 right-2 z-10"
+            className="absolute top-1.5 right-1.5 z-10"
           >
             <IconComponent className={cn('h-3 w-3', getIndicatorColor())} />
           </motion.div>
@@ -129,8 +129,8 @@ const RetryButton: React.FC<RetryButtonProps> = ({
   }, [nodeId, onRetry, isRetrying]);
 
   const positionClasses = {
-    'top-right': 'absolute top-2 right-8 z-10',
-    'bottom-right': 'absolute bottom-2 right-2 z-10',
+    'top-right': 'absolute top-1.5 right-8 z-10',
+    'bottom-right': 'absolute bottom-1.5 right-1.5 z-10',
     'inline': 'inline-flex'
   };
 
@@ -365,7 +365,7 @@ export const RealtimeWorkflowNode: React.FC<RealtimeWorkflowNodeProps> = ({
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="absolute top-1 left-1 z-10"
+            className="absolute top-1.5 left-1.5 z-10"
           >
             <TooltipProvider>
               <Tooltip>
@@ -422,11 +422,11 @@ export const RealtimeWorkflowNode: React.FC<RealtimeWorkflowNodeProps> = ({
 
         {/* Inline retry for error nodes */}
         {mergedData.status === 'error' && onRetry && retryButtonPosition === 'inline' && (
-          <div className="absolute bottom-2 left-2 right-2 z-10">
+          <div className="absolute bottom-1.5 left-1.5 right-1.5 z-10">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-center justify-between p-2 bg-red-50/90 backdrop-blur-sm rounded-lg border border-red-200"
+              className="flex items-center justify-between p-2.5 bg-red-50/90 backdrop-blur-sm rounded-lg border border-red-200"
             >
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-3 w-3 text-red-600" />
@@ -462,7 +462,7 @@ export const RealtimeWorkflowNode: React.FC<RealtimeWorkflowNodeProps> = ({
 
         {/* Data freshness indicator */}
         {statusTransition.hasRealTimeData && (
-          <div className="absolute bottom-1 left-1 z-10">
+          <div className="absolute bottom-1.5 left-1.5 z-10">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>

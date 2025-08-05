@@ -15,6 +15,7 @@ import {
   getAnimationVariants,
   SPRING_CONFIG,
   SMOOTH_SPRING,
+  STATUS_COLORS,
 } from './nodeAnimations';
 import { cn } from '../../../lib/utils';
 
@@ -238,10 +239,10 @@ export const ProgressAnimation: React.FC<ProgressAnimationProps> = ({
 
   // Determine progress color based on percentage
   const getProgressColor = () => {
-    if (percentage >= 100) return '#22c55e'; // green
-    if (percentage >= 75) return '#3b82f6'; // blue
-    if (percentage >= 50) return '#f59e0b'; // yellow
-    return '#ef4444'; // red
+    if (percentage >= 100) return STATUS_COLORS.completed;
+    if (percentage >= 75) return STATUS_COLORS.running;
+    if (percentage >= 50) return STATUS_COLORS.paused;
+    return STATUS_COLORS.error;
   };
 
   const progressColor = getProgressColor();
@@ -444,10 +445,10 @@ export const ProgressDot: React.FC<{
   className?: string;
 }> = ({ percentage, size = 20, className }) => {
   const getColor = () => {
-    if (percentage >= 100) return '#22c55e';
-    if (percentage >= 75) return '#3b82f6';
-    if (percentage >= 50) return '#f59e0b';
-    return '#ef4444';
+    if (percentage >= 100) return STATUS_COLORS.completed;
+    if (percentage >= 75) return STATUS_COLORS.running;
+    if (percentage >= 50) return STATUS_COLORS.paused;
+    return STATUS_COLORS.error;
   };
 
   return (

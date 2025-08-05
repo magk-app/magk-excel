@@ -570,36 +570,7 @@ export const ApiRealtimeNode: React.FC<ApiRealtimeNodeProps> = ({
         </motion.div>
       )}
 
-      {/* Enhanced status indicators */}
-      <div className="absolute -top-1 -right-1 flex gap-1">
-        {/* HTTP Method indicator */}
-        <Badge 
-          variant="outline" 
-          className="text-xs px-1.5 py-0.5"
-          style={{ 
-            backgroundColor: NODE_THEMES['api-fetch'].backgroundColor,
-            color: NODE_THEMES['api-fetch'].textColor,
-            borderColor: NODE_THEMES['api-fetch'].borderColor
-          }}
-        >
-          {config.method}
-          {apiProgress && (
-            <span className="ml-1">({apiProgress.recordsExtracted})</span>
-          )}
-        </Badge>
-        
-        {/* Response format with real-time data size */}
-        {data.status === 'running' && apiData?.metrics.dataReceived && (
-          <motion.div
-            animate={{ scale: [1, 1.1, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            <Badge variant="secondary" className="text-xs px-1.5 py-0.5 bg-green-100 text-green-800">
-              {config.responseFormat.toUpperCase()} ({(apiData.metrics.dataReceived / 1024).toFixed(1)}KB)
-            </Badge>
-          </motion.div>
-        )}
-      </div>
+
 
       {/* Live API activity pulse animation */}
       {data.status === 'running' && activeStage && (
