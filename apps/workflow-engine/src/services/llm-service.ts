@@ -23,7 +23,7 @@ export class LLMService {
     return this.chatWithSystem(undefined, message, history);
   }
 
-  async chatWithSystem(systemPrompt: string | undefined, message: string, history: ChatMessage[] = []): Promise<string> {
+  async chatWithSystem(systemPrompt: string | undefined, message: string, history: ChatMessage[] = [], enableThinking: boolean = true): Promise<{ response: string, thinking?: string }> {
     try {
       console.log('🤖 Sending request to Claude...');
 
@@ -47,30 +47,68 @@ You help users:
 - Export results to Excel with custom formatting
 - Build data processing pipelines
 
+${enableThinking ? `
+
+When thinking through complex requests, use <thinking> tags to reason through your approach:
+
+<thinking>
+Let me analyze what the user is asking for...
+- Consider the data sources they mention
+- Think about the best workflow approach
+- Consider any potential challenges
+- Plan the steps needed
+</thinking>
+
+Then provide your helpful response.` : ''}
+
 Be conversational, helpful, and focus on understanding what data they want to work with and where it comes from. Ask clarifying questions when needed.`;
 
       const response = await this.anthropic.messages.create({
         model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 1000,
+        max_tokens: 2000, // Increased for thinking mode
         system: systemPrompt || defaultSystemPrompt,
         messages: messages
       });
 
-      const responseText = response.content[0]?.type === 'text' 
-        ? response.content[0].text 
-        : 'Sorry, I had trouble generating a response.';
+      let responseText = '';
+      let thinking = '';
+
+      if (response.content[0]?.type === 'text') {
+        const fullText = response.content[0].text;
+        
+        // Extract thinking content if present
+        const thinkingMatch = fullText.match(/<thinking>(.*?)<\/thinking>/s);
+        if (thinkingMatch && enableThinking) {
+          thinking = thinkingMatch[1].trim();
+          responseText = fullText.replace(/<thinking>.*?<\/thinking>/s, '').trim();
+          console.log('🧠 Thinking extracted:', thinking.substring(0, 100) + '...');
+        } else {
+          responseText = fullText;
+        }
+      } else {
+        responseText = 'Sorry, I had trouble generating a response.';
+      }
 
       console.log('✅ Claude response received');
-      return responseText;
+      console.log('📝 Response length:', responseText.length);
+      console.log('🧠 Thinking length:', thinking.length);
+      
+      return { response: responseText, thinking: thinking || undefined };
 
     } catch (error) {
       console.error('❌ LLM Service error:', error);
       
       if (error instanceof Error && error.message.includes('api_key')) {
-        return 'I\'m having trouble connecting to my AI service. Please check that the API key is configured correctly.';
+        return { response: 'I\'m having trouble connecting to my AI service. Please check that the API key is configured correctly.' };
       }
       
-      return 'Sorry, I encountered an error while processing your request. Please try again.';
+      return { response: 'Sorry, I encountered an error while processing your request. Please try again.' };
     }
+  }
+
+  // Backwards compatibility method
+  async chatWithSystemOld(systemPrompt: string | undefined, message: string, history: ChatMessage[] = []): Promise<string> {
+    const result = await this.chatWithSystem(systemPrompt, message, history, false);
+    return result.response;
   }
 }

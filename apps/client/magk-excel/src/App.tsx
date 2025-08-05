@@ -1,12 +1,31 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChatInterface } from './components/ChatInterface'
 import { WorkflowDemo } from './components/workflow'
 import { MCPServerToggle } from './components/MCPServerToggle'
 import { Button } from './components/ui/button'
+import { useMCPStore } from './services/mcpService'
 import './App.css'
 
 function App() {
   const [activeTab, setActiveTab] = useState<'chat' | 'workflow' | 'mcp'>('workflow')
+  const { initialize, tools, enabledServers } = useMCPStore()
+  
+  // Initialize MCP on app startup
+  useEffect(() => {
+    console.log('🚀 App: Initializing MCP store on startup...')
+    initialize().then(async () => {
+      console.log('✅ App: MCP initialized with', tools.length, 'tools from', enabledServers.length, 'servers')
+      
+      // Auto-enable Excel server if not already enabled
+      if (!enabledServers.includes('excel')) {
+        console.log('🔧 App: Auto-enabling Excel MCP server...')
+        const { toggleServer } = useMCPStore.getState()
+        await toggleServer('excel', true)
+      }
+    }).catch((error) => {
+      console.error('❌ App: MCP initialization failed:', error)
+    })
+  }, [])
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background">
@@ -15,6 +34,11 @@ function App() {
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-semibold text-foreground">MAGK Excel</h1>
           <span className="text-sm text-muted-foreground">Workflow Builder</span>
+          {tools.length > 0 && (
+            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+              {tools.length} MCP tools
+            </span>
+          )}
         </div>
         
         {/* Tab Navigation */}

@@ -541,10 +541,9 @@ export const SmitheryServerBrowser: React.FC = () => {
                         size="sm" 
                         className="flex-1"
                         onClick={() => setSelectedServer(server)}
-                        disabled={!server.isDeployed}
                       >
                         <Plus className="h-4 w-4 mr-1" />
-                        Install
+                        {server.isDeployed ? 'Connect' : 'Install'}
                       </Button>
                     </DialogTrigger>
                     {selectedServer && (
@@ -566,8 +565,8 @@ export const SmitheryServerBrowser: React.FC = () => {
                 </div>
 
                 {!server.isDeployed && (
-                  <p className="text-xs text-amber-600 mt-2">
-                    Server not currently deployed
+                  <p className="text-xs text-blue-600 mt-2">
+                    Local server - requires Smithery CLI
                   </p>
                 )}
               </div>

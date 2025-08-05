@@ -79,6 +79,20 @@ export class SmitheryClient {
       });
 
       const response = await this.makeRequest(`/servers?${params.toString()}`);
+      
+      // Fix deployment status - all servers from Smithery registry should be deployable
+      // The API might return 'deployed' instead of 'isDeployed' or might not have this field
+      if (response.servers) {
+        response.servers = response.servers.map((server: any) => ({
+          ...server,
+          // If searching for verified servers or if the server has a qualifiedName, it should be deployable
+          isDeployed: server.isDeployed ?? server.deployed ?? server.verified ?? true,
+          // Ensure verified field is set for verified searches
+          verified: query.includes('is:verified') ? true : (server.verified ?? false)
+        }));
+      }
+      
+      console.log(`🔍 Search results: ${response.servers?.length || 0} servers (query: ${query})`);
       return response as SmitherySearchResponse;
     } catch (error) {
       console.error('Failed to search Smithery servers:', error);
@@ -121,7 +135,8 @@ export class SmitheryClient {
    */
   async getServersByCategory(category: string): Promise<SmitheryServerInfo[]> {
     try {
-      const response = await this.searchServers(`category:${category} is:deployed`);
+      // Remove the is:deployed filter since we're handling deployment status ourselves
+      const response = await this.searchServers(`category:${category}`);
       return response.servers;
     } catch (error) {
       console.error(`Failed to get servers for category ${category}:`, error);
@@ -144,15 +159,11 @@ export class SmitheryClient {
         configRequired: !!serverDetails.configSchema
       });
       
+      // For local servers (not deployed on Smithery), we would need Smithery CLI
+      // For now, we'll focus on hosted servers which are the majority
       if (!serverDetails.isDeployed) {
-        const error = 'Server is not deployed and available';
-        console.warn(`⚠️ ${error}:`, serverDetails);
-        return {
-          success: false,
-          serverInfo: serverDetails,
-          configRequired: false,
-          error
-        };
+        console.warn(`⚠️ ${serverDetails.displayName} is a local server that requires Smithery CLI installation`);
+        // We'll still try to connect in case it's already installed locally
       }
 
       // Build connection URL

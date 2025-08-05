@@ -86,7 +86,13 @@ function setupMCPHandlers() {
   })
 
   ipcMain.handle('mcp:list-resources', async (_, serverName?: string) => {
-    return await mcpManager.listResources(serverName)
+    try {
+      return await mcpManager.listResources(serverName)
+    } catch (error) {
+      console.error('Error in mcp:list-resources handler:', error)
+      // Return empty array instead of failing completely
+      return []
+    }
   })
 
   ipcMain.handle('mcp:call-tool', async (_, serverName: string, toolName: string, args: any) => {

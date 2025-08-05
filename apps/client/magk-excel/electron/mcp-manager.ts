@@ -256,19 +256,38 @@ export class MCPManager {
       if (!client) {
         throw new Error(`Not connected to server: ${serverName}`);
       }
-      const resources = await client.listResources();
-      return resources.resources || [];
+      
+      try {
+        const resources = await client.listResources();
+        return resources.resources || [];
+      } catch (error: any) {
+        // Handle servers that don't support resources (MCP error -32601: Method not found)
+        if (error.code === -32601) {
+          console.log(`📋 Server ${serverName} does not support resources (tools-only server)`);
+          return [];
+        }
+        throw error;
+      }
     }
 
     // List all resources from all connected servers
     const allResources = [];
     for (const [name, client] of this.clients) {
-      const resources = await client.listResources();
-      for (const resource of (resources.resources || [])) {
-        allResources.push({
-          ...resource,
-          server: name
-        });
+      try {
+        const resources = await client.listResources();
+        for (const resource of (resources.resources || [])) {
+          allResources.push({
+            ...resource,
+            server: name
+          });
+        }
+      } catch (error: any) {
+        // Handle servers that don't support resources
+        if (error.code === -32601) {
+          console.log(`📋 Server ${name} does not support resources (tools-only server)`);
+          continue;
+        }
+        console.warn(`⚠️ Failed to list resources from ${name}:`, error);
       }
     }
     return allResources;

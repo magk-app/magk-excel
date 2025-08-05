@@ -1,0 +1,15 @@
+{
+  "smitheryServers": {
+    "context7": {
+      "command": "",
+      "type": "http",
+      "url": "https://server.smithery.ai/@upstash/context7-mcp/mcp?api_key=00a026b7-3827-4340-91be-a057d063cccd",
+      "isSmithery": true,
+      "qualifiedName": "@upstash/context7-mcp",
+      "displayName": "Context7",
+      "description": "Fetch up-to-date, version-specific documentation and code examples directly into your prompts. Enhance your coding experience by eliminating outdated information and hallucinated APIs. Simply add `use context7` to your questions for accurate and relevant answers.",
+      "config": {}
+    }
+  },
+  "lastUpdated": "2025-08-05T04:10:52.791Z"
+}

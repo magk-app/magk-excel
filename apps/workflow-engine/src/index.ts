@@ -3,8 +3,10 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { chatRoute } from './routes/chat.js';
 import { extractRoute } from './routes/extract.js';
+import { demoRoute } from './routes/demo.js';
 
 const app = new Hono();
 
@@ -29,9 +31,16 @@ app.get('/health', (c) => {
   return c.json({ status: 'healthy', service: 'magk-workflow-engine' });
 });
 
+// Serve static files from downloads folder
+app.use('/downloads/*', serveStatic({
+  root: '../client/magk-excel/public',
+  rewriteRequestPath: (path) => path
+}));
+
 // Mount routes
 app.route('', chatRoute);
 app.route('', extractRoute);
+app.route('', demoRoute);
 
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 console.log(`🚀 MAGK Workflow Engine starting on http://localhost:${port}`);

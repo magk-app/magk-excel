@@ -1,10 +1,36 @@
 import { AiChat } from '@nlux/react';
 import '@nlux/themes/nova.css';
+import { useState, useEffect, useRef } from 'react';
 import { useMCPChat } from '../hooks/useMCPChat';
 import { useMCPStore } from '../services/mcpService';
+import { FileUploadArea, FileAttachment } from './FileUploadArea';
+import { ChatSessionsSidebar } from './ChatSessionsSidebar';
+import { ToolCallStatusWindow, useToolCallMonitor } from './ToolCallStatusWindow';
+import { useChatHistory, chatHistoryHelpers } from '../services/chatHistoryService';
+import { PDFExtractionService } from '../services/pdfExtractionService';
 
 
 export function ChatInterface() {
+  const [attachments, setAttachments] = useState<FileAttachment[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currentMessageId, setCurrentMessageId] = useState<string | null>(null);
+  const [showPDFExtraction, setShowPDFExtraction] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState('');
+  const [extractionPrompt, setExtractionPrompt] = useState('');
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [nluxKey, setNluxKey] = useState(0); // Force NLUX re-render when switching sessions
+  
+  // Tool call monitoring
+  const {
+    toolCalls,
+    isWindowOpen,
+    addToolCall,
+    updateToolCall,
+    clearToolCalls,
+    openWindow,
+    closeWindow
+  } = useToolCallMonitor();
+  
   const { tools, enabledServers } = useMCPStore();
   const { 
     parseToolCalls, 
@@ -13,14 +39,283 @@ export function ChatInterface() {
     findRelevantTools,
     callTool
   } = useMCPChat();
+  
+  const {
+    sessions,
+    activeSessionId,
+    createSession,
+    addMessage,
+    updateMessage,
+    updateSessionTitle,
+    getActiveSession,
+    getSessionHistory
+  } = useChatHistory();
+
+  // Initialize with a default session if none exists
+  useEffect(() => {
+    if (sessions.length === 0) {
+      createSession('Welcome Chat');
+    }
+  }, [sessions.length, createSession]);
+
+  // Force NLUX to re-render when active session changes
+  useEffect(() => {
+    console.log('🔄 Active session changed to:', activeSessionId);
+    setNluxKey(prev => prev + 1); // This will force NLUX to completely re-render
+  }, [activeSessionId]);
+
+  // PDF Extraction function
+  const handlePDFExtraction = async (extractAll: boolean = false) => {
+    if (!pdfUrl.trim()) {
+      alert('Please enter a PDF URL');
+      return;
+    }
+
+    setIsExtracting(true);
+    
+    // Add progress status message
+    const statusMessageId = Date.now().toString();
+    if (activeSessionId) {
+      const operationType = extractAll ? 'Extract All Tables' : 'Extract Specific Data';
+      addMessage(activeSessionId, {
+        role: 'assistant',
+        content: `📄 **${operationType} - Starting...**\n\n⏳ **Status:** Initializing PDF extraction\n📄 **PDF URL:** ${pdfUrl}\n${!extractAll ? `🎯 **Prompt:** ${extractionPrompt}\n` : ''}🤖 **Method:** Modal AI API\n\n*Please wait while I process the PDF...*`
+      });
+    }
+
+    try {
+      let result;
+      let operationType;
+      
+      // Update status: Processing
+      if (activeSessionId) {
+        setTimeout(() => {
+          updateMessage(activeSessionId, statusMessageId, {
+            role: 'assistant',
+            content: `📄 **${extractAll ? 'Extract All Tables' : 'Extract Specific Data'}**\n\n⏳ **Status:** Processing PDF with AI...\n📄 **PDF URL:** ${pdfUrl}\n${!extractAll ? `🎯 **Prompt:** ${extractionPrompt}\n` : ''}🤖 **Method:** Modal AI API\n\n*AI is analyzing the PDF content...*`
+          });
+        }, 1000);
+      }
+      
+      if (extractAll) {
+        result = await PDFExtractionService.extractAllTables(pdfUrl);
+        operationType = 'Extract All Tables';
+      } else {
+        if (!extractionPrompt.trim()) {
+          alert('Please enter a prompt for specific extraction');
+          return;
+        }
+        result = await PDFExtractionService.extractSpecificTable(pdfUrl, extractionPrompt);
+        operationType = 'Extract Specific Data';
+      }
+
+      // Update the status message with final results
+      if (activeSessionId) {
+        let displayData = '';
+        if (result.data || result.tables || result.extracted_data) {
+          const dataToShow = result.data || result.tables || result.extracted_data;
+          displayData = JSON.stringify(dataToShow, null, 2);
+          // Truncate if too long
+          if (displayData.length > 2000) {
+            displayData = displayData.substring(0, 2000) + '...\n\n*[Data truncated for display - see full results in console]*';
+          }
+        }
+
+        const extractionMessage = `**${operationType} from PDF - Success!** ✅\n\n` +
+          `**📄 PDF URL:** ${pdfUrl}\n` +
+          (extractionPrompt ? `**🎯 Prompt:** ${extractionPrompt}\n` : '') +
+          `**⏱️ Status:** ${result.status}\n` +
+          `**🤖 Method:** Modal AI API\n\n` +
+          (displayData ? `**📋 Extracted Data:**\n\`\`\`json\n${displayData}\n\`\`\`\n\n` : '') +
+          `*PDF extraction completed successfully!*`;
+        
+        updateMessage(activeSessionId, statusMessageId, {
+          role: 'assistant',
+          content: extractionMessage
+        });
+
+        // Log full results to console for debugging
+        console.log('📄 PDF Extraction - Full Results:', result);
+      }
+
+      // Clear inputs
+      setPdfUrl('');
+      setExtractionPrompt('');
+      setShowPDFExtraction(false);
+
+    } catch (error) {
+      console.error('PDF extraction error:', error);
+      if (activeSessionId) {
+        updateMessage(activeSessionId, statusMessageId, {
+          role: 'assistant',
+          content: `**PDF Extraction - Error** ❌\n\n**Error:** ${error instanceof Error ? error.message : 'Unknown error'}\n\n**Troubleshooting:**\n- Check if the PDF URL is accessible\n- Verify the Modal API is responding\n- Try with a different PDF or prompt\n\n*You can try again with different parameters.*`
+        });
+      }
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  // Autonomous chat simulation helper
+  const simulateUserMessage = async (message: string, delay: number = 1000) => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        if (activeSessionId) {
+          addMessage(activeSessionId, {
+            role: 'user',
+            content: message
+          });
+        }
+        resolve(true);
+      }, delay);
+    });
+  };
+
+  const simulateAIResponse = async (observer: any, message: string) => {
+    // Use the existing chat adapter to process the message properly
+    return new Promise((resolve) => {
+      mcpEnhancedAdapter.streamText(message, {
+        next: (chunk: string) => {
+          // The adapter handles the streaming and message adding
+        },
+        complete: () => {
+          resolve(true);
+        },
+        error: (error: any) => {
+          console.error('Simulated AI response error:', error);
+          resolve(false);
+        }
+      });
+    });
+  };
+
+  // Quick demo functions - Autonomous Chat Replay
+  const runHKPassengerDemo = async () => {
+    if (!activeSessionId) return;
+
+    console.log('🎯 Starting HK Passenger Statistics Demo - Autonomous Chat');
+
+    try {
+      // Step 1: Simulate user asking for HK passenger stats
+      await simulateUserMessage(
+        "I need to extract the latest Hong Kong passenger statistics from the Immigration Department website. Can you help me scrape the arrival and departure data and create an Excel file?",
+        500
+      );
+
+      // Step 2: Let the AI process and respond (delay to let user see the message)
+      setTimeout(async () => {
+        await simulateAIResponse(null,
+          "I need to extract the latest Hong Kong passenger statistics from the Immigration Department website. Can you help me scrape the arrival and departure data and create an Excel file?"
+        );
+
+        // Step 3: After AI responds, simulate follow-up request
+        setTimeout(async () => {
+          await simulateUserMessage(
+            `Please extract data for today's date (${new Date().toISOString().slice(0,8).replace(/-/g, '')}) and format it as an Excel file with proper headers.`,
+            3000
+          );
+
+          // Step 4: Final AI processing
+          setTimeout(async () => {
+            await simulateAIResponse(null,
+              `Please extract data for today's date (${new Date().toISOString().slice(0,8).replace(/-/g, '')}) and format it as an Excel file with proper headers.`
+            );
+          }, 2000);
+        }, 4000);
+      }, 2000);
+
+    } catch (error) {
+      console.error('HK Demo autonomous chat error:', error);
+      addMessage(activeSessionId, {
+        role: 'assistant',
+        content: `❌ **Demo Error**: Failed to simulate autonomous chat conversation.\n\n**Error:** ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+    }
+  };
+
+  const runPDFBalanceSheetDemo = async () => {
+    if (!activeSessionId) return;
+
+    console.log('🎯 Starting PDF Balance Sheet Demo - Autonomous Chat');
+
+    try {
+      // Step 1: Simulate user asking for PDF extraction
+      await simulateUserMessage(
+        "I need to extract the consolidated balance sheets from Google's latest 10-Q filing. Can you help me extract the financial data from this PDF: https://abc.xyz/assets/51/e1/bf43f01041f6a8882a29d7e89cae/goog-10-q-q1-2025.pdf",
+        500
+      );
+
+      // Step 2: Let the AI process and respond
+      setTimeout(async () => {
+        await simulateAIResponse(null,
+          "I need to extract the consolidated balance sheets from Google's latest 10-Q filing. Can you help me extract the financial data from this PDF: https://abc.xyz/assets/51/e1/bf43f01041f6a8882a29d7e89cae/goog-10-q-q1-2025.pdf"
+        );
+
+        // Step 3: Follow-up with specific extraction request
+        setTimeout(async () => {
+          await simulateUserMessage(
+            "Please specifically extract the 'Consolidated balance sheets' section and format the data in a structured way so I can analyze Google's assets, liabilities, and equity.",
+            3000
+          );
+
+          // Step 4: Final AI processing for specific extraction
+          setTimeout(async () => {
+            await simulateAIResponse(null,
+              "Please specifically extract the 'Consolidated balance sheets' section and format the data in a structured way so I can analyze Google's assets, liabilities, and equity."
+            );
+          }, 2000);
+        }, 4000);
+      }, 2000);
+
+    } catch (error) {
+      console.error('PDF Demo autonomous chat error:', error);
+      addMessage(activeSessionId, {
+        role: 'assistant',
+        content: `❌ **Demo Error**: Failed to simulate autonomous chat conversation.\n\n**Error:** ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+    }
+  };
 
   console.log('🔍 ChatInterface: Current enabled servers:', enabledServers);
   console.log('🛠️ ChatInterface: Available tools:', tools.length);
 
-  // Enhanced adapter with dynamic MCP server detection
+  // Enhanced adapter with dynamic MCP server detection and improved status indicators
   const mcpEnhancedAdapter = {
     streamText: (message: string, observer: any) => {
       console.log('🚀 Frontend: Starting MCP-enhanced chat request for message:', message);
+      
+      // Get current session
+      const currentSession = getActiveSession();
+      if (!currentSession) {
+        observer.error(new Error('No active chat session'));
+        return;
+      }
+      
+      // FIRST: Add user message to storage
+      if (activeSessionId) {
+        addMessage(activeSessionId, {
+          role: 'user',
+          content: message,
+          attachments: attachments.map(att => ({
+            name: att.name,
+            type: att.type,
+            size: att.size
+          }))
+        });
+        console.log('💾 Added user message to session storage');
+      }
+      
+      // THEN: Get complete conversation history including the new message
+      const updatedSession = getActiveSession();
+      const history = chatHistoryHelpers.toNLUXHistory(updatedSession?.messages || []);
+      console.log('📚 Using conversation history:', history.length, 'messages');
+      console.log('📚 History preview:', history.slice(-2)); // Show last 2 messages for debugging
+      
+      // Auto-generate session title from first message
+      if (currentSession.messages.length === 0) {
+        const title = chatHistoryHelpers.generateSessionTitle(message);
+        // We'll update the title after this message is processed
+      }
       
       // Make the async request with MCP tool execution
       (async () => {
@@ -29,6 +324,8 @@ export function ChatInterface() {
           
           console.log('🛠️ Frontend: Using tools from enabled servers:', enabledServers);
           console.log('🔧 Frontend: All available tools:', tools);
+
+          // Skip processing message - go straight to API call
 
           // Prepare dynamic MCP servers data (includes Smithery servers!)
           const mcpServers = enabledServers.reduce((acc, server) => {
@@ -41,24 +338,51 @@ export function ChatInterface() {
 
           console.log('📊 Frontend: Dynamic MCP servers data:', mcpServers);
 
+          // Prepare request with file support
+          let requestBody: any;
+          let requestHeaders: any = {};
+          
+          if (attachments.length > 0) {
+            // Use FormData for file uploads
+            const formData = new FormData();
+            formData.append('message', message);
+            formData.append('mcpTools', JSON.stringify(tools));
+            formData.append('mcpServers', JSON.stringify(mcpServers));
+            formData.append('history', JSON.stringify(history));
+            
+            // Add file attachments
+            attachments.forEach((attachment, index) => {
+              formData.append(`file_${index}`, attachment.file);
+              formData.append(`file_${index}_type`, attachment.type);
+              formData.append(`file_${index}_name`, attachment.name);
+            });
+            
+            formData.append('fileCount', attachments.length.toString());
+            requestBody = formData;
+            // Don't set Content-Type header - let browser set it with boundary for FormData
+          } else {
+            // Use JSON for text-only messages
+            requestHeaders['Content-Type'] = 'application/json';
+            requestBody = JSON.stringify({
+              message,
+              history: history,
+              mcpTools: tools, // Send ALL available MCP tools (including Smithery!)
+              mcpServers: mcpServers // Dynamic server detection
+            });
+          }
+
           // Send to backend for LLM processing with dynamic MCP tool context
           const response = await fetch('http://localhost:3001/chat', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              message,
-              history: [], // TODO: Implement proper history tracking
-              mcpTools: tools, // Send ALL available MCP tools (including Smithery!)
-              mcpServers: mcpServers // Dynamic server detection
-            })
+            headers: requestHeaders,
+            body: requestBody
           });
 
           console.log('📨 Frontend: Received response with status:', response.status);
 
           if (!response.ok) {
             console.error('❌ Frontend: HTTP error:', response.status, response.statusText);
+            observer.next(`❌ **Connection Error**: HTTP ${response.status} - ${response.statusText}\n\n`);
             observer.error(new Error(`HTTP Error ${response.status}: ${response.statusText}`));
             return;
           }
@@ -68,73 +392,72 @@ export function ChatInterface() {
           
           if (data.status === 'error') {
             console.error('❌ Frontend: Backend returned error:', data.error);
+            observer.next(`❌ **Backend Error**: ${data.error || 'Unknown error occurred'}\n\n`);
             observer.error(new Error(`Backend Error: ${data.error || 'Unknown error occurred'}`));
             return;
           }
 
-          // Handle LLM response with potential MCP tool calls
+          // Skip status messages - process files silently
+
+          // Skip thinking display - go straight to response
+
+          // Simple response handling - just stream the response
+          if (!data.response) {
+            console.error('❌ Frontend: No response field in data:', data);
+            observer.error(new Error('Backend did not return a response field'));
+            return;
+          }
+
+          console.log('✅ Frontend: Got response, streaming...', data.response.length, 'chars');
+          
+          // Just stream the response word by word - keep it simple
+          const words = data.response.split(' ');
+          for (const word of words) {
+            observer.next(word + ' ');
+            await new Promise(resolve => setTimeout(resolve, 30));
+          }
+
+          // Handle MCP tool calls if present (simplified)
           if (data.mcpToolCalls && data.mcpToolCalls.length > 0) {
-            console.log('🛠️ Frontend: LLM requested MCP tool calls:', data.mcpToolCalls);
+            observer.next(`\n\n🔧 **Using ${data.mcpToolCalls.length} MCP tool(s)...**\n\n`);
             
-            // Stream initial response
-            if (data.response) {
-              observer.next(`${data.response}\n\n`);
-              await new Promise(resolve => setTimeout(resolve, 100));
-            }
-            
-            // Show tool execution status
-            observer.next('🔧 **Executing MCP Tools:**\n\n');
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            // Execute each tool call and stream results
             for (const toolCall of data.mcpToolCalls) {
               try {
-                observer.next(`⚡ Calling **${toolCall.tool}** from **${toolCall.server}**...\n`);
-                await new Promise(resolve => setTimeout(resolve, 200));
-                
                 const result = await callTool(toolCall.server, toolCall.tool, toolCall.args);
-                
-                observer.next(`✅ **${toolCall.tool}** completed successfully:\n`);
-                observer.next(`\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\`\n\n`);
-                await new Promise(resolve => setTimeout(resolve, 300));
-                
+                observer.next(`✅ ${toolCall.tool}: Success\n`);
               } catch (error) {
-                observer.next(`❌ **${toolCall.tool}** failed: ${error}\n\n`);
-                await new Promise(resolve => setTimeout(resolve, 200));
+                observer.next(`❌ ${toolCall.tool}: ${error}\n`);
               }
-            }
-            
-            // Stream final summary if provided
-            if (data.summary) {
-              observer.next('📊 **Summary:**\n');
-              const summaryWords = data.summary.split(' ');
-              for (const word of summaryWords) {
-                observer.next(word + ' ');
-                await new Promise(resolve => setTimeout(resolve, 30));
-              }
-            }
-            
-          } else {
-            // Regular response without tool calls
-            if (!data.response) {
-              console.error('❌ Frontend: No response field in data:', data);
-              observer.error(new Error('Backend did not return a response field'));
-              return;
-            }
-
-            console.log('✅ Frontend: Successfully got response, starting to stream...');
-            
-            // Stream the response word by word for better UX
-            const words = data.response.split(' ');
-            console.log(`📝 Frontend: Streaming ${words.length} words...`);
-            
-            for (const word of words) {
-              observer.next(word + ' ');
-              await new Promise(resolve => setTimeout(resolve, 30)); // Faster streaming
             }
           }
           
           console.log('✅ Frontend: Finished streaming response');
+          
+          // Save assistant response to chat history (simplified)
+          if (activeSessionId) {
+            const assistantMessage = {
+              role: 'assistant' as const,
+              content: data.response || 'Response processed successfully',
+              mcpToolCalls: data.mcpToolCalls || []
+            };
+            
+            addMessage(activeSessionId, assistantMessage);
+            console.log('💾 Saved assistant message to chat history');
+            
+            // Auto-generate session title from first user message
+            if (currentSession.messages.length <= 2) {
+              const title = chatHistoryHelpers.generateSessionTitle(message);
+              updateSessionTitle(activeSessionId, title);
+              console.log('📝 Updated session title:', title);
+            }
+          }
+          
+          // Clear attachments after successful processing
+          if (attachments.length > 0) {
+            console.log('🧹 Frontend: Clearing attachments after successful processing');
+            setAttachments([]);
+          }
+          
           observer.complete();
 
         } catch (error) {
@@ -146,39 +469,217 @@ export function ChatInterface() {
           });
           
           const errorMessage = error instanceof Error ? error.message : String(error);
+          observer.next(`❌ **Connection Error**: ${errorMessage}\n\n*Please make sure the workflow engine is running on http://localhost:3001*\n\n`);
           observer.error(new Error(`Connection Error: ${errorMessage}. Please make sure the workflow engine is running on http://localhost:3001`));
         }
       })();
     }
   };
 
+  // Get current session info for display
+  const currentSession = getActiveSession();
+  const sessionTitle = currentSession?.title || 'New Chat';
+
   return (
-    <div className="h-full w-full">
-      <AiChat
-        adapter={mcpEnhancedAdapter}
-        displayOptions={{
-          colorScheme: 'auto',
-          width: '100%',
-          height: '100%'
-        }}
-        conversationOptions={{
-          historyPayloadSize: 'max'
-        }}
-        messageOptions={{
-          showCodeBlockCopyButton: true,
-          markdownLinkTarget: 'blank'
-        }}
-        composerOptions={{
-          placeholder: 'Ask me to create an Excel workflow, extract PDF data, or scrape web content...',
-          autoFocus: true
-        }}
-        personaOptions={{
-          assistant: {
-            name: 'MAGK Assistant',
-            tagline: 'Excel Workflow Expert with MCP Tools',
-            avatar: '🤖'
-          }
-        }}
+    <div className="h-full w-full flex">
+      {/* Chat Sessions Sidebar */}
+      <ChatSessionsSidebar 
+        isOpen={sidebarOpen} 
+        onToggle={() => setSidebarOpen(!sidebarOpen)} 
+      />
+      
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Chat Header */}
+        <div className="p-3 border-b bg-background/80 backdrop-blur-sm">
+          <div className="flex items-center gap-3">
+            {!sidebarOpen && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="p-2 hover:bg-muted rounded-md transition-colors"
+                title="Open chat sessions"
+              >
+                💬
+              </button>
+            )}
+            <div className="flex-1">
+              <h1 className="font-semibold text-lg">{sessionTitle}</h1>
+              <p className="text-sm text-muted-foreground">
+                {currentSession ? `${currentSession.messages.length} messages` : 'No active session'}
+                {enabledServers.length > 0 && (
+                  <span> • {enabledServers.length} MCP server{enabledServers.length !== 1 ? 's' : ''} enabled</span>
+                )}
+              </p>
+            </div>
+            
+            {/* Demo Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={runHKPassengerDemo}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium"
+                title="Run HK Passenger Statistics Demo - Extract live data from Hong Kong Immigration Department"
+              >
+                🇭🇰 HK Demo
+              </button>
+              
+              <button
+                onClick={runPDFBalanceSheetDemo}
+                className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm font-medium"
+                title="Run Google 10-Q Balance Sheet Demo - Extract consolidated balance sheets using AI"
+              >
+                📊 PDF Demo
+              </button>
+            </div>
+
+            {/* PDF Extraction Button */}
+            <button
+              onClick={() => setShowPDFExtraction(!showPDFExtraction)}
+              className="p-2 hover:bg-muted rounded-md transition-colors"
+              title="PDF Data Extraction"
+            >
+              📄
+            </button>
+            
+            {/* Tool Call Monitor Button */}
+            <button
+              onClick={openWindow}
+              className="p-2 hover:bg-muted rounded-md transition-colors relative"
+              title="Open MCP Tool Monitor"
+            >
+              🔧
+              {toolCalls.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {toolCalls.length}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* PDF Extraction Panel */}
+        {showPDFExtraction && (
+          <div className="border-b bg-muted/30 p-4">
+            <div className="max-w-4xl mx-auto">
+              <h3 className="font-semibold mb-3">📄 PDF Data Extraction</h3>
+              
+              {/* PDF URL Input */}
+              <div className="mb-3">
+                <label className="block text-sm font-medium mb-1">PDF URL:</label>
+                <input
+                  type="url"
+                  value={pdfUrl}
+                  onChange={(e) => setPdfUrl(e.target.value)}
+                  placeholder="https://example.com/document.pdf"
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={isExtracting}
+                />
+              </div>
+              
+              {/* Extraction Prompt */}
+              <div className="mb-3">
+                <label className="block text-sm font-medium mb-1">
+                  Extraction Prompt (optional for specific extraction):
+                </label>
+                <input
+                  type="text"
+                  value={extractionPrompt}
+                  onChange={(e) => setExtractionPrompt(e.target.value)}
+                  placeholder="e.g., 'Consolidated balance sheets', 'Revenue table', 'Financial summary'"
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={isExtracting}
+                />
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => handlePDFExtraction(true)}
+                  disabled={isExtracting || !pdfUrl.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isExtracting ? 'Extracting...' : 'Extract All Tables'}
+                </button>
+                
+                <button
+                  onClick={() => handlePDFExtraction(false)}
+                  disabled={isExtracting || !pdfUrl.trim() || !extractionPrompt.trim()}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isExtracting ? 'Extracting...' : 'Extract Specific Data'}
+                </button>
+                
+                <button
+                  onClick={() => setShowPDFExtraction(false)}
+                  className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                  disabled={isExtracting}
+                >
+                  Cancel
+                </button>
+              </div>
+              
+              {/* API Endpoints Reference */}
+              <div className="mt-3 p-2 bg-gray-100 rounded text-xs">
+                <strong>API Endpoints:</strong>
+                <br />• Extract All: <code>extract-tables.modal.run</code>
+                <br />• Extract Specific: <code>extract-specific-table.modal.run</code>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* File Upload Area */}
+        <FileUploadArea
+          attachments={attachments}
+          onAttachmentsChange={setAttachments}
+          maxFiles={5}
+          maxFileSize={50 * 1024 * 1024} // 50MB
+        />
+        
+        {/* Chat Interface */}
+        <div className="flex-1 min-h-0">
+          <AiChat
+          key={nluxKey} // Force complete re-render when session changes
+          adapter={mcpEnhancedAdapter}
+          initialConversation={currentSession ? chatHistoryHelpers.toNLUXHistory(currentSession.messages) : []}
+          displayOptions={{
+            colorScheme: 'auto',
+            width: '100%',
+            height: '100%'
+          }}
+          conversationOptions={{
+            historyPayloadSize: 'max'
+          }}
+          messageOptions={{
+            showCodeBlockCopyButton: true,
+            markdownLinkTarget: 'blank',
+            syntaxHighlighter: {
+              highlightjs: true
+            },
+            markdownLookAndFeel: 'github',
+            streamingAnimationSpeed: 10
+          }}
+          composerOptions={{
+            placeholder: attachments.length > 0 
+              ? `Ask me about the ${attachments.length} uploaded file${attachments.length > 1 ? 's' : ''}, or create an Excel workflow...`
+              : 'Ask me to create an Excel workflow, extract PDF data, or scrape web content...',
+            autoFocus: true
+          }}
+          personaOptions={{
+            assistant: {
+              name: 'MAGK Assistant',
+              tagline: 'Excel Workflow Expert with MCP Tools',
+              avatar: '🤖'
+            }
+          }}
+          />
+        </div>
+      </div>
+      
+      {/* Tool Call Status Window */}
+      <ToolCallStatusWindow
+        toolCalls={toolCalls}
+        isOpen={isWindowOpen}
+        onClose={closeWindow}
       />
     </div>
   );
