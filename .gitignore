@@ -47,6 +47,7 @@ Thumbs.db
 .hive-mind/
 
 # Claude Flow
+.claude-flow/
 .mcp.json
 claude-flow
 claude-flow.bat
