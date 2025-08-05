@@ -14,9 +14,12 @@ export class LLMService {
       throw new Error('ANTHROPIC_API_KEY environment variable is required');
     }
     
-    this.anthropic = new Anthropic({
-      apiKey: apiKey,
-    });
+    // Only initialize Anthropic if we have a real API key
+    if (apiKey !== 'your_anthropic_api_key_here') {
+      this.anthropic = new Anthropic({
+        apiKey: apiKey,
+      });
+    }
   }
 
   async chat(message: string, history: ChatMessage[] = []): Promise<string> {
@@ -25,6 +28,13 @@ export class LLMService {
 
   async chatWithSystem(systemPrompt: string | undefined, message: string, history: ChatMessage[] = []): Promise<string> {
     try {
+      // Check if we're in mock mode (placeholder API key)
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (apiKey === 'your_anthropic_api_key_here') {
+        console.log('🤖 Using mock response (no API key configured)...');
+        return this.generateMockWorkflowResponse(message);
+      }
+
       console.log('🤖 Sending request to Claude...');
 
       // Convert history to Anthropic format
@@ -72,5 +82,103 @@ Be conversational, helpful, and focus on understanding what data they want to wo
       
       return 'Sorry, I encountered an error while processing your request. Please try again.';
     }
+  }
+
+  private generateMockWorkflowResponse(message: string): string {
+    const lowerMessage = message.toLowerCase();
+    
+    // Generate contextual mock responses based on the user's request
+    if (lowerMessage.includes('random') || lowerMessage.includes('number')) {
+      return `I'll help you create a workflow to generate random numbers! Here's what I can build for you:
+
+**Random Number Generator Workflow:**
+
+1. **Input Configuration**
+   - Specify range (min/max values)
+   - Choose quantity of numbers to generate
+   - Select distribution type (uniform, normal, etc.)
+
+2. **Processing Steps**
+   - Generate random numbers using your specified parameters
+   - Apply any formatting or rounding rules
+   - Add optional seed for reproducible results
+
+3. **Excel Export**
+   - Create formatted Excel spreadsheet
+   - Include headers and metadata
+   - Add charts/visualizations if needed
+
+Would you like me to create this workflow for you? I can customize it based on:
+- What range of numbers do you need?
+- How many numbers should I generate?
+- Do you need them in any specific format?
+
+Just let me know your preferences and I'll build the complete automation!`;
+    }
+    
+    if (lowerMessage.includes('excel') || lowerMessage.includes('spreadsheet')) {
+      return `I can help you create Excel automation workflows! Here are some popular options:
+
+**Excel Workflow Options:**
+1. **Data Import & Processing** - Extract data from websites, APIs, or files
+2. **Report Generation** - Create formatted reports with charts and pivot tables  
+3. **Data Transformation** - Clean, merge, and restructure data
+4. **Automated Calculations** - Build complex formulas and calculations
+
+What type of Excel workflow would you like to create? For example:
+- "Import sales data from a website and create monthly reports"
+- "Process customer data and generate invoices"
+- "Extract financial data and create dashboard"
+
+Tell me more about your specific needs and I'll design the perfect workflow for you!`;
+    }
+    
+    if (lowerMessage.includes('website') || lowerMessage.includes('scrape') || lowerMessage.includes('web')) {
+      return `Perfect! I can create a web scraping workflow for you. Here's what I can build:
+
+**Web Data Extraction Workflow:**
+
+1. **Website Analysis**
+   - Identify target websites and data sources
+   - Handle authentication if needed
+   - Respect robots.txt and rate limits
+
+2. **Data Extraction**
+   - Scrape specific data fields (prices, text, images, etc.)
+   - Handle dynamic content and JavaScript
+   - Process multiple pages automatically
+
+3. **Data Processing**
+   - Clean and validate extracted data
+   - Apply filters and transformations
+   - Handle errors and missing data
+
+4. **Excel Export**
+   - Organize data in structured spreadsheet
+   - Add timestamps and source tracking
+   - Create summary reports and charts
+
+Which websites would you like to extract data from? What specific information are you looking for?`;
+    }
+    
+    // Default response for general requests
+    return `Hi! I'm your MAGK Excel workflow assistant. I can help you create automated workflows for:
+
+**🔄 Data Processing Workflows:**
+- Extract data from websites, APIs, PDFs, and databases
+- Clean and transform data automatically  
+- Generate Excel reports with custom formatting
+- Create automated data pipelines
+
+**🎯 Popular Workflow Types:**
+1. **Web Scraping** → Extract data from websites to Excel
+2. **API Integration** → Pull data from services and APIs
+3. **PDF Processing** → Extract tables and text from PDFs
+4. **Report Generation** → Create formatted Excel reports
+5. **Data Transformation** → Clean and restructure data
+
+What type of workflow would you like to create? Just describe what data you want to work with and where it comes from, and I'll build the automation for you!
+
+Example: "Extract product prices from Amazon and create a comparison spreadsheet"`;
   }
 }

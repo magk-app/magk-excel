@@ -6,13 +6,7 @@ import { useMCPStore } from '../services/mcpService';
 
 export function ChatInterface() {
   const { tools, enabledServers } = useMCPStore();
-  const { 
-    parseToolCalls, 
-    executeToolCalls, 
-    formatToolResults,
-    findRelevantTools,
-    callTool
-  } = useMCPChat();
+  const { callTool } = useMCPChat();
 
   console.log('🔍 ChatInterface: Current enabled servers:', enabledServers);
   console.log('🛠️ ChatInterface: Available tools:', tools.length);
@@ -128,8 +122,10 @@ export function ChatInterface() {
             const words = data.response.split(' ');
             console.log(`📝 Frontend: Streaming ${words.length} words...`);
             
+            let streamedContent = '';
             for (const word of words) {
-              observer.next(word + ' ');
+              streamedContent += word + ' ';
+              observer.next(streamedContent);
               await new Promise(resolve => setTimeout(resolve, 30)); // Faster streaming
             }
           }
