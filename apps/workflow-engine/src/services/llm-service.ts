@@ -20,6 +20,10 @@ export class LLMService {
   }
 
   async chat(message: string, history: ChatMessage[] = []): Promise<string> {
+    return this.chatWithSystem(undefined, message, history);
+  }
+
+  async chatWithSystem(systemPrompt: string | undefined, message: string, history: ChatMessage[] = []): Promise<string> {
     try {
       console.log('🤖 Sending request to Claude...');
 
@@ -35,10 +39,7 @@ export class LLMService {
         }
       ];
 
-      const response = await this.anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 1000,
-        system: `You are MAGK Excel Assistant, an expert at helping users create Excel workflows for data extraction, transformation, and export.
+      const defaultSystemPrompt = `You are MAGK Excel Assistant, an expert at helping users create Excel workflows for data extraction, transformation, and export.
 
 You help users:
 - Extract data from websites, PDFs, APIs, and other sources
@@ -46,7 +47,12 @@ You help users:
 - Export results to Excel with custom formatting
 - Build data processing pipelines
 
-Be conversational, helpful, and focus on understanding what data they want to work with and where it comes from. Ask clarifying questions when needed.`,
+Be conversational, helpful, and focus on understanding what data they want to work with and where it comes from. Ask clarifying questions when needed.`;
+
+      const response = await this.anthropic.messages.create({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 1000,
+        system: systemPrompt || defaultSystemPrompt,
         messages: messages
       });
 

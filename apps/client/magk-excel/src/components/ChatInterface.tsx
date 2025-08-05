@@ -1,90 +1,23 @@
 import { AiChat } from '@nlux/react';
 import '@nlux/themes/nova.css';
 import { useMCPChat } from '../hooks/useMCPChat';
+import { useMCPStore } from '../services/mcpService';
 
-// Real adapter - connects to our Hono.js backend with Claude
-// Using correct @nlux observer pattern interface
-const realAdapter = {
-  streamText: (message: string, observer: any) => {
-    console.log('🚀 Frontend: Starting chat request for message:', message);
-    
-    // Make the async request
-    (async () => {
-      try {
-        console.log('📡 Frontend: Making fetch request to backend...');
-        
-        const response = await fetch('http://localhost:3001/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            message,
-            history: [] // TODO: Implement proper history tracking
-          })
-        });
-
-        console.log('📨 Frontend: Received response with status:', response.status);
-
-        if (!response.ok) {
-          console.error('❌ Frontend: HTTP error:', response.status, response.statusText);
-          observer.error(new Error(`HTTP Error ${response.status}: ${response.statusText}`));
-          return;
-        }
-
-        const data = await response.json();
-        console.log('📋 Frontend: Parsed response data:', data);
-        
-        if (data.status === 'error') {
-          console.error('❌ Frontend: Backend returned error:', data.error);
-          observer.error(new Error(`Backend Error: ${data.error || 'Unknown error occurred'}`));
-          return;
-        }
-
-        if (!data.response) {
-          console.error('❌ Frontend: No response field in data:', data);
-          observer.error(new Error('Backend did not return a response field'));
-          return;
-        }
-
-        console.log('✅ Frontend: Successfully got response, starting to stream...');
-        
-        // Stream the response word by word for better UX
-        const words = data.response.split(' ');
-        console.log(`📝 Frontend: Streaming ${words.length} words...`);
-        
-        for (const word of words) {
-          observer.next(word + ' ');
-          await new Promise(resolve => setTimeout(resolve, 30)); // Faster streaming
-        }
-        
-        console.log('✅ Frontend: Finished streaming response');
-        observer.complete();
-
-      } catch (error) {
-        console.error('❌ Frontend: Chat adapter error:', error);
-        console.error('❌ Frontend: Error details:', {
-          name: error instanceof Error ? error.name : 'Unknown',
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined
-        });
-        
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        observer.error(new Error(`Connection Error: ${errorMessage}. Please make sure the workflow engine is running on http://localhost:3001`));
-      }
-    })();
-  }
-};
 
 export function ChatInterface() {
+  const { tools, enabledServers } = useMCPStore();
   const { 
     parseToolCalls, 
     executeToolCalls, 
     formatToolResults,
-    findRelevantTools 
+    findRelevantTools,
+    callTool
   } = useMCPChat();
 
-  // Enhanced adapter with MCP tool execution
+  console.log('🔍 ChatInterface: Current enabled servers:', enabledServers);
+  console.log('🛠️ ChatInterface: Available tools:', tools.length);
+
+  // Enhanced adapter with dynamic MCP server detection
   const mcpEnhancedAdapter = {
     streamText: (message: string, observer: any) => {
       console.log('🚀 Frontend: Starting MCP-enhanced chat request for message:', message);
@@ -94,11 +27,21 @@ export function ChatInterface() {
         try {
           console.log('📡 Frontend: Making fetch request to backend...');
           
-          // Get available MCP tools to include in LLM context
-          const availableTools = findRelevantTools(message);
-          console.log('🛠️ Frontend: Available MCP tools:', availableTools);
+          console.log('🛠️ Frontend: Using tools from enabled servers:', enabledServers);
+          console.log('🔧 Frontend: All available tools:', tools);
 
-          // Send to backend for LLM processing with MCP tool context
+          // Prepare dynamic MCP servers data (includes Smithery servers!)
+          const mcpServers = enabledServers.reduce((acc, server) => {
+            acc[server] = {
+              enabled: true,
+              tools: tools.filter(tool => tool.server === server)
+            };
+            return acc;
+          }, {} as Record<string, any>);
+
+          console.log('📊 Frontend: Dynamic MCP servers data:', mcpServers);
+
+          // Send to backend for LLM processing with dynamic MCP tool context
           const response = await fetch('http://localhost:3001/chat', {
             method: 'POST',
             headers: {
@@ -107,14 +50,8 @@ export function ChatInterface() {
             body: JSON.stringify({
               message,
               history: [], // TODO: Implement proper history tracking
-              mcpTools: availableTools, // Send all available MCP tools
-              mcpServers: {
-                claude_flow: { enabled: true, tools: availableTools.filter(t => t.server === 'claude-flow') },
-                ruv_swarm: { enabled: true, tools: availableTools.filter(t => t.server === 'ruv-swarm') },
-                firecrawl: { enabled: true, tools: availableTools.filter(t => t.server === 'firecrawl') },
-                puppeteer: { enabled: true, tools: availableTools.filter(t => t.server === 'puppeteer') },
-                fetch: { enabled: true, tools: availableTools.filter(t => t.server === 'fetch') }
-              }
+              mcpTools: tools, // Send ALL available MCP tools (including Smithery!)
+              mcpServers: mcpServers // Dynamic server detection
             })
           });
 

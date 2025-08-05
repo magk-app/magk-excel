@@ -1,6 +1,7 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { mcpManager } from './mcp-manager.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -63,4 +64,78 @@ app.on('activate', () => {
   }
 })
 
-app.whenReady().then(createWindow)
+// Setup IPC handlers for MCP
+function setupMCPHandlers() {
+  ipcMain.handle('mcp:load-config', async () => {
+    await mcpManager.loadConfig()
+    return {
+      availableServers: mcpManager.getAvailableServers(),
+      enabledServers: mcpManager.getEnabledServers()
+    }
+  })
+
+  ipcMain.handle('mcp:toggle-server', async (_, serverName: string, enabled: boolean) => {
+    await mcpManager.toggleServer(serverName, enabled)
+    return {
+      enabledServers: mcpManager.getEnabledServers()
+    }
+  })
+
+  ipcMain.handle('mcp:list-tools', async (_, serverName?: string) => {
+    return await mcpManager.listTools(serverName)
+  })
+
+  ipcMain.handle('mcp:list-resources', async (_, serverName?: string) => {
+    return await mcpManager.listResources(serverName)
+  })
+
+  ipcMain.handle('mcp:call-tool', async (_, serverName: string, toolName: string, args: any) => {
+    return await mcpManager.callTool(serverName, toolName, args)
+  })
+
+  ipcMain.handle('mcp:read-resource', async (_, serverName: string, uri: string) => {
+    return await mcpManager.readResource(serverName, uri)
+  })
+
+  // Smithery integration handlers
+  ipcMain.handle('mcp:add-smithery-server', async (_, serverName: string, config: any) => {
+    return await mcpManager.addSmitheryServer(serverName, config)
+  })
+
+  ipcMain.handle('mcp:remove-smithery-server', async (_, serverName: string) => {
+    return await mcpManager.removeSmitheryServer(serverName)
+  })
+
+  ipcMain.handle('mcp:get-server-config', async (_, serverName: string) => {
+    return mcpManager.getServerConfig(serverName)
+  })
+
+  ipcMain.handle('mcp:is-smithery-server', async (_, serverName: string) => {
+    return mcpManager.isSmitheryServer(serverName)
+  })
+
+  ipcMain.handle('mcp:get-smithery-servers', async () => {
+    return mcpManager.getSmitheryServers()
+  })
+}
+
+app.whenReady().then(async () => {
+  // Initialize MCP manager
+  try {
+    await mcpManager.initialize()
+    console.log('✅ MCP Manager initialized')
+  } catch (error) {
+    console.error('❌ Failed to initialize MCP Manager:', error)
+  }
+
+  // Setup IPC handlers
+  setupMCPHandlers()
+
+  // Create window
+  createWindow()
+})
+
+// Cleanup on quit
+app.on('before-quit', async () => {
+  await mcpManager.shutdown()
+})

@@ -334,7 +334,14 @@ export const SmitheryServerBrowser: React.FC = () => {
   };
 
   const handleInstallServer = async (qualifiedName: string, config?: Record<string, any>) => {
-    await installSmitheryServer(qualifiedName, config);
+    try {
+      console.log(`🎯 UI: Starting installation of ${qualifiedName}`, config);
+      await installSmitheryServer(qualifiedName, config);
+      console.log(`✅ UI: Successfully installed ${qualifiedName}`);
+    } catch (error) {
+      console.error(`❌ UI: Installation failed for ${qualifiedName}:`, error);
+      // Error is already handled by the store, just log here for UI debugging
+    }
   };
 
   return (
