@@ -8,6 +8,7 @@ import { ChatSessionsSidebar } from './ChatSessionsSidebar';
 import { ToolCallStatusWindow, useToolCallMonitor } from './ToolCallStatusWindow';
 import { useChatHistory, chatHistoryHelpers } from '../services/chatHistoryService';
 import { PDFExtractionService } from '../services/pdfExtractionService';
+import { ExcelService } from '../services/excelService';
 
 
 export function ChatInterface() {
@@ -404,34 +405,66 @@ export function ChatInterface() {
         return;
       }
       
-      // FIRST: Add user message to storage
-      if (activeSessionId) {
-        addMessage(activeSessionId, {
-          role: 'user',
-          content: message,
-          attachments: attachments.map(att => ({
-            name: att.name,
-            type: att.type,
-            size: att.size
-          }))
-        });
-        console.log('💾 Added user message to session storage');
-      }
-      
-      // THEN: Get complete conversation history including the new message
-      const updatedSession = getActiveSession();
-      const history = chatHistoryHelpers.toNLUXHistory(updatedSession?.messages || []);
-      console.log('📚 Using conversation history:', history.length, 'messages');
-      console.log('📚 History preview:', history.slice(-2)); // Show last 2 messages for debugging
-      
-      // Auto-generate session title from first message
-      if (currentSession.messages.length === 0) {
-        const title = chatHistoryHelpers.generateSessionTitle(message);
-        // We'll update the title after this message is processed
-      }
-      
       // Make the async request with MCP tool execution
       (async () => {
+        // Process Excel files before sending message
+        let processedMessage = message;
+        const excelData: unknown[] = [];
+        
+        // Add processing status message for Excel files
+        if (attachments.some(att => att.type === 'excel')) {
+          if (activeSessionId) {
+            addMessage(activeSessionId, {
+              role: 'assistant',
+              content: `📊 **Processing Excel Files...**\n\n⏳ **Status:** Reading and analyzing uploaded Excel files\n🔍 **Processing:** Extracting data, formatting tables, and preparing for analysis\n\n*Please wait while I process your Excel data...*`
+            });
+          }
+        }
+        
+        for (const attachment of attachments) {
+          if (attachment.type === 'excel') {
+            console.log('📊 Processing Excel file:', attachment.name);
+            const excelResult = await ExcelService.readExcelFile(attachment.file);
+            
+            if (excelResult.status === 'success') {
+              const formattedResult = ExcelService.formatExcelDataForChat(excelResult);
+              processedMessage += `\n\n${formattedResult}`;
+              
+              // Store Excel data for potential use
+              if (excelResult.data) {
+                excelData.push(...excelResult.data);
+              }
+            } else {
+              processedMessage += `\n\n❌ **Excel Processing Error**: ${excelResult.error}`;
+            }
+          }
+        }
+        
+        // FIRST: Add user message to storage
+        if (activeSessionId) {
+          addMessage(activeSessionId, {
+            role: 'user',
+            content: processedMessage,
+            attachments: attachments.map(att => ({
+              name: att.name,
+              type: att.type,
+              size: att.size
+            }))
+          });
+          console.log('💾 Added user message to session storage');
+        }
+        
+        // THEN: Get complete conversation history including the new message
+        const updatedSession = getActiveSession();
+        const history = chatHistoryHelpers.toNLUXHistory(updatedSession?.messages || []);
+        console.log('📚 Using conversation history:', history.length, 'messages');
+        console.log('📚 History preview:', history.slice(-2)); // Show last 2 messages for debugging
+        
+        // Auto-generate session title from first message
+        if (currentSession.messages.length === 0) {
+          const title = chatHistoryHelpers.generateSessionTitle(message);
+          // We'll update the title after this message is processed
+        }
         try {
           console.log('📡 Frontend: Making fetch request to backend...');
           
@@ -447,21 +480,24 @@ export function ChatInterface() {
               tools: tools.filter(tool => tool.server === server)
             };
             return acc;
-          }, {} as Record<string, any>);
+          }, {} as Record<string, unknown>);
 
           console.log('📊 Frontend: Dynamic MCP servers data:', mcpServers);
 
           // Prepare request with file support
-          let requestBody: any;
-          let requestHeaders: any = {};
+          let requestBody: FormData | string;
+          const requestHeaders: Record<string, string> = {};
           
           if (attachments.length > 0) {
             // Use FormData for file uploads
             const formData = new FormData();
-            formData.append('message', message);
+            formData.append('message', processedMessage); // Use processed message
             formData.append('mcpTools', JSON.stringify(tools));
             formData.append('mcpServers', JSON.stringify(mcpServers));
             formData.append('history', JSON.stringify(history));
+            if (excelData.length > 0) {
+              formData.append('excelData', JSON.stringify(excelData));
+            }
             
             // Add file attachments
             attachments.forEach((attachment, index) => {
@@ -477,10 +513,11 @@ export function ChatInterface() {
             // Use JSON for text-only messages
             requestHeaders['Content-Type'] = 'application/json';
             requestBody = JSON.stringify({
-              message,
+              message: processedMessage, // Use processed message that includes Excel data
               history: history,
               mcpTools: tools, // Send ALL available MCP tools (including Smithery!)
-              mcpServers: mcpServers // Dynamic server detection
+              mcpServers: mcpServers, // Dynamic server detection
+              excelData: excelData.length > 0 ? excelData : undefined // Include Excel data if available
             });
           }
 
@@ -652,6 +689,13 @@ export function ChatInterface() {
             >
               📄
             </button>
+            
+            {/* Excel Processing Indicator */}
+            {attachments.some(att => att.type === 'excel') && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-md text-xs">
+                📊 Excel Ready
+              </div>
+            )}
             
             {/* Tool Call Monitor Button */}
             <button
