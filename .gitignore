@@ -48,7 +48,7 @@ Thumbs.db
 
 # Claude Flow
 .claude-flow/
-.mcp.json
+.smithery.json
 claude-flow
 claude-flow.bat
 claude-flow.config.json

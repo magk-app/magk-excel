@@ -7,7 +7,7 @@ import { FileUploadArea, FileAttachment } from './FileUploadArea';
 import { ChatSessionsSidebar } from './ChatSessionsSidebar';
 import { ToolCallStatusWindow, useToolCallMonitor } from './ToolCallStatusWindow';
 import { useChatHistory, chatHistoryHelpers } from '../services/chatHistoryService';
-import { PDFExtractionService } from '../services/pdfExtractionService';
+import { PDFExtractionService, ClientExcelService } from '../services/pdfExtractionService';
 import { ExcelService } from '../services/excelService';
 
 
@@ -172,22 +172,38 @@ export function ChatInterface() {
     });
   };
 
-  const simulateAIResponse = async (observer: any, message: string) => {
-    // Use the existing chat adapter to process the message properly
-    return new Promise((resolve) => {
-      mcpEnhancedAdapter.streamText(message, {
-        next: (chunk: string) => {
-          // The adapter handles the streaming and message adding
-        },
-        complete: () => {
-          resolve(true);
-        },
-        error: (error: any) => {
-          console.error('Simulated AI response error:', error);
-          resolve(false);
-        }
-      });
+  // Helper function for word-by-word streaming
+  const streamMessage = async (content: string, delay: number = 50) => {
+    if (!activeSessionId || !content || content.trim().length === 0) return;
+    
+    const messageId = Date.now().toString();
+    let streamedContent = '';
+    
+    // Start with first word to avoid empty messages
+    const words = content.split(' ').filter(word => word.length > 0);
+    if (words.length === 0) return;
+    
+    // Add first word immediately to avoid empty content
+    streamedContent = words[0];
+    addMessage(activeSessionId, {
+      role: 'assistant',
+      content: streamedContent
     });
+    
+    // Stream remaining words
+    for (let i = 1; i < words.length; i++) {
+      streamedContent += ' ' + words[i];
+      updateMessage(activeSessionId, messageId, {
+        role: 'assistant',
+        content: streamedContent
+      });
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  };
+
+  const simulateAIResponse = async (message: string) => {
+    // Simple streaming implementation without recursive calls
+    return streamMessage(message, 30);
   };
 
   // Quick demo functions - Autonomous Chat with Real API Calls
@@ -203,12 +219,9 @@ export function ChatInterface() {
         500
       );
 
-      // Step 2: AI responds with plan
+      // Step 2: AI responds with plan (streaming)
       setTimeout(async () => {
-        addMessage(activeSessionId, {
-          role: 'assistant',
-          content: `🎯 **HK Immigration Clearance Statistics Extraction**\n\nI'll help you extract the Immigration Clearance statistics from the Hong Kong Immigration Department website. Let me:\n\n1. 🌐 Access the IMMD statistics page\n2. 📊 Extract Immigration Clearance data (2023 vs 2024)\n3. 📋 Include Passenger Traffic, Air, Sea, Land, and Visitor data\n4. 📄 Generate Excel file with proper formatting\n\n⏳ Starting extraction process...`
-        });
+        await streamMessage(`🎯 **HK Immigration Clearance Statistics Extraction**\n\nI'll help you extract the Immigration Clearance statistics from the Hong Kong Immigration Department website. Let me:\n\n1. 🌐 Access the IMMD statistics page\n2. 📊 Extract Immigration Clearance data (2023 vs 2024)\n3. 📋 Include Passenger Traffic, Air, Sea, Land, and Visitor data\n4. 📄 Generate Excel file with proper formatting\n\n⏳ Starting extraction process...`, 25);
 
         // Step 3: Stream the extraction process with real-time table display
         setTimeout(async () => {
@@ -216,17 +229,11 @@ export function ChatInterface() {
           
           try {
             // First, show the data streaming step by step
-            addMessage(activeSessionId, {
-              role: 'assistant',
-              content: `🔄 **Processing Immigration Clearance Data...**\n\n⏳ Retrieving statistics from IMMD database...`
-            });
+            await streamMessage(`🔄 **Processing Immigration Clearance Data...**\n\n⏳ Retrieving statistics from IMMD database...`, 40);
 
             // Simulate data streaming with delays
-            setTimeout(() => {
-              addMessage(activeSessionId, {
-                role: 'assistant',
-                content: `📊 **Immigration Clearance Statistics (2023 vs 2024)**\n\n| Category | 2023 (Million) | 2024 (Million) | Growth |\n|----------|----------------|----------------|--------|\n| Passenger Traffic | 211.8 | 298.5 | +40.9% |\n| Air | 31.7 | 41.9 | +32.2% |\n| Sea | 8.1 | 8.8 | +8.6% |\n| Land | 172.0 | 247.8 | +44.1% |\n| Vehicular Traffic (Mainland) | 10.3 | 15.5 | +50.5% |\n| Visitors | 67.7 | 89.0 | +31.5% |\n\n📈 **Key Insights:**\n- Total passenger traffic increased by **40.9%** from 2023 to 2024\n- Land traffic showed the highest growth at **44.1%**\n- Vehicular traffic to/from Mainland grew by **50.5%**\n- Visitor numbers increased by **31.5%**`
-              });
+            setTimeout(async () => {
+              await streamMessage(`📊 **Immigration Clearance Statistics (2023 vs 2024)**\n\n| Category | 2023 (Million) | 2024 (Million) | Growth |\n|----------|----------------|----------------|--------|\n| Passenger Traffic | 211.8 | 298.5 | +40.9% |\n| Air | 31.7 | 41.9 | +32.2% |\n| Sea | 8.1 | 8.8 | +8.6% |\n| Land | 172.0 | 247.8 | +44.1% |\n| Vehicular Traffic (Mainland) | 10.3 | 15.5 | +50.5% |\n| Visitors | 67.7 | 89.0 | +31.5% |\n\n📈 **Key Insights:**\n- Total passenger traffic increased by **40.9%** from 2023 to 2024\n- Land traffic showed the highest growth at **44.1%**\n- Vehicular traffic to/from Mainland grew by **50.5%**\n- Visitor numbers increased by **31.5%**`, 20);
 
               // Now call the actual API for Excel generation
           setTimeout(async () => {
@@ -259,14 +266,25 @@ export function ChatInterface() {
                   document.body.removeChild(a);
                   URL.revokeObjectURL(url);
 
-                  // Success message with details
-                  addMessage(activeSessionId, {
-                    role: 'assistant',
-                    content: `✅ **Excel File Generated Successfully!**\n\n📄 **File Details:**\n- Filename: **${filename}**\n- Processing time: ${processingTime}\n- File size: ${(blob.size / 1024).toFixed(1)} KB\n\n📁 **Download Location:** Your downloads folder\n\n🎯 **What's Included:**\n- Complete Immigration Clearance statistics\n- 2023 vs 2024 comparison data\n- All categories with growth calculations\n- Professional Excel formatting\n\n*The table above shows the extracted data, and the Excel file contains the same data in a structured spreadsheet format.*`
-                  });
+                  // Success message with details (streaming)
+                  await streamMessage(`✅ **Excel File Generated Successfully!**\n\n📄 **File Details:**\n- Filename: **${filename}**\n- Processing time: ${processingTime}\n- File size: ${(blob.size / 1024).toFixed(1)} KB\n\n📁 **Download Location:** Your downloads folder\n\n🎯 **What's Included:**\n- Complete Immigration Clearance statistics\n- 2023 vs 2024 comparison data\n- All categories with growth calculations\n- Professional Excel formatting\n\n*The table above shows the extracted data, and the Excel file contains the same data in a structured spreadsheet format.*`, 15);
+                  
+                  // Generate Excel from chat using ClientExcelService
+                  try {
+                    const currentSession = getActiveSession();
+                    if (currentSession && currentSession.messages.length > 0) {
+                      await ClientExcelService.generateExcelFromChat(
+                        currentSession.messages.map(msg => ({ role: msg.role, content: msg.content })),
+                        filename.replace('.xlsx', '_chat.xlsx')
+                      );
+                      console.log('📊 Generated Excel from chat data');
+                    }
+                  } catch (excelError) {
+                    console.warn('⚠️ Could not generate Excel from chat:', excelError);
+                  }
 
                 } else {
-                  const errorData = await response.json();
+                  const errorData = await response.json().catch(() => ({ error: 'Unknown server error' }));
                   throw new Error(errorData.error || `HTTP ${response.status}`);
                 }
               }, 1500);
@@ -274,20 +292,14 @@ export function ChatInterface() {
 
           } catch (apiError) {
             console.error('❌ API call failed:', apiError);
-            addMessage(activeSessionId, {
-              role: 'assistant',
-              content: `❌ **Excel Generation Failed**\n\n**Error:** ${apiError instanceof Error ? apiError.message : 'Unknown error'}\n\n**However, the data extraction was successful!** You can see the Immigration Clearance statistics in the table above.\n\n**Troubleshooting:**\n- Make sure the workflow engine is running on port 3001\n- Check network connectivity\n- The data is still available in the chat above`
-            });
+            await streamMessage(`❌ **Excel Generation Failed**\n\n**Error:** ${apiError instanceof Error ? apiError.message : 'Unknown error'}\n\n**However, the data extraction was successful!** You can see the Immigration Clearance statistics in the table above.\n\n**Troubleshooting:**\n- Make sure the workflow engine is running on port 3001\n- Check network connectivity\n- The data is still available in the chat above`, 30);
           }
           }, 2000);
       }, 1000);
 
     } catch (error) {
       console.error('HK Demo error:', error);
-      addMessage(activeSessionId, {
-        role: 'assistant',
-        content: `❌ **Demo Error**: Failed to start autonomous demo.\n\n**Error:** ${error instanceof Error ? error.message : 'Unknown error'}`
-      });
+      await streamMessage(`❌ **Demo Error**: Failed to start autonomous demo.\n\n**Error:** ${error instanceof Error ? error.message : 'Unknown error'}`, 50);
     }
   };
 
@@ -303,12 +315,9 @@ export function ChatInterface() {
         500
       );
 
-      // Step 2: AI responds with plan and starts extraction
+      // Step 2: AI responds with plan and starts extraction (streaming)
       setTimeout(async () => {
-        addMessage(activeSessionId, {
-          role: 'assistant',
-          content: `📄 **PDF Balance Sheet Extraction**\n\nI'll extract the consolidated balance sheets from Google's Q1 2025 10-Q filing. Let me:\n\n1. 📄 Process the PDF using AI extraction\n2. 🎯 Focus on "Consolidated balance sheets" section\n3. 📊 Structure the financial data\n4. 💾 Format for analysis\n\n⏳ Starting PDF processing with Modal AI...`
-        });
+        await streamMessage(`📄 **PDF Balance Sheet Extraction**\n\nI'll extract the consolidated balance sheets from Google's Q1 2025 10-Q filing. Let me:\n\n1. 📄 Process the PDF using AI extraction\n2. 🎯 Focus on "Consolidated balance sheets" section\n3. 📊 Structure the financial data\n4. 💾 Format for analysis\n\n⏳ Starting PDF processing with Modal AI...`, 25);
 
                 // Step 3: Stream the PDF extraction process with table display
         setTimeout(async () => {
@@ -316,11 +325,8 @@ export function ChatInterface() {
           const prompt = 'Consolidated balance sheets';
           
           try {
-            // First, show the processing message
-            addMessage(activeSessionId, {
-              role: 'assistant',
-              content: `🔄 **Processing Google 10-Q PDF...**\n\n⏳ Analyzing PDF content with AI...\n📄 **Source:** Google Q1 2025 10-Q Filing\n🎯 **Target:** Derivatives and Financial Instruments`
-            });
+            // First, show the processing message (streaming)
+            await streamMessage(`🔄 **Processing Google 10-Q PDF...**\n\n⏳ Analyzing PDF content with AI...\n📄 **Source:** Google Q1 2025 10-Q Filing\n🎯 **Target:** Derivatives and Financial Instruments`, 40);
 
             console.log('📡 Calling PDF extraction API...');
             
@@ -328,12 +334,9 @@ export function ChatInterface() {
             const result = await PDFExtractionService.extractSpecificTable(pdfUrl, prompt);
             
             if (result.status === 'success' && result.data) {
-              // Display the derivatives table in a formatted way
-              setTimeout(() => {
-                addMessage(activeSessionId, {
-                  role: 'assistant',
-                  content: `📊 **Gross Notional Amounts of Outstanding Derivative Instruments**\n**(in millions)**\n\n**🔹 Derivatives designated as hedging instruments:**\n\n| Foreign Exchange Contracts | Dec 31, 2024 | Mar 31, 2025 | Change |\n|----------------------------|--------------|--------------|--------|\n| Cash flow hedges | $20,315 | $20,624 | +$309 |\n| Fair value hedges | $1,562 | $0 | -$1,562 |\n| Net investment hedges | $6,986 | $6,695 | -$291 |\n\n**🔸 Derivatives not designated as hedging instruments:**\n\n| Contract Type | Dec 31, 2024 | Mar 31, 2025 | Change |\n|---------------|--------------|--------------|--------|\n| Foreign exchange contracts | $44,227 | $40,612 | -$3,615 |\n| Other contracts | $15,082 | $12,549 | -$2,533 |\n\n**📈 Summary Analysis:**\n- **Total Portfolio:** $88.2B → $80.5B (-$7.7B, -8.7%)\n- **Largest Change:** Fair value hedges eliminated (-$1.6B)\n- **Significant Reduction:** Non-hedging FX contracts (-$3.6B)\n- **Stability:** Cash flow hedges remained relatively stable (+$309M)`
-                });
+              // Display the derivatives table in a formatted way (streaming)
+              setTimeout(async () => {
+                await streamMessage(`📊 **Gross Notional Amounts of Outstanding Derivative Instruments**\n**(in millions)**\n\n**🔹 Derivatives designated as hedging instruments:**\n\n| Foreign Exchange Contracts | Dec 31, 2024 | Mar 31, 2025 | Change |\n|----------------------------|--------------|--------------|--------|\n| Cash flow hedges | $20,315 | $20,624 | +$309 |\n| Fair value hedges | $1,562 | $0 | -$1,562 |\n| Net investment hedges | $6,986 | $6,695 | -$291 |\n\n**🔸 Derivatives not designated as hedging instruments:**\n\n| Contract Type | Dec 31, 2024 | Mar 31, 2025 | Change |\n|---------------|--------------|--------------|--------|\n| Foreign exchange contracts | $44,227 | $40,612 | -$3,615 |\n| Other contracts | $15,082 | $12,549 | -$2,533 |\n\n**📈 Summary Analysis:**\n- **Total Portfolio:** $88.2B → $80.5B (-$7.7B, -8.7%)\n- **Largest Change:** Fair value hedges eliminated (-$1.6B)\n- **Significant Reduction:** Non-hedging FX contracts (-$3.6B)\n- **Stability:** Cash flow hedges remained relatively stable (+$309M)`, 20);
 
                 // Show Excel generation step
           setTimeout(async () => {
@@ -351,16 +354,24 @@ export function ChatInterface() {
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
 
-                    addMessage(activeSessionId, {
-                      role: 'assistant',
-                      content: `✅ **PDF Extraction & Excel Generation Complete!**\n\n📄 **Successfully extracted derivatives data from Google 10-Q**\n\n**📋 Data Extracted:**\n- Gross notional amounts of derivative instruments\n- Hedging vs non-hedging instrument breakdown\n- Quarter-over-quarter comparison (Dec 2024 → Mar 2025)\n- Change analysis and portfolio insights\n\n**📊 Excel File Generated:**\n- **Filename:** google_derivatives_analysis.csv\n- **Content:** Structured derivatives data with categories\n- **Format:** Ready for financial analysis\n- **Location:** Your downloads folder\n\n**🎯 Key Findings:**\n- Google reduced total derivative exposure by $7.7 billion\n- Fair value hedges were completely eliminated\n- Overall risk reduction strategy evident\n\n**📈 The table above shows the complete derivatives portfolio breakdown, and the downloaded file contains the same data in a structured spreadsheet format.**`
-                    });
+                    await streamMessage(`✅ **PDF Extraction & Excel Generation Complete!**\n\n📄 **Successfully extracted derivatives data from Google 10-Q**\n\n**📋 Data Extracted:**\n- Gross notional amounts of derivative instruments\n- Hedging vs non-hedging instrument breakdown\n- Quarter-over-quarter comparison (Dec 2024 → Mar 2025)\n- Change analysis and portfolio insights\n\n**📊 Excel File Generated:**\n- **Filename:** google_derivatives_analysis.csv\n- **Content:** Structured derivatives data with categories\n- **Format:** Ready for financial analysis\n- **Location:** Your downloads folder\n\n**🎯 Key Findings:**\n- Google reduced total derivative exposure by $7.7 billion\n- Fair value hedges were completely eliminated\n- Overall risk reduction strategy evident\n\n**📈 The table above shows the complete derivatives portfolio breakdown, and the downloaded file contains the same data in a structured spreadsheet format.**`, 15);
+                    
+                    // Generate Excel from chat using ClientExcelService
+                    try {
+                      const currentSession = getActiveSession();
+                      if (currentSession && currentSession.messages.length > 0) {
+                        await ClientExcelService.generateExcelFromChat(
+                          currentSession.messages.map(msg => ({ role: msg.role, content: msg.content })),
+                          'google_derivatives_chat.xlsx'
+                        );
+                        console.log('📊 Generated Excel from chat data');
+                      }
+                    } catch (excelError) {
+                      console.warn('⚠️ Could not generate Excel from chat:', excelError);
+                    }
                   } catch (excelError) {
                     console.error('Excel generation error:', excelError);
-                    addMessage(activeSessionId, {
-                      role: 'assistant',
-                      content: `✅ **PDF Extraction Complete!**\n\n📄 **Successfully extracted derivatives data from Google 10-Q**\n\n**📋 Data Extracted:**\n- Gross notional amounts of derivative instruments\n- Hedging vs non-hedging instrument breakdown\n- Quarter-over-quarter comparison (Dec 2024 → Mar 2025)\n- Change analysis and portfolio insights\n\n**🎯 Key Findings:**\n- Google reduced total derivative exposure by $7.7 billion\n- Fair value hedges were completely eliminated\n- Overall risk reduction strategy evident\n\n**📊 The table above shows the complete derivatives portfolio breakdown with detailed financial analysis.**\n\n*Note: Excel file generation encountered an issue, but the data extraction was successful.*`
-                    });
+                    await streamMessage(`✅ **PDF Extraction Complete!**\n\n📄 **Successfully extracted derivatives data from Google 10-Q**\n\n**📋 Data Extracted:**\n- Gross notional amounts of derivative instruments\n- Hedging vs non-hedging instrument breakdown\n- Quarter-over-quarter comparison (Dec 2024 → Mar 2025)\n- Change analysis and portfolio insights\n\n**🎯 Key Findings:**\n- Google reduced total derivative exposure by $7.7 billion\n- Fair value hedges were completely eliminated\n- Overall risk reduction strategy evident\n\n**📊 The table above shows the complete derivatives portfolio breakdown with detailed financial analysis.**\n\n*Note: Excel file generation encountered an issue, but the data extraction was successful.*`, 20);
                   }
                 }, 1000);
               }, 1500);
@@ -373,20 +384,14 @@ export function ChatInterface() {
 
           } catch (apiError) {
             console.error('❌ PDF API call failed:', apiError);
-            addMessage(activeSessionId, {
-              role: 'assistant',
-              content: `❌ **PDF Extraction Failed**\n\n**Error:** ${apiError instanceof Error ? apiError.message : 'Unknown error'}\n\n**However, this demo shows how PDF data would be extracted and displayed!**\n\n**What would happen:**\n- AI would analyze the Google 10-Q PDF\n- Extract the derivatives table automatically\n- Format the data in a clear table structure\n- Provide financial analysis and insights\n\n*The extraction process has been demonstrated above.*`
-            });
+            await streamMessage(`❌ **PDF Extraction Failed**\n\n**Error:** ${apiError instanceof Error ? apiError.message : 'Unknown error'}\n\n**However, this demo shows how PDF data would be extracted and displayed!**\n\n**What would happen:**\n- AI would analyze the Google 10-Q PDF\n- Extract the derivatives table automatically\n- Format the data in a clear table structure\n- Provide financial analysis and insights\n\n*The extraction process has been demonstrated above.*`, 30);
           }
           }, 2000);
       }, 1000);
 
     } catch (error) {
       console.error('PDF Demo error:', error);
-      addMessage(activeSessionId, {
-        role: 'assistant',
-        content: `❌ **Demo Error**: Failed to start autonomous PDF demo.\n\n**Error:** ${error instanceof Error ? error.message : 'Unknown error'}`
-      });
+      await streamMessage(`❌ **Demo Error**: Failed to start autonomous PDF demo.\n\n**Error:** ${error instanceof Error ? error.message : 'Unknown error'}`, 50);
     }
   };
 
@@ -456,7 +461,13 @@ export function ChatInterface() {
         
         // THEN: Get complete conversation history including the new message
         const updatedSession = getActiveSession();
-        const history = chatHistoryHelpers.toNLUXHistory(updatedSession?.messages || []);
+        // Create backend-compatible history (content field, not message field)
+        const history = (updatedSession?.messages || [])
+          .filter(msg => msg.content && msg.content.trim().length > 0) // Filter out messages with empty/undefined content
+          .map(msg => ({
+            role: msg.role,
+            content: msg.content || '' // Ensure content is never undefined
+          }));
         console.log('📚 Using conversation history:', history.length, 'messages');
         console.log('📚 History preview:', history.slice(-2)); // Show last 2 messages for debugging
         
@@ -619,8 +630,15 @@ export function ChatInterface() {
           });
           
           const errorMessage = error instanceof Error ? error.message : String(error);
-          observer.next(`❌ **Connection Error**: ${errorMessage}\n\n*Please make sure the workflow engine is running on http://localhost:3001*\n\n`);
-          observer.error(new Error(`Connection Error: ${errorMessage}. Please make sure the workflow engine is running on http://localhost:3001`));
+          
+          // Provide a helpful fallback response instead of just throwing an error
+          if (errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch') || errorMessage.includes('ERR_CONNECTION_REFUSED')) {
+            observer.next(`❌ **Backend Connection Failed**\n\n**Issue:** Cannot connect to the workflow engine at http://localhost:3001\n\n**Quick Solutions:**\n1. **Start the workflow engine:**\n   \`\`\`bash\n   cd apps/workflow-engine\n   npm run dev\n   \`\`\`\n\n2. **Check if port 3001 is available**\n\n3. **Try the demo buttons above** - they work independently\n\n**Note:** You can still use the HK Demo 🇭🇰 and PDF Demo 📊 buttons above, which have built-in data and don't require the backend.\n\n*Once the backend is running, regular chat will work normally.*`);
+          } else {
+            observer.next(`❌ **Processing Error**: ${errorMessage}\n\n**Suggestions:**\n- Try rephrasing your question\n- Use the demo buttons above\n- Check your file attachments\n\n*If the issue persists, try refreshing the page.*`);
+          }
+          
+          observer.complete(); // Complete the stream instead of erroring
         }
       })();
     }
@@ -681,6 +699,32 @@ export function ChatInterface() {
               </button>
             </div>
 
+            {/* Excel Export Button */}
+            <button
+              onClick={async () => {
+                try {
+                  const currentSession = getActiveSession();
+                  if (!currentSession || currentSession.messages.length === 0) {
+                    alert('No chat messages to export. Start a conversation first.');
+                    return;
+                  }
+                  
+                  await ClientExcelService.generateExcelFromChat(
+                    currentSession.messages.map(msg => ({ role: msg.role, content: msg.content })),
+                    `chat_export_${new Date().toISOString().slice(0,10)}.xlsx`
+                  );
+                  console.log('📄 Excel export completed');
+                } catch (error) {
+                  console.error('❌ Excel export failed:', error);
+                  alert('Failed to export chat to Excel. Please try again.');
+                }
+              }}
+              className="p-2 hover:bg-muted rounded-md transition-colors"
+              title="Export Chat to Excel"
+            >
+              📊
+            </button>
+            
             {/* PDF Extraction Button */}
             <button
               onClick={() => setShowPDFExtraction(!showPDFExtraction)}
