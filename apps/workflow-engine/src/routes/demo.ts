@@ -116,7 +116,7 @@ demoRoute.post('/demo/hk-passenger-stats/extract', async (c) => {
 
     const extractService = new HKTableExtractService({
       headless: headless ?? true,
-      outputDir: './demo-output',
+      outputDir: '../client/magk-excel/public/downloads', // Save to client downloads folder
       timeout: 30000
     });
 

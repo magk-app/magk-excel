@@ -30,7 +30,7 @@ extractRoute.post('/hk-extract', async (c) => {
     // Create service instance with options
     const extractService = new HKTableExtractService({
       headless: headless ?? true,
-      outputDir: '../client/magk-excel/public/downloads', // Save to client downloads folder
+      outputDir: './temp-output', // Use temp directory for API downloads
       timeout: 30000
     });
 

@@ -518,10 +518,10 @@ const WorkflowCanvasContent: React.FC<WorkflowCanvasProps> = ({
     connectionMode: ConnectionMode.Loose,
     fitView: true,
     fitViewOptions: {
-      padding: 0.15,
+      padding: 0.2,
       includeHiddenNodes: false,
-      maxZoom: 1.2,
-      minZoom: 0.3
+      maxZoom: 1.0,
+      minZoom: 0.2
     },
     defaultEdgeOptions: {
       type: 'smoothstep',

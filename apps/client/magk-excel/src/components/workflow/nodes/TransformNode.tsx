@@ -88,42 +88,7 @@ export const TransformNode: React.FC<TransformNodeProps> = (props) => {
 
 
 
-      {/* Real-time transformation progress overlay */}
-      {transformProgress && (
-        <div className="absolute top-8 left-2 right-2 bg-background/95 backdrop-blur-sm border rounded-lg p-2 shadow-lg">
-          <div className="space-y-2">
-            {/* Current operation indicator */}
-            <div className="flex items-center gap-2 text-xs text-blue-600">
-              <Cog className="h-3 w-3 animate-spin" />
-              <span>Operation {transformProgress.operationIndex + 1}/{transformProgress.totalOperations}</span>
-              <Badge variant="outline" className="text-xs px-1 py-0.5">
-                {transformProgress.currentOperation || 'Processing'}
-              </Badge>
-            </div>
-            
-            {/* Records processed */}
-            <div className="flex items-center gap-2 text-xs text-green-600">
-              <Activity className="h-3 w-3 animate-pulse" />
-              <span>Records processed</span>
-              <Badge variant="outline" className="text-xs px-1 py-0.5">
-                {transformProgress.recordsProcessed.toLocaleString()}/{transformProgress.totalRecords.toLocaleString()}
-              </Badge>
-            </div>
-            
-            {/* Data preview indicator */}
-            <div className="flex items-center gap-2 text-xs text-purple-600">
-              <Eye className="h-3 w-3" />
-              <span>Preview available</span>
-            </div>
-            
-            {/* Mini progress bar */}
-            <Progress 
-              value={(transformProgress.recordsProcessed / transformProgress.totalRecords) * 100} 
-              className="h-1" 
-            />
-          </div>
-        </div>
-      )}
+      {/* Transform progress overlay completely removed - handled by base node */}
     </div>
   );
 };

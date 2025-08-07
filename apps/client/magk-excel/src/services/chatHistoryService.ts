@@ -269,7 +269,7 @@ export const chatHistoryHelpers = {
   toNLUXHistory: (messages: ChatMessage[]) => {
     return messages.map(msg => ({
       role: msg.role,
-      content: msg.content
+      message: msg.content  // NLUX expects 'message' not 'content'
     }));
   },
 

@@ -3,13 +3,12 @@
  * Advanced progress indicator with smooth animations, wave effects, and particle animations
  */
 
-import React, { useEffect, useState, useMemo } from 'react';
-import { motion, AnimatePresence, useAnimation } from 'framer-motion';
+import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, Zap, Clock, CheckCircle2 } from 'lucide-react';
 import { NodeProgress } from '../../../types/workflow';
 import {
   progressBarVariants,
-  waveVariants,
   counterVariants,
   particleVariants,
   getAnimationVariants,
@@ -21,7 +20,7 @@ import { cn } from '../../../lib/utils';
 
 interface ProgressAnimationProps {
   progress: NodeProgress;
-  variant?: 'default' | 'minimal' | 'detailed' | 'circular';
+  variant?: 'default' | 'minimal' | 'detailed' | 'circular' | 'node-compact';
   size?: 'sm' | 'md' | 'lg';
   showPercentage?: boolean;
   showEta?: boolean;
@@ -48,7 +47,6 @@ const AnimatedNumber: React.FC<AnimatedNumberProps> = ({
   className,
 }) => {
   const [displayValue, setDisplayValue] = useState(0);
-  const controls = useAnimation();
 
   useEffect(() => {
     const startValue = displayValue;
@@ -301,6 +299,41 @@ export const ProgressAnimation: React.FC<ProgressAnimationProps> = ({
     );
   }
 
+  if (variant === 'node-compact') {
+    return (
+      <div className={cn('space-y-2', className)}>
+        {/* Progress stages completely removed for clean display */}
+
+        {/* Compact progress bar with message */}
+        <div className="space-y-1">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-gray-700 font-medium truncate">
+              {progress.message || 'Processing...'}
+            </span>
+            <span className="text-gray-500 font-mono ml-2">
+              {percentage}%
+            </span>
+          </div>
+          
+          {/* Progress bar removed from node-compact variant - prevents duplicates */}
+          
+          <div className="flex justify-between items-center text-xs text-gray-500">
+            <span>
+              {progress.current.toLocaleString()} / {progress.total.toLocaleString()}
+            </span>
+            {showEta && progress.estimatedTimeRemaining && (
+              <span className="whitespace-nowrap">
+                ETA: {formatEta(progress.estimatedTimeRemaining)}
+              </span>
+            )}
+          </div>
+
+          {/* Compact stats (moved up to avoid duplication) */}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       className={cn('w-full space-y-2', className)}
@@ -346,12 +379,11 @@ export const ProgressAnimation: React.FC<ProgressAnimationProps> = ({
         <div className={cn('w-full bg-gray-200 rounded-full overflow-hidden', config.height)}>
           <motion.div
             className="h-full relative rounded-full"
-            style={{ backgroundColor: progressColor }}
+            style={{ backgroundColor: progressColor, width: `${percentage}%` }}
             variants={getAnimationVariants(progressBarVariants)}
             initial="initial"
             animate="animate"
             transition={{ duration: 0.5, ease: 'easeOut' }}
-            style={{ width: `${percentage}%` }}
           >
             {/* Wave effect for active progress */}
             {animated && percentage > 0 && percentage < 100 && (
@@ -418,7 +450,7 @@ export const ProgressAnimation: React.FC<ProgressAnimationProps> = ({
           animate={{ opacity: 1, height: 'auto' }}
           transition={{ delay: 0.4 }}
         >
-          {progress.stages.map((stage, index) => (
+          {progress.stages.map((stage) => (
             <div key={stage.name} className="flex items-center gap-2 text-xs">
               <div className={cn(
                 'w-2 h-2 rounded-full',
