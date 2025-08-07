@@ -17,6 +17,13 @@
         "start"
       ],
       "type": "stdio"
+    },
+    "pdf-tools": {
+      "command": "npx",
+      "args": [
+        "@modelcontextprotocol/server-pdf@latest"
+      ],
+      "type": "stdio"
     }
   }
 }

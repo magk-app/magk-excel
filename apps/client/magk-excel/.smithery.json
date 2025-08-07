@@ -9,7 +9,17 @@
       "displayName": "Context7",
       "description": "Fetch up-to-date, version-specific documentation and code examples directly into your prompts. Enhance your coding experience by eliminating outdated information and hallucinated APIs. Simply add `use context7` to your questions for accurate and relevant answers.",
       "config": {}
+    },
+    "file-extractor-service": {
+      "command": "",
+      "type": "http",
+      "url": "https://server.smithery.ai/@dravidsajinraj-iex/file-extractor-mcp/mcp?api_key=00a026b7-3827-4340-91be-a057d063cccd",
+      "isSmithery": true,
+      "qualifiedName": "@dravidsajinraj-iex/file-extractor-mcp",
+      "displayName": "File Extractor Service",
+      "description": "Extract content and metadata from various file formats including PDF, DOC, DOCX, PPTX, CSV, and XLSX. Support both URL downloads and direct file uploads with integrated search and pagination for spreadsheets. Automatically handle Google Drive and other supported cloud storage URLs for seamless file access.",
+      "config": {}
     }
   },
-  "lastUpdated": "2025-08-05T04:10:52.791Z"
+  "lastUpdated": "2025-08-07T02:40:42.143Z"
 }
