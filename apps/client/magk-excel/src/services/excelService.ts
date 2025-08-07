@@ -240,4 +240,140 @@ export class ExcelService {
     
     return result;
   }
+  
+  /**
+   * Write data to Excel file and download it
+   */
+  static async writeExcelFile(
+    data: unknown[],
+    filename: string = 'export.xlsx',
+    sheetName: string = 'Sheet1'
+  ): Promise<void> {
+    try {
+      console.log('📝 Writing Excel file:', filename);
+      
+      // Create a new workbook
+      const workbook = XLSX.utils.book_new();
+      
+      // Convert data to worksheet
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+      
+      // Write the file and trigger download
+      XLSX.writeFile(workbook, filename);
+      
+      console.log('✅ Excel file written successfully:', filename);
+    } catch (error) {
+      console.error('❌ Excel writing error:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Create Excel file from multiple sheets
+   */
+  static async writeMultiSheetExcel(
+    sheets: { name: string; data: unknown[] }[],
+    filename: string = 'export.xlsx'
+  ): Promise<void> {
+    try {
+      console.log('📝 Writing multi-sheet Excel file:', filename);
+      
+      // Create a new workbook
+      const workbook = XLSX.utils.book_new();
+      
+      // Add each sheet
+      for (const sheet of sheets) {
+        const worksheet = XLSX.utils.json_to_sheet(sheet.data);
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name);
+      }
+      
+      // Write the file and trigger download
+      XLSX.writeFile(workbook, filename);
+      
+      console.log('✅ Multi-sheet Excel file written successfully:', filename);
+    } catch (error) {
+      console.error('❌ Excel writing error:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Convert JSON data to Excel with formatting
+   */
+  static async exportToExcel(
+    data: unknown[],
+    options: {
+      filename?: string;
+      sheetName?: string;
+      headers?: string[];
+      columnWidths?: number[];
+    } = {}
+  ): Promise<void> {
+    try {
+      const {
+        filename = 'export.xlsx',
+        sheetName = 'Data',
+        headers,
+        columnWidths
+      } = options;
+      
+      console.log('📊 Exporting to Excel with formatting:', filename);
+      
+      // Create workbook
+      const workbook = XLSX.utils.book_new();
+      
+      // Process data with custom headers if provided
+      let processedData = data;
+      if (headers && data.length > 0) {
+        processedData = data.map(row => {
+          const newRow: Record<string, unknown> = {};
+          const rowObj = row as Record<string, unknown>;
+          headers.forEach((header, index) => {
+            const originalKey = Object.keys(rowObj)[index];
+            newRow[header] = rowObj[originalKey];
+          });
+          return newRow;
+        });
+      }
+      
+      // Create worksheet
+      const worksheet = XLSX.utils.json_to_sheet(processedData);
+      
+      // Apply column widths if provided
+      if (columnWidths) {
+        worksheet['!cols'] = columnWidths.map(width => ({ wch: width }));
+      } else {
+        // Auto-size columns based on content
+        const cols: { wch: number }[] = [];
+        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          let maxWidth = 10;
+          for (let R = range.s.r; R <= range.e.r; ++R) {
+            const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+            const cell = worksheet[cellAddress];
+            if (cell && cell.v) {
+              const cellLength = String(cell.v).length;
+              if (cellLength > maxWidth) maxWidth = cellLength;
+            }
+          }
+          cols.push({ wch: Math.min(maxWidth + 2, 50) });
+        }
+        worksheet['!cols'] = cols;
+      }
+      
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+      
+      // Write file
+      XLSX.writeFile(workbook, filename);
+      
+      console.log('✅ Excel export completed:', filename);
+    } catch (error) {
+      console.error('❌ Excel export error:', error);
+      throw error;
+    }
+  }
 }

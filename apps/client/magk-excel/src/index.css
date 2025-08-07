@@ -21,17 +21,25 @@
   h3 { @apply text-lg; }
   h4 { @apply text-base; }
   
-  /* Lists */
+  /* Lists - Fixed with proper text color */
   ul {
     @apply list-disc list-outside mb-3 ml-6 space-y-1;
+    color: var(--foreground) !important;
   }
   
   ol {
     @apply list-decimal list-outside mb-3 ml-6 space-y-1;
+    color: var(--foreground) !important;
   }
   
   li {
     @apply text-foreground leading-relaxed mb-1;
+    color: inherit !important;
+  }
+  
+  /* Fix bullet and number colors */
+  li::marker {
+    color: var(--foreground) !important;
   }
   
   /* Text formatting */
@@ -75,13 +83,18 @@
   display: list-item !important;
 }
 
-/* Force list bullets to show */
+/* Force list bullets to show with proper color */
 ul li::marker {
-  @apply text-foreground;
+  color: var(--foreground) !important;
 }
 
 ol li::marker {
-  @apply text-foreground;
+  color: var(--foreground) !important;
+}
+
+/* Ensure list items have correct text color */
+ul li, ol li {
+  color: var(--foreground) !important;
 }
 
 /* Code styling */
