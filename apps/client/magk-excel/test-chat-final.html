@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat API Final Test</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #1a1a2e;
+            color: white;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .status {
+            padding: 10px;
+            background: #16213e;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .status.success { background: #1e5128; }
+        .status.error { background: #5c1e1e; }
+        .chat-box {
+            background: #0f0f23;
+            border-radius: 8px;
+            padding: 20px;
+            height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message.user {
+            background: #2d3561;
+            margin-left: 20%;
+        }
+        .message.assistant {
+            background: #1e3a5f;
+            margin-right: 20%;
+        }
+        .message.thinking {
+            background: #4a3c28;
+            font-style: italic;
+        }
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+        input {
+            flex: 1;
+            padding: 12px;
+            background: #0f0f23;
+            border: 1px solid #333;
+            color: white;
+            border-radius: 8px;
+        }
+        button {
+            padding: 12px 24px;
+            background: #4a5568;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        button:hover { background: #5a6578; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .test-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .test-btn {
+            padding: 8px 16px;
+            background: #2d3748;
+            font-size: 14px;
+        }
+        .test-btn.active { background: #48bb78; }
+        .logs {
+            background: #0a0a0a;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .log-entry { margin-bottom: 2px; }
+        .log-entry.error { color: #fc8181; }
+        .log-entry.success { color: #68d391; }
+        .log-entry.info { color: #63b3ed; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Chat API Final Test</h1>
+        
+        <div id="status" class="status">
+            <strong>Status:</strong> <span id="statusText">Initializing...</span>
+        </div>
+        
+        <div class="test-buttons">
+            <button class="test-btn" onclick="testHealth()">Test Health</button>
+            <button class="test-btn" onclick="testSimpleMessage()">Test Simple Message</button>
+            <button class="test-btn" onclick="testWithHistory()">Test With History</button>
+            <button class="test-btn" onclick="testThinking()">Test Thinking Mode</button>
+            <button class="test-btn" onclick="clearChat()">Clear Chat</button>
+        </div>
+        
+        <div id="chatBox" class="chat-box"></div>
+        
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="Type your message..." 
+                   onkeypress="if(event.key === 'Enter') sendMessage()">
+            <button id="sendBtn" onclick="sendMessage()">Send</button>
+        </div>
+        
+        <div id="logs" class="logs"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000';
+        let messageHistory = [];
+        let isStreaming = false;
+        
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logs.appendChild(entry);
+            logs.scrollTop = logs.scrollHeight;
+        }
+        
+        function setStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            const statusText = document.getElementById('statusText');
+            statusText.textContent = message;
+            status.className = `status ${type === 'success' ? 'success' : type === 'error' ? 'error' : ''}`;
+        }
+        
+        function addMessage(role, content, isThinking = false) {
+            const chatBox = document.getElementById('chatBox');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role} ${isThinking ? 'thinking' : ''}`;
+            messageDiv.textContent = content;
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return messageDiv;
+        }
+        
+        async function testHealth() {
+            log('Testing API health...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/api/v2/chat/health`);
+                const data = await response.json();
+                if (response.ok) {
+                    log('✅ Health check passed', 'success');
+                    setStatus('API is healthy', 'success');
+                } else {
+                    throw new Error('Health check failed');
+                }
+            } catch (error) {
+                log(`❌ Health check failed: ${error.message}`, 'error');
+                setStatus('API is not responding', 'error');
+            }
+        }
+        
+        async function testSimpleMessage() {
+            const message = 'Hello, can you hear me?';
+            log(`Testing simple message: "${message}"`, 'info');
+            await sendMessageToAPI(message);
+        }
+        
+        async function testWithHistory() {
+            // First message
+            await sendMessageToAPI('My name is Alice');
+            // Wait a bit
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Second message that should remember context
+            await sendMessageToAPI('What is my name?');
+        }
+        
+        async function testThinking() {
+            const message = 'Can you explain quantum computing? (Please think through this)';
+            log('Testing thinking mode...', 'info');
+            await sendMessageToAPI(message, true);
+        }
+        
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            if (!message) return;
+            
+            input.value = '';
+            await sendMessageToAPI(message);
+        }
+        
+        async function sendMessageToAPI(message, enableThinking = false) {
+            if (isStreaming) {
+                log('Already streaming, please wait...', 'error');
+                return;
+            }
+            
+            // Add user message to UI and history
+            addMessage('user', message);
+            messageHistory.push({ role: 'user', content: message });
+            
+            // Keep only last 10 messages for context
+            if (messageHistory.length > 10) {
+                messageHistory = messageHistory.slice(-10);
+            }
+            
+            log(`Sending message: "${message.substring(0, 50)}..."`, 'info');
+            setStatus('Sending message...', '');
+            
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+            isStreaming = true;
+            
+            try {
+                // Create assistant message placeholder
+                const assistantMsg = addMessage('assistant', '', enableThinking);
+                
+                const response = await fetch(`${API_BASE}/api/v2/chat/stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message,
+                        modelConfig: {
+                            provider: 'anthropic',
+                            model: 'claude-3-5-sonnet-20241022',
+                            enableThinking: enableThinking,
+                            temperature: 0.7,
+                            maxTokens: 1000
+                        },
+                        history: messageHistory.slice(0, -1) // Don't include the message we just added
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+                
+                setStatus('Streaming response...', 'success');
+                log('📥 Receiving stream...', 'info');
+                
+                // Read SSE stream
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let finalContent = '';
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                
+                                if (data.type === 'thinking') {
+                                    assistantMsg.textContent = '🤔 Thinking...';
+                                    assistantMsg.classList.add('thinking');
+                                } else if (data.type === 'content') {
+                                    assistantMsg.textContent = data.content;
+                                    assistantMsg.classList.remove('thinking');
+                                    finalContent = data.content;
+                                } else if (data.type === 'complete') {
+                                    assistantMsg.textContent = data.content;
+                                    assistantMsg.classList.remove('thinking');
+                                    finalContent = data.content;
+                                    log('✅ Stream completed', 'success');
+                                    setStatus('Response received', 'success');
+                                } else if (data.type === 'error') {
+                                    throw new Error(data.error);
+                                }
+                            } catch (e) {
+                                if (e.message !== data.error) {
+                                    console.error('Parse error:', e);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Add assistant response to history
+                if (finalContent) {
+                    messageHistory.push({ role: 'assistant', content: finalContent });
+                }
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                setStatus(`Error: ${error.message}`, 'error');
+                addMessage('assistant', `Error: ${error.message}`);
+            } finally {
+                sendBtn.disabled = false;
+                isStreaming = false;
+            }
+        }
+        
+        function clearChat() {
+            document.getElementById('chatBox').innerHTML = '';
+            messageHistory = [];
+            log('Chat cleared', 'info');
+        }
+        
+        // Initialize on load
+        window.onload = () => {
+            log('Chat test suite loaded', 'success');
+            testHealth();
+        };
+    </script>
+</body>
+</html>

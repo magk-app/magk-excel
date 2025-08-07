@@ -79,20 +79,17 @@ export class LLMService {
         if (!this.anthropic) {
           // No API key available
           console.log('⚠️ No Anthropic API key configured, using mock response...');
-          const mock = this.generateMockWorkflowResponse(message);
-          return { response: mock, thinking: undefined };
+          return { response: this.generateMockWorkflowResponse(message) };
         }
       } else {
         // Other providers not yet implemented
         console.log(`⚠️ Provider ${config.provider} not yet implemented, using mock response...`);
-        const mock = this.generateMockWorkflowResponse(message);
-        return { response: mock, thinking: undefined };
+        return { response: this.generateMockWorkflowResponse(message) };
       }
 
       if (!apiClient) {
         console.log('⚠️ No API client available, using mock response...');
-        const mock = this.generateMockWorkflowResponse(message);
-        return { response: mock, thinking: undefined };
+        return { response: this.generateMockWorkflowResponse(message) };
       }
 
       console.log(`🤖 Sending request to ${config.provider} (${config.model})...`);
@@ -134,6 +131,10 @@ IMPORTANT RULES:
 - Only ask questions when there are genuine ambiguities or missing required information
 - Be direct and action-oriented - assume reasonable defaults when possible
 - If the user uploads Excel files, focus on processing them immediately
+- ALWAYS format your responses using Markdown for better readability
+- Use **bold** for emphasis, \`code\` for technical terms, and proper headings
+- When creating tables, use markdown table syntax
+- When mentioning files, format them as links or use backticks
 
 You help users:
 - Extract data from websites, PDFs, APIs, and other sources
@@ -193,12 +194,19 @@ Be conversational and helpful, but prioritize action over questions. If the user
 
     } catch (error) {
       console.error('❌ LLM Service error:', error);
+      console.error('❌ Error details:', {
+        provider: config.provider,
+        model: config.model,
+        hasApiKey: !!config.apiKey,
+        hasEnvKey: !!process.env.ANTHROPIC_API_KEY
+      });
       
-      if (error instanceof Error && error.message.includes('api_key')) {
-        return { 
-          response: 'I\'m having trouble connecting to my AI service. Please check that the API key is configured correctly.',
-          thinking: undefined
-        };
+      if (error instanceof Error) {
+        if (error.message.includes('api_key')) {
+          return { response: 'I\'m having trouble connecting to my AI service. Please check that the API key is configured correctly.' };
+        }
+        // Return more specific error message
+        return { response: `Error: ${error.message}. Please try again or check your configuration.` };
       }
       
       // Consistent error response format

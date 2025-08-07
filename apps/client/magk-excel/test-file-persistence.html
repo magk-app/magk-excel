@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Persistence System Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        h1 { color: #4CAF50; }
+        h2 { color: #81C784; margin-top: 30px; }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #3a3a3a;
+        }
+        .file-item {
+            background: #3a3a3a;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .file-info {
+            flex: 1;
+        }
+        .file-name {
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .file-meta {
+            font-size: 12px;
+            color: #999;
+        }
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+            margin-left: 8px;
+        }
+        .badge-persistent {
+            background: #4CAF50;
+            color: white;
+        }
+        .badge-temporary {
+            background: #FF9800;
+            color: white;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 4px;
+            font-size: 14px;
+        }
+        button:hover { background: #45a049; }
+        button.danger { background: #f44336; }
+        button.danger:hover { background: #da190b; }
+        button.secondary { background: #666; }
+        button.secondary:hover { background: #555; }
+        .upload-area {
+            border: 2px dashed #4CAF50;
+            padding: 30px;
+            text-align: center;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            background: #3a3a3a;
+            border-color: #81C784;
+        }
+        .upload-area.dragging {
+            background: #4CAF50;
+            color: white;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #3a3a3a;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+        }
+        .session-selector {
+            margin-bottom: 20px;
+        }
+        select {
+            background: #3a3a3a;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            padding: 8px;
+            border-radius: 4px;
+            width: 100%;
+        }
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #3a3a3a;
+            border-radius: 6px;
+        }
+        .toggle {
+            position: relative;
+            width: 48px;
+            height: 24px;
+            background: #666;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .toggle.active {
+            background: #4CAF50;
+        }
+        .toggle-slider {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+        .toggle.active .toggle-slider {
+            transform: translateX(24px);
+        }
+        .log {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+        .log-entry {
+            margin-bottom: 4px;
+            padding: 4px;
+        }
+        .log-success { color: #4CAF50; }
+        .log-error { color: #f44336; }
+        .log-info { color: #2196F3; }
+    </style>
+</head>
+<body>
+    <h1>📁 File Persistence System Test</h1>
+    <p>Test the file persistence system with session management and Supabase mock integration</p>
+
+    <!-- Session Selector -->
+    <div class="session-selector">
+        <label>Current Session:</label>
+        <select id="session-select">
+            <option value="session1">Session 1 - Main Chat</option>
+            <option value="session2">Session 2 - Excel Work</option>
+            <option value="session3">Session 3 - PDF Analysis</option>
+        </select>
+    </div>
+
+    <!-- Statistics -->
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-value" id="temp-count">0</div>
+            <div class="stat-label">Temporary Files</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="persist-count">0</div>
+            <div class="stat-label">Persistent Files</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="total-size">0 KB</div>
+            <div class="stat-label">Total Size</div>
+        </div>
+    </div>
+
+    <!-- Auto-Persist Toggle -->
+    <div class="toggle-container">
+        <label>Auto-persist new files:</label>
+        <div class="toggle" id="auto-persist-toggle">
+            <div class="toggle-slider"></div>
+        </div>
+        <span id="persist-status">OFF</span>
+    </div>
+
+    <div class="container">
+        <!-- Left Panel: Upload and Session Files -->
+        <div class="panel">
+            <h2>📤 Upload Files</h2>
+            
+            <!-- Upload Area -->
+            <div class="upload-area" id="upload-area">
+                <input type="file" id="file-input" multiple style="display: none;">
+                <div>📎 Drop files here or click to upload</div>
+                <div style="font-size: 12px; margin-top: 10px; color: #999;">
+                    PDF, Excel, Images • Max 10MB per file
+                </div>
+            </div>
+
+            <h3>Session Files</h3>
+            <div id="session-files">
+                <p style="color: #666;">No files in current session</p>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button onclick="clearTemporary()">Clear Temporary</button>
+                <button onclick="persistAll()">Persist All</button>
+            </div>
+        </div>
+
+        <!-- Right Panel: Persistent Files -->
+        <div class="panel">
+            <h2>📌 Persistent Files</h2>
+            <p style="font-size: 12px; color: #999;">Available across all sessions</p>
+            
+            <div id="persistent-files">
+                <p style="color: #666;">No persistent files</p>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button onclick="syncWithSupabase()">🔄 Sync with Supabase</button>
+                <button class="danger" onclick="clearAllPersistent()">Clear All</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="log" id="activity-log">
+        <div class="log-entry log-info">System initialized</div>
+    </div>
+
+    <script>
+        // Mock File Persistence Store
+        class FilePersistenceStore {
+            constructor() {
+                this.temporaryFiles = new Map();
+                this.persistentFiles = new Map();
+                this.currentSession = 'session1';
+                this.autoPersist = false;
+                this.loadFromStorage();
+            }
+
+            loadFromStorage() {
+                const stored = localStorage.getItem('file-persistence-test');
+                if (stored) {
+                    const data = JSON.parse(stored);
+                    this.persistentFiles = new Map(data.persistent || []);
+                }
+            }
+
+            saveToStorage() {
+                const data = {
+                    persistent: Array.from(this.persistentFiles.entries())
+                };
+                localStorage.setItem('file-persistence-test', JSON.stringify(data));
+            }
+
+            async addFile(file, isPersistent = false) {
+                const fileData = {
+                    id: `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    name: file.name,
+                    type: file.type,
+                    size: file.size,
+                    uploadedAt: new Date().toISOString(),
+                    sessionId: this.currentSession,
+                    isPersistent,
+                    content: await this.fileToBase64(file)
+                };
+
+                if (isPersistent) {
+                    this.persistentFiles.set(fileData.id, fileData);
+                } else {
+                    this.temporaryFiles.set(fileData.id, fileData);
+                }
+
+                this.saveToStorage();
+                return fileData;
+            }
+
+            togglePersistence(fileId) {
+                const tempFile = this.temporaryFiles.get(fileId);
+                const persistFile = this.persistentFiles.get(fileId);
+
+                if (tempFile) {
+                    this.temporaryFiles.delete(fileId);
+                    tempFile.isPersistent = true;
+                    this.persistentFiles.set(fileId, tempFile);
+                    this.log(`File "${tempFile.name}" made persistent`, 'success');
+                } else if (persistFile) {
+                    this.persistentFiles.delete(fileId);
+                    persistFile.isPersistent = false;
+                    this.temporaryFiles.set(fileId, persistFile);
+                    this.log(`File "${persistFile.name}" made temporary`, 'info');
+                }
+
+                this.saveToStorage();
+            }
+
+            removeFile(fileId) {
+                const file = this.temporaryFiles.get(fileId) || this.persistentFiles.get(fileId);
+                if (file) {
+                    this.temporaryFiles.delete(fileId);
+                    this.persistentFiles.delete(fileId);
+                    this.log(`File "${file.name}" removed`, 'error');
+                    this.saveToStorage();
+                }
+            }
+
+            getSessionFiles() {
+                const files = [];
+                this.temporaryFiles.forEach(file => {
+                    if (file.sessionId === this.currentSession) {
+                        files.push(file);
+                    }
+                });
+                this.persistentFiles.forEach(file => {
+                    files.push(file);
+                });
+                return files;
+            }
+
+            clearTemporary() {
+                const count = this.temporaryFiles.size;
+                this.temporaryFiles.clear();
+                this.saveToStorage();
+                this.log(`Cleared ${count} temporary files`, 'info');
+            }
+
+            clearAllPersistent() {
+                const count = this.persistentFiles.size;
+                this.persistentFiles.clear();
+                this.saveToStorage();
+                this.log(`Cleared ${count} persistent files`, 'error');
+            }
+
+            async syncWithSupabase() {
+                this.log('Syncing with Supabase (mock)...', 'info');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                this.log(`Synced ${this.persistentFiles.size} files to Supabase (mock)`, 'success');
+            }
+
+            getStats() {
+                let totalSize = 0;
+                this.temporaryFiles.forEach(f => totalSize += f.size);
+                this.persistentFiles.forEach(f => totalSize += f.size);
+                return {
+                    temporary: this.temporaryFiles.size,
+                    persistent: this.persistentFiles.size,
+                    totalSize
+                };
+            }
+
+            async fileToBase64(file) {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            log(message, type = 'info') {
+                const log = document.getElementById('activity-log');
+                const entry = document.createElement('div');
+                entry.className = `log-entry log-${type}`;
+                entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                log.insertBefore(entry, log.firstChild);
+                
+                // Keep only last 20 entries
+                while (log.children.length > 20) {
+                    log.removeChild(log.lastChild);
+                }
+            }
+        }
+
+        // Initialize store
+        const store = new FilePersistenceStore();
+
+        // UI Functions
+        function updateUI() {
+            const stats = store.getStats();
+            
+            // Update stats
+            document.getElementById('temp-count').textContent = stats.temporary;
+            document.getElementById('persist-count').textContent = stats.persistent;
+            document.getElementById('total-size').textContent = formatFileSize(stats.totalSize);
+            
+            // Update session files
+            const sessionFiles = store.getSessionFiles();
+            const sessionContainer = document.getElementById('session-files');
+            
+            if (sessionFiles.length === 0) {
+                sessionContainer.innerHTML = '<p style="color: #666;">No files in current session</p>';
+            } else {
+                sessionContainer.innerHTML = sessionFiles
+                    .filter(f => !f.isPersistent || f.sessionId === store.currentSession)
+                    .map(f => createFileItem(f))
+                    .join('');
+            }
+            
+            // Update persistent files
+            const persistentContainer = document.getElementById('persistent-files');
+            const persistentFiles = Array.from(store.persistentFiles.values());
+            
+            if (persistentFiles.length === 0) {
+                persistentContainer.innerHTML = '<p style="color: #666;">No persistent files</p>';
+            } else {
+                persistentContainer.innerHTML = persistentFiles
+                    .map(f => createFileItem(f))
+                    .join('');
+            }
+        }
+
+        function createFileItem(file) {
+            return `
+                <div class="file-item">
+                    <div class="file-info">
+                        <div class="file-name">
+                            ${getFileIcon(file.type)} ${file.name}
+                            <span class="badge badge-${file.isPersistent ? 'persistent' : 'temporary'}">
+                                ${file.isPersistent ? '📌 Persistent' : '⏱️ Temporary'}
+                            </span>
+                        </div>
+                        <div class="file-meta">
+                            ${formatFileSize(file.size)} • ${new Date(file.uploadedAt).toLocaleString()}
+                        </div>
+                    </div>
+                    <div>
+                        <button class="secondary" onclick="toggleFile('${file.id}')">
+                            ${file.isPersistent ? 'Make Temp' : 'Persist'}
+                        </button>
+                        <button class="danger" onclick="removeFile('${file.id}')">×</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function getFileIcon(type) {
+            if (type.includes('pdf')) return '📄';
+            if (type.includes('excel') || type.includes('spreadsheet')) return '📊';
+            if (type.includes('image')) return '🖼️';
+            return '📎';
+        }
+
+        // Event Handlers
+        async function handleFileUpload(files) {
+            for (const file of files) {
+                if (file.size > 10 * 1024 * 1024) {
+                    store.log(`File "${file.name}" too large (max 10MB)`, 'error');
+                    continue;
+                }
+                
+                const fileData = await store.addFile(file, store.autoPersist);
+                store.log(`Uploaded "${file.name}" as ${fileData.isPersistent ? 'persistent' : 'temporary'}`, 'success');
+            }
+            updateUI();
+        }
+
+        function toggleFile(fileId) {
+            store.togglePersistence(fileId);
+            updateUI();
+        }
+
+        function removeFile(fileId) {
+            store.removeFile(fileId);
+            updateUI();
+        }
+
+        function clearTemporary() {
+            if (confirm('Clear all temporary files?')) {
+                store.clearTemporary();
+                updateUI();
+            }
+        }
+
+        function clearAllPersistent() {
+            if (confirm('Clear all persistent files? This cannot be undone.')) {
+                store.clearAllPersistent();
+                updateUI();
+            }
+        }
+
+        function persistAll() {
+            const tempFiles = Array.from(store.temporaryFiles.keys());
+            tempFiles.forEach(id => store.togglePersistence(id));
+            store.log(`Made ${tempFiles.length} files persistent`, 'success');
+            updateUI();
+        }
+
+        async function syncWithSupabase() {
+            await store.syncWithSupabase();
+            updateUI();
+        }
+
+        // Setup event listeners
+        document.getElementById('upload-area').addEventListener('click', () => {
+            document.getElementById('file-input').click();
+        });
+
+        document.getElementById('file-input').addEventListener('change', (e) => {
+            handleFileUpload(Array.from(e.target.files));
+            e.target.value = '';
+        });
+
+        // Drag and drop
+        const uploadArea = document.getElementById('upload-area');
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragging');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragging');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragging');
+            handleFileUpload(Array.from(e.dataTransfer.files));
+        });
+
+        // Session selector
+        document.getElementById('session-select').addEventListener('change', (e) => {
+            store.currentSession = e.target.value;
+            store.log(`Switched to ${e.target.value}`, 'info');
+            updateUI();
+        });
+
+        // Auto-persist toggle
+        const toggle = document.getElementById('auto-persist-toggle');
+        const toggleStatus = document.getElementById('persist-status');
+        
+        toggle.addEventListener('click', () => {
+            store.autoPersist = !store.autoPersist;
+            toggle.classList.toggle('active');
+            toggleStatus.textContent = store.autoPersist ? 'ON' : 'OFF';
+            store.log(`Auto-persist ${store.autoPersist ? 'enabled' : 'disabled'}`, 'info');
+        });
+
+        // Initial UI update
+        updateUI();
+        
+        // Add some demo files
+        async function addDemoFiles() {
+            const demoFiles = [
+                new File(['Demo Excel Content'], 'sales-report.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+                new File(['Demo PDF Content'], 'contract.pdf', { type: 'application/pdf' }),
+                new File(['Demo Text'], 'notes.txt', { type: 'text/plain' })
+            ];
+            
+            // Add first file as persistent
+            await store.addFile(demoFiles[0], true);
+            // Add others as temporary
+            await store.addFile(demoFiles[1], false);
+            await store.addFile(demoFiles[2], false);
+            
+            store.log('Added demo files', 'info');
+            updateUI();
+        }
+        
+        // Uncomment to add demo files on load
+        // addDemoFiles();
+    </script>
+</body>
+</html>

@@ -26,6 +26,10 @@ export { default as WorkflowDemo } from './WorkflowDemo';
 export { default as WorkflowCanvasExample } from './WorkflowCanvasExample';
 export { default as SpecializedNodesDemo } from './SpecializedNodesDemo';
 
+// Store-integrated editor
+export { default as WorkflowStoreEditor } from './WorkflowStoreEditor';
+export { default as NodeExecutionMonitor } from './NodeExecutionMonitor';
+
 // Re-export types for convenience
 export type {
   WorkflowNode,

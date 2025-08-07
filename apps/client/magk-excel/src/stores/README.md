@@ -1,6 +1,6 @@
 # MAGK Excel Stores
 
-This directory contains Zustand stores for managing application state in the MAGK Excel Electron application.
+This directory contains Zustand stores for managing application state in the MAGK Excel application.
 
 ## NodeExecutionStore
 

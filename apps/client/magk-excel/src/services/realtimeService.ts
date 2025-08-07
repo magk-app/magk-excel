@@ -1,5 +1,5 @@
 /**
- * Robust real-time connection service for MAGK Excel Electron application
+ * Robust real-time connection service for MAGK Excel application
  * Supports both WebSocket and Server-Sent Events (EventSource) with automatic reconnection,
  * heartbeat monitoring, offline message queuing, and comprehensive error handling.
  */
@@ -333,9 +333,9 @@ export class RealtimeService {
     return {
       isHealthy: this.connectionState === 'connected' && errors.length === 0,
       connectionState: this.connectionState,
-      connectedAt: this.connectedAt,
-      lastMessageAt: this.lastMessageAt,
-      lastHeartbeatAt: this.lastHeartbeatAt,
+      connectedAt: this.connectedAt || undefined,
+      lastMessageAt: this.lastMessageAt || undefined,
+      lastHeartbeatAt: this.lastHeartbeatAt || undefined,
       reconnectAttempts: this.reconnectAttempts,
       totalMessages: this.totalMessages,
       queuedMessages: this.messageQueue.length,
@@ -904,7 +904,10 @@ export class RealtimeService {
       ...data,
     };
 
-    console[level as keyof Console](message, logData);
+    const logMethod = console[level as keyof Console] as (message?: any, ...optionalParams: any[]) => void;
+    if (typeof logMethod === 'function') {
+      logMethod(message, logData);
+    }
   }
 }
 

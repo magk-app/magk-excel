@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Workflow Store</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { margin: 10px; padding: 10px; }
+        .debug-info { background: #f5f5f5; padding: 10px; margin: 10px 0; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>Workflow Store Debug</h1>
+    
+    <button id="testCreateWorkflow">Test Create Workflow</button>
+    <button id="testStoreState">Check Store State</button>
+    <button id="clearStorage">Clear LocalStorage</button>
+    
+    <div id="output"></div>
+
+    <script>
+        // Debug the store creation issue
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const div = document.createElement('div');
+            div.className = `debug-info ${type}`;
+            div.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            output.appendChild(div);
+        }
+
+        // Test Map functionality
+        function testMapFunctionality() {
+            log('Testing Map functionality...');
+            try {
+                const testMap = new Map();
+                testMap.set('test', { name: 'Test Workflow' });
+                const size = testMap.size;
+                const hasTest = testMap.has('test');
+                log(`Map test: size=${size}, has('test')=${hasTest}`, 'success');
+            } catch (error) {
+                log(`Map test failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Test localStorage
+        function testLocalStorage() {
+            log('Testing localStorage...');
+            try {
+                localStorage.setItem('test', 'value');
+                const value = localStorage.getItem('test');
+                localStorage.removeItem('test');
+                log(`localStorage test: ${value === 'value' ? 'success' : 'failed'}`, 'success');
+            } catch (error) {
+                log(`localStorage test failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Simulate workflow creation
+        function simulateWorkflowCreation() {
+            log('Simulating workflow creation...');
+            
+            try {
+                // Simulate the store state
+                const temporaryWorkflows = new Map();
+                const permanentWorkflows = new Map();
+                
+                // Simulate createWorkflow function
+                const createWorkflow = (name, type, chatSessionId) => {
+                    const id = `workflow-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                    const workflow = {
+                        id,
+                        name,
+                        type,
+                        chatSessionId,
+                        nodes: [],
+                        edges: [],
+                        status: 'draft',
+                        metadata: {
+                            created: new Date(),
+                            modified: new Date(),
+                            tags: [],
+                            category: 'general'
+                        },
+                        version: 1
+                    };
+
+                    if (type === 'temporary') {
+                        temporaryWorkflows.set(id, workflow);
+                    } else {
+                        permanentWorkflows.set(id, workflow);
+                    }
+
+                    return id;
+                };
+
+                const workflowId = createWorkflow(
+                    `New Workflow ${new Date().toLocaleTimeString()}`,
+                    'temporary',
+                    'test-session'
+                );
+
+                log(`Workflow created with ID: ${workflowId}`, 'success');
+                log(`Temporary workflows count: ${temporaryWorkflows.size}`, 'success');
+                
+                const workflow = temporaryWorkflows.get(workflowId);
+                log(`Retrieved workflow: ${JSON.stringify(workflow, null, 2)}`, 'success');
+                
+                return workflowId;
+
+            } catch (error) {
+                log(`Workflow creation failed: ${error.message}`, 'error');
+                log(`Stack: ${error.stack}`, 'error');
+            }
+        }
+
+        // Check for potential issues
+        function checkPotentialIssues() {
+            log('Checking for potential issues...');
+            
+            // Check if we're in a browser environment
+            log(`Window object exists: ${typeof window !== 'undefined'}`, 'info');
+            log(`localStorage available: ${typeof localStorage !== 'undefined'}`, 'info');
+            
+            // Check for Map support
+            log(`Map constructor exists: ${typeof Map !== 'undefined'}`, 'info');
+            
+            // Check stored data
+            const storedData = localStorage.getItem('workflow-store');
+            if (storedData) {
+                try {
+                    const parsed = JSON.parse(storedData);
+                    log(`Stored data found: ${JSON.stringify(parsed, null, 2)}`, 'info');
+                } catch (error) {
+                    log(`Failed to parse stored data: ${error.message}`, 'error');
+                }
+            } else {
+                log('No stored workflow data found', 'info');
+            }
+        }
+
+        // Event listeners
+        document.getElementById('testCreateWorkflow').addEventListener('click', () => {
+            log('=== Testing Workflow Creation ===');
+            testMapFunctionality();
+            testLocalStorage();
+            simulateWorkflowCreation();
+        });
+
+        document.getElementById('testStoreState').addEventListener('click', () => {
+            log('=== Checking Store State ===');
+            checkPotentialIssues();
+        });
+
+        document.getElementById('clearStorage').addEventListener('click', () => {
+            localStorage.clear();
+            log('LocalStorage cleared', 'success');
+        });
+
+        // Run initial checks
+        window.addEventListener('load', () => {
+            log('=== Initial Checks ===');
+            checkPotentialIssues();
+        });
+    </script>
+</body>
+</html>

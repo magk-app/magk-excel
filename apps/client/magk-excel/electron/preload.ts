@@ -49,3 +49,15 @@ contextBridge.exposeInMainWorld('mcpAPI', {
   getSmitheryServers: () => 
     ipcRenderer.invoke('mcp:get-smithery-servers')
 })
+
+// Expose File API for Excel downloads
+contextBridge.exposeInMainWorld('fileAPI', {
+  downloadFile: (filePath: string) => 
+    ipcRenderer.invoke('download-file', filePath),
+  openFile: (filePath: string) => 
+    ipcRenderer.invoke('open-file', filePath),
+  showInFolder: (filePath: string) => 
+    ipcRenderer.invoke('show-in-folder', filePath),
+  getExcelDirectory: () => 
+    ipcRenderer.invoke('get-excel-directory')
+})

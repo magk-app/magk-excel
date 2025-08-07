@@ -1,6 +1,6 @@
 # Real-time Connection Services
 
-This directory contains robust real-time connection services for the MAGK Excel Electron application, providing WebSocket and EventSource connectivity with comprehensive error handling and automatic reconnection.
+This directory contains robust real-time connection services for the MAGK Excel application, providing WebSocket and EventSource connectivity with comprehensive error handling and automatic reconnection.
 
 ## Overview
 

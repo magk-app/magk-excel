@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from './ui/alert';
 
 export interface FileAttachment {
   file: File;
-  type: 'pdf' | 'excel';
+  type: string;
   name: string;
   size: number;
   id: string;
