@@ -1,5 +1,4 @@
 {
-  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
       "Bash(ls:*)",
@@ -16,6 +15,8 @@
       "WebFetch(domain:github.com)",
       "mcp__firecrawl__firecrawl_search",
       "WebFetch(domain:raw.githubusercontent.com)"
+      "mcp__ruv-swarm",
+      "mcp__claude-flow"
     ],
     "deny": []
   },

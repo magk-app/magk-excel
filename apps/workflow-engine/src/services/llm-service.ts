@@ -11,8 +11,17 @@ export interface ModelConfig {
   enableThinking?: boolean;
   temperature?: number;
   maxTokens?: number;
-  apiKey?: string;
+  // API keys should only be managed via environment variables
 }
+
+// Valid models for validation
+const VALID_ANTHROPIC_MODELS = new Set([
+  'claude-3-5-sonnet-20241022',
+  'claude-3-5-sonnet-latest',
+  'claude-3-5-haiku-20241022',
+  'claude-3-opus-20240229',
+  'claude-3-sonnet-20240229'
+]);
 
 export class LLMService {
   private anthropic: Anthropic | null = null;
@@ -50,18 +59,24 @@ export class LLMService {
       model: modelConfig?.model || this.defaultModel,
       enableThinking: modelConfig?.enableThinking ?? true,
       temperature: modelConfig?.temperature ?? 0.7,
-      maxTokens: modelConfig?.maxTokens ?? 4096,
-      apiKey: modelConfig?.apiKey
+      maxTokens: modelConfig?.maxTokens ?? 4096
     };
+    
+    // Validate model before proceeding
+    if (config.provider === 'anthropic' && !VALID_ANTHROPIC_MODELS.has(config.model)) {
+      console.error(`❌ Invalid Anthropic model: ${config.model}`);
+      return { 
+        response: `Error: Invalid model "${config.model}". Valid models are: ${Array.from(VALID_ANTHROPIC_MODELS).join(', ')}`,
+        thinking: undefined 
+      };
+    }
+    
     try {
-      // Use provided API key or fall back to environment
+      // Only use environment API key - never accept from frontend
       let apiClient: Anthropic | null = this.anthropic;
       
       if (config.provider === 'anthropic') {
-        if (config.apiKey) {
-          // Use provided API key
-          apiClient = new Anthropic({ apiKey: config.apiKey });
-        } else if (!this.anthropic) {
+        if (!this.anthropic) {
           // No API key available
           console.log('⚠️ No Anthropic API key configured, using mock response...');
           return { response: this.generateMockWorkflowResponse(message) };
@@ -78,7 +93,23 @@ export class LLMService {
       }
 
       console.log(`🤖 Sending request to ${config.provider} (${config.model})...`);
-      console.log(`🔑 API Key source: ${config.apiKey ? 'Client provided' : 'Environment variable'}`);
+      console.log(`🧠 Thinking mode: ${config.enableThinking ? 'enabled' : 'disabled'}`);
+
+      // Use thinking model variant if enabled
+      let actualModel = config.model;
+      if (config.enableThinking && config.provider === 'anthropic') {
+        // Map to thinking variants for Claude models
+        const thinkingModels: Record<string, string> = {
+          'claude-3-5-sonnet-20241022': 'claude-3-5-sonnet-20241022-v2:0',
+          'claude-3-5-sonnet-latest': 'claude-3-5-sonnet-20241022-v2:0',
+          'claude-3-opus-20240229': 'claude-3-opus-20240229-v2:0'
+        };
+        
+        if (thinkingModels[config.model]) {
+          actualModel = thinkingModels[config.model];
+          console.log(`🧠 Using thinking variant: ${actualModel}`);
+        }
+      }
 
       // Convert history to Anthropic format
       const messages: Anthropic.Messages.MessageParam[] = [
@@ -129,7 +160,7 @@ Then provide your helpful response.` : ''}
 Be conversational and helpful, but prioritize action over questions. If the user uploads an Excel file, immediately show them what's in it and what you can do with it.`;
 
       const response = await apiClient.messages.create({
-        model: config.model,
+        model: actualModel,
         max_tokens: config.maxTokens || 4096,
         temperature: config.temperature || 0.7,
         system: systemPrompt || defaultSystemPrompt,
@@ -178,7 +209,11 @@ Be conversational and helpful, but prioritize action over questions. If the user
         return { response: `Error: ${error.message}. Please try again or check your configuration.` };
       }
       
-      return { response: 'Sorry, I encountered an error while processing your request. Please try again.' };
+      // Consistent error response format
+      return { 
+        response: 'Sorry, I encountered an error while processing your request. Please try again.',
+        thinking: undefined
+      };
     }
   }
 

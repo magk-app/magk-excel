@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { LLMService } from '../services/llm-service.js';
+import { rateLimiter } from '../middleware/rateLimiter.js';
 
 const chatRoute = new Hono();
 const llmService = new LLMService();
@@ -157,8 +158,15 @@ const chatRequestSchema = z.object({
   }).optional(),
   // Legacy fields for backward compatibility
   model: z.string().optional().default('claude-3-5-sonnet-20241022'),
-  enableThinking: z.boolean().optional().default(true)
+  provider: z.string().optional().default('anthropic'),
+  enableThinking: z.boolean().optional().default(true),
+  temperature: z.number().optional(),
+  maxTokens: z.number().optional()
+  // API keys should only be managed via environment variables
 });
+
+// Apply rate limiting middleware
+chatRoute.use('/chat', rateLimiter.middleware());
 
 chatRoute.post('/chat', async (c) => {
   try {
@@ -217,7 +225,7 @@ chatRoute.post('/chat', async (c) => {
       modelConfig.enableThinking = enableThinkingStr === 'true' || enableThinkingStr === '1';
       modelConfig.temperature = formData.get('temperature') ? parseFloat(formData.get('temperature') as string) : undefined;
       modelConfig.maxTokens = formData.get('maxTokens') ? parseInt(formData.get('maxTokens') as string) : undefined;
-      modelConfig.apiKey = formData.get('apiKey') as string || undefined;
+      // API keys removed - managed via environment variables only
       
       const fileCount = parseInt(formData.get('fileCount') as string || '0');
       console.log(`📄 File count: ${fileCount}`);
@@ -433,7 +441,7 @@ chatRoute.post('/chat', async (c) => {
     let enhancedResponse = llmResult.response;
     if (downloadLinks.length > 0) {
       enhancedResponse += `\n\n📁 **Excel File Created:**\n`;
-      downloadLinks.forEach((link, index) => {
+      downloadLinks.forEach((link) => {
         const filename = link.split('/').pop();
         enhancedResponse += `\n🔗 [Download ${filename}](${link})`;
       });
