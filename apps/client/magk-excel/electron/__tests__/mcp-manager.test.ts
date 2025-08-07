@@ -1,6 +1,5 @@
 import { MCPManager } from '../mcp-manager';
 import { readFile } from 'fs/promises';
-import path from 'path';
 
 // Mock the MCP SDK
 jest.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
