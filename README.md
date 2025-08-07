@@ -139,6 +139,10 @@ graph LR
 **Arman**  
 **Status:** Not yet onboarded
 
+**Kevin**  
+**Operating System:** macOS 
+**Python Version:** ???
+
 ### Contributing
 
 We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on:

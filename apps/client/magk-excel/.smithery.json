@@ -19,9 +19,6 @@
       "displayName": "File Extractor Service",
       "description": "Extract content and metadata from various file formats including PDF, DOC, DOCX, PPTX, CSV, and XLSX. Support both URL downloads and direct file uploads with integrated search and pagination for spreadsheets. Automatically handle Google Drive and other supported cloud storage URLs for seamless file access.",
       "config": {}
-    }
-  },
-  "lastUpdated": "2025-08-07T02:40:42.143Z"
     },
     "desktop-commander": {
       "command": "",
