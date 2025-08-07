@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat API Test - Complete Flow</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: #2d3748;
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .status {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 6px;
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #f44336;
+        }
+        .dot.online { background: #4caf50; }
+        .dot.connecting { background: #ff9800; animation: pulse 1s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .main {
+            display: flex;
+            height: 600px;
+        }
+        .sidebar {
+            width: 300px;
+            background: #f7fafc;
+            padding: 20px;
+            border-right: 1px solid #e2e8f0;
+            overflow-y: auto;
+        }
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #fff;
+        }
+        .message {
+            margin-bottom: 15px;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message.user {
+            text-align: right;
+        }
+        .message.assistant {
+            text-align: left;
+        }
+        .message-content {
+            display: inline-block;
+            padding: 10px 15px;
+            border-radius: 18px;
+            max-width: 70%;
+            word-wrap: break-word;
+        }
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .message.assistant .message-content {
+            background: #f1f5f9;
+            color: #1a202c;
+        }
+        .message.thinking .message-content {
+            background: #fef3c7;
+            color: #92400e;
+            font-style: italic;
+        }
+        .message-time {
+            font-size: 11px;
+            color: #718096;
+            margin-top: 4px;
+        }
+        .input-area {
+            padding: 20px;
+            background: #f7fafc;
+            border-top: 1px solid #e2e8f0;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #cbd5e0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        button:hover:not(:disabled) {
+            transform: scale(1.05);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .test-controls {
+            margin-bottom: 20px;
+        }
+        .test-btn {
+            width: 100%;
+            margin-bottom: 10px;
+            background: #4a5568;
+        }
+        .test-btn.success { background: #48bb78; }
+        .test-btn.error { background: #f56565; }
+        .model-config {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .config-item {
+            margin-bottom: 10px;
+        }
+        .config-item label {
+            display: block;
+            font-size: 12px;
+            color: #4a5568;
+            margin-bottom: 4px;
+        }
+        .config-item select, .config-item input {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .logs {
+            background: #1a202c;
+            color: #4caf50;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 10px;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .log-entry {
+            margin-bottom: 4px;
+        }
+        .log-entry.error { color: #f56565; }
+        .log-entry.info { color: #63b3ed; }
+        .log-entry.success { color: #48bb78; }
+        .streaming-indicator {
+            display: inline-block;
+            margin-left: 5px;
+        }
+        .streaming-indicator span {
+            animation: blink 1.4s infinite;
+            animation-fill-mode: both;
+        }
+        .streaming-indicator span:nth-child(2) {
+            animation-delay: .2s;
+        }
+        .streaming-indicator span:nth-child(3) {
+            animation-delay: .4s;
+        }
+        @keyframes blink {
+            0%, 60%, 100% { opacity: 0.3; }
+            30% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Chat API Test Suite</h1>
+            <div class="status">
+                <div class="status-indicator">
+                    <div id="apiStatus" class="dot"></div>
+                    <span id="apiStatusText">Disconnected</span>
+                </div>
+                <div class="status-indicator">
+                    <div id="streamStatus" class="dot"></div>
+                    <span id="streamStatusText">Not Streaming</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="main">
+            <div class="sidebar">
+                <div class="model-config">
+                    <h3>Model Configuration</h3>
+                    <div class="config-item">
+                        <label>Provider</label>
+                        <select id="provider">
+                            <option value="anthropic">Anthropic</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="bedrock">Bedrock</option>
+                        </select>
+                    </div>
+                    <div class="config-item">
+                        <label>Model</label>
+                        <select id="model">
+                            <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                            <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                            <option value="gpt-4">GPT-4</option>
+                        </select>
+                    </div>
+                    <div class="config-item">
+                        <label>
+                            <input type="checkbox" id="enableThinking"> Enable Thinking
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="test-controls">
+                    <h3>API Tests</h3>
+                    <button class="test-btn" onclick="testHealth()">Test Health Check</button>
+                    <button class="test-btn" onclick="testNonStreaming()">Test Non-Streaming</button>
+                    <button class="test-btn" onclick="testStreaming()">Test Streaming</button>
+                    <button class="test-btn" onclick="testWithThinking()">Test With Thinking</button>
+                    <button class="test-btn" onclick="clearChat()">Clear Chat</button>
+                </div>
+                
+                <div class="logs" id="logs"></div>
+            </div>
+            
+            <div class="chat-area">
+                <div class="messages" id="messages"></div>
+                <div class="input-area">
+                    <div class="input-group">
+                        <input type="text" id="messageInput" placeholder="Type your message..." 
+                               onkeypress="if(event.key === 'Enter') sendMessage()">
+                        <button onclick="sendMessage()" id="sendBtn">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3001';
+        let isStreaming = false;
+        
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logs.appendChild(entry);
+            logs.scrollTop = logs.scrollHeight;
+        }
+        
+        function updateStatus(api, stream) {
+            const apiStatus = document.getElementById('apiStatus');
+            const apiStatusText = document.getElementById('apiStatusText');
+            const streamStatus = document.getElementById('streamStatus');
+            const streamStatusText = document.getElementById('streamStatusText');
+            
+            if (api === 'online') {
+                apiStatus.className = 'dot online';
+                apiStatusText.textContent = 'Connected';
+            } else if (api === 'connecting') {
+                apiStatus.className = 'dot connecting';
+                apiStatusText.textContent = 'Connecting...';
+            } else {
+                apiStatus.className = 'dot';
+                apiStatusText.textContent = 'Disconnected';
+            }
+            
+            if (stream) {
+                streamStatus.className = 'dot online';
+                streamStatusText.textContent = 'Streaming';
+            } else {
+                streamStatus.className = 'dot';
+                streamStatusText.textContent = 'Not Streaming';
+            }
+        }
+        
+        function addMessage(role, content, isThinking = false, isStreaming = false) {
+            const messages = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role} ${isThinking ? 'thinking' : ''}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = content;
+            
+            if (isStreaming) {
+                const indicator = document.createElement('span');
+                indicator.className = 'streaming-indicator';
+                indicator.innerHTML = '<span>.</span><span>.</span><span>.</span>';
+                contentDiv.appendChild(indicator);
+            }
+            
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = new Date().toLocaleTimeString();
+            
+            messageDiv.appendChild(contentDiv);
+            messageDiv.appendChild(timeDiv);
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+            
+            return messageDiv;
+        }
+        
+        async function testHealth() {
+            log('Testing health check...', 'info');
+            updateStatus('connecting', false);
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/v2/chat/health`);
+                const data = await response.json();
+                log(`Health check passed: ${JSON.stringify(data)}`, 'success');
+                updateStatus('online', false);
+            } catch (error) {
+                log(`Health check failed: ${error.message}`, 'error');
+                updateStatus('offline', false);
+            }
+        }
+        
+        async function testNonStreaming() {
+            const message = 'Hello, this is a non-streaming test';
+            await sendMessageToAPI(message, false);
+        }
+        
+        async function testStreaming() {
+            const message = 'Hello, this is a streaming test';
+            await sendMessageToAPI(message, true);
+        }
+        
+        async function testWithThinking() {
+            document.getElementById('enableThinking').checked = true;
+            const message = 'Explain quantum computing in simple terms';
+            await sendMessageToAPI(message, true);
+        }
+        
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            if (!message) return;
+            
+            input.value = '';
+            await sendMessageToAPI(message, true);
+        }
+        
+        async function sendMessageToAPI(message, useStreaming = true) {
+            if (isStreaming) {
+                log('Already streaming, please wait...', 'error');
+                return;
+            }
+            
+            const provider = document.getElementById('provider').value;
+            const model = document.getElementById('model').value;
+            const enableThinking = document.getElementById('enableThinking').checked;
+            
+            // Add user message
+            addMessage('user', message);
+            log(`Sending message: "${message}"`, 'info');
+            
+            // Disable send button
+            document.getElementById('sendBtn').disabled = true;
+            isStreaming = true;
+            
+            try {
+                updateStatus('online', true);
+                
+                if (useStreaming) {
+                    // Create assistant message placeholder
+                    const assistantMsg = addMessage('assistant', '', enableThinking, true);
+                    const contentDiv = assistantMsg.querySelector('.message-content');
+                    
+                    // Call streaming endpoint
+                    const response = await fetch(`${API_BASE}/api/v2/chat/stream`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            message,
+                            modelConfig: {
+                                provider,
+                                model,
+                                enableThinking
+                            },
+                            history: []
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`API error: ${response.status}`);
+                    }
+                    
+                    // Read SSE stream
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+                    
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+                        
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const data = JSON.parse(line.slice(6));
+                                    
+                                    if (data.type === 'thinking') {
+                                        contentDiv.textContent = 'Thinking...';
+                                        assistantMsg.classList.add('thinking');
+                                    } else if (data.type === 'content') {
+                                        contentDiv.textContent = data.content;
+                                        assistantMsg.classList.remove('thinking');
+                                    } else if (data.type === 'complete') {
+                                        contentDiv.textContent = data.content;
+                                        assistantMsg.classList.remove('thinking');
+                                        const indicator = contentDiv.querySelector('.streaming-indicator');
+                                        if (indicator) indicator.remove();
+                                        log('Streaming completed', 'success');
+                                    } else if (data.type === 'error') {
+                                        throw new Error(data.error);
+                                    }
+                                } catch (e) {
+                                    console.error('Parse error:', e);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Non-streaming
+                    const response = await fetch(`${API_BASE}/api/v2/chat`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            message,
+                            modelConfig: {
+                                provider,
+                                model,
+                                enableThinking
+                            },
+                            history: []
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    addMessage('assistant', data.response);
+                    log('Non-streaming response received', 'success');
+                }
+                
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                addMessage('assistant', `Error: ${error.message}`);
+            } finally {
+                document.getElementById('sendBtn').disabled = false;
+                isStreaming = false;
+                updateStatus('online', false);
+            }
+        }
+        
+        function clearChat() {
+            document.getElementById('messages').innerHTML = '';
+            log('Chat cleared', 'info');
+        }
+        
+        // Initial setup
+        window.onload = () => {
+            log('Chat API Test Suite loaded', 'success');
+            testHealth();
+        };
+    </script>
+</body>
+</html>
