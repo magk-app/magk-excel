@@ -11,5 +11,11 @@
       "Bash(npm install:*)"
     ],
     "deny": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "claude-flow",
+    "ruv-swarm",
+    "pdf-tools"
+  ],
+  "enableAllProjectMcpServers": true
 }
