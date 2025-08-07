@@ -81,9 +81,17 @@ interface WorkflowCanvasProps {
   className?: string;
 }
 
-// Enhanced edge styles with better data flow visualization
+// Memoized edge styles to prevent unnecessary recalculations
+const EDGE_STYLE_CACHE = new Map();
+
 const getEnhancedEdgeStyle = (edge: WorkflowEdge, isExecuting: boolean = false) => {
   const hasData = edge.data?.sampleData;
+  const cacheKey = `${hasData}-${isExecuting}`;
+  
+  if (EDGE_STYLE_CACHE.has(cacheKey)) {
+    return EDGE_STYLE_CACHE.get(cacheKey);
+  }
+
   const baseStyle = {
     stroke: hasData ? STATUS_COLORS.completed : STATUS_COLORS.pending,
     strokeWidth: hasData ? 3 : 2,
@@ -91,16 +99,15 @@ const getEnhancedEdgeStyle = (edge: WorkflowEdge, isExecuting: boolean = false) 
     filter: hasData ? `drop-shadow(0 0 6px ${STATUS_COLORS.completed}30)` : undefined,
   };
 
-  if (isExecuting && hasData) {
-    return {
-      ...baseStyle,
-      stroke: STATUS_COLORS.running,
-      strokeWidth: 4,
-      filter: `drop-shadow(0 0 8px ${STATUS_COLORS.running}40)`,
-    };
-  }
+  const finalStyle = isExecuting && hasData ? {
+    ...baseStyle,
+    stroke: STATUS_COLORS.running,
+    strokeWidth: 4,
+    filter: `drop-shadow(0 0 8px ${STATUS_COLORS.running}40)`,
+  } : baseStyle;
 
-  return baseStyle;
+  EDGE_STYLE_CACHE.set(cacheKey, finalStyle);
+  return finalStyle;
 };
 
 // Enhanced MiniMap node colors with better status indication
