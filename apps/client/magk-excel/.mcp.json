@@ -13,6 +13,16 @@
         "EXCEL_MCP_PAGING_CELLS_LIMIT": "4000"
       }
     },
+    "pdf": {
+      "command": "npx",
+      "args": [
+        "--yes",
+        "@modelcontextprotocol/server-pdf"
+      ],
+      "type": "stdio",
+      "displayName": "PDF Tools",
+      "description": "Read and extract data from PDF files"
+    },
     "puppeteer": {
       "command": "npx",
       "args": [

@@ -42,6 +42,31 @@ interface ModelInfo {
 }
 
 const AVAILABLE_MODELS: ModelInfo[] = [
+  // Eliza Models (Custom tuned based on Claude Sonnet)
+  {
+    value: 'eliza-4.0',
+    displayName: 'Eliza 4.0',
+    baseModel: 'claude-3-5-sonnet-20241022',
+    provider: 'anthropic',
+    contextWindow: 200000,
+    features: ['Excel-Expert', 'Fast', 'Data-Analysis', 'Workflow'],
+    tier: 'flagship',
+    supportsThinking: true,
+    requiresApiKey: true,
+    description: 'Excel and data workflow specialist - optimized for spreadsheet tasks'
+  },
+  {
+    value: 'eliza-3.5',
+    displayName: 'Eliza 3.5',
+    baseModel: 'claude-3-sonnet-20240229',
+    provider: 'anthropic',
+    contextWindow: 200000,
+    features: ['Balanced', 'Reliable', 'Excel', 'Fast'],
+    tier: 'fast',
+    supportsThinking: true,
+    requiresApiKey: true,
+    description: 'Efficient Excel assistant - balanced performance and cost'
+  },
   // Claude Models (Anthropic) - Latest versions as of Dec 2024
   {
     value: 'claude-3-5-sonnet-latest',
@@ -354,7 +379,7 @@ const TIER_BADGES = {
 };
 
 export function ModelSelector({ currentModel, onModelChange }: ModelSelectorProps) {
-  const [selectedModel, setSelectedModel] = useState(currentModel.model || 'claude-3-5-sonnet');
+  const [selectedModel, setSelectedModel] = useState(currentModel.model || 'eliza-4.0');
   const [selectedProvider, setSelectedProvider] = useState<string>(currentModel.provider || 'anthropic');
   const [enableThinking, setEnableThinking] = useState(currentModel.enableThinking);
   const [temperature, setTemperature] = useState(currentModel.temperature || 0.7);
@@ -387,10 +412,15 @@ export function ModelSelector({ currentModel, onModelChange }: ModelSelectorProp
       // Save API keys to localStorage
       localStorage.setItem('magk-api-keys', JSON.stringify(apiKeys));
       
+      // For Eliza models, add (Thinking) to the display name when thinking is enabled
+      const displayName = selectedModelConfig.displayName.startsWith('Eliza') 
+        ? `${selectedModelConfig.displayName}${enableThinking && selectedModelConfig.supportsThinking ? ' (Thinking)' : ''}`
+        : `${selectedModelConfig.displayName}${enableThinking && selectedModelConfig.supportsThinking ? ' (Thinking)' : ''}`;
+      
       onModelChange({
         provider: selectedModelConfig.provider,
         model: selectedModelConfig.baseModel,
-        displayName: `${selectedModelConfig.displayName}${enableThinking && selectedModelConfig.supportsThinking ? ' (Thinking)' : ''}`,
+        displayName: displayName,
         enableThinking: enableThinking && (selectedModelConfig.supportsThinking || false),
         temperature,
         maxTokens,

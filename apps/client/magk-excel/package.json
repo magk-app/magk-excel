@@ -8,11 +8,23 @@
   "scripts": {
     "dev": "npx vite",
     "build": "tsc && npx vite build && electron-builder",
-    "lint": "eslint . --max-warnings 0",
-    "preview": "npx vite preview",
+    "build:app": "tsc --skipLibCheck && npx vite build && electron-builder",
+    "build:electron": "npx vite build && electron-builder",
+    "build:simple": "npx vite build",
+    "build:win": "npx vite build && electron-builder --win",
+    "build:mac": "npx vite build && electron-builder --mac",
+    "build:linux": "npx vite build && electron-builder --linux",
+    "build:all": "npx vite build && electron-builder -mwl",
+    "start": "npx electron dist-electron/main.js",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:mcp": "jest electron/__tests__/mcp-manager.test.ts"
+    "test:mcp": "jest electron/__tests__/mcp-manager.test.ts",
+    "test:win": "scripts\\test-win-build.bat",
+    "test:mac": "chmod +x scripts/test-mac-build.sh && scripts/test-mac-build.sh",
+    "lint": "eslint . --max-warnings 0",
+    "preview": "npx vite preview",
+    "icons:generate": "node scripts/generate-icons.js",
+    "icons:setup": "node scripts/setup-icons.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.1",
@@ -44,6 +56,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
+    "@testing-library/jest-dom": "^6.6.4",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/exceljs": "^0.5.3",
     "@types/jest": "^30.0.0",
     "@types/marked": "^5.0.2",
     "@types/react": "^18.2.64",

@@ -24,8 +24,8 @@ export function ChatInterface() {
   const [modelConfig, setModelConfig] = useState<ModelConfig>({
     provider: 'anthropic',
     model: 'claude-3-5-sonnet-20241022',
-    displayName: 'Claude 3.5 Sonnet',
-    enableThinking: true
+    displayName: 'Eliza 4.0',
+    enableThinking: false
   });
   
   // Add request tracking to prevent duplicate sends
@@ -470,16 +470,7 @@ export function ChatInterface() {
         let processedMessage = message;
         const excelData: unknown[] = [];
         
-        // Add processing status message for Excel files
-        if (attachments.some(att => att.type === 'excel')) {
-          if (activeSessionId) {
-            addMessage(activeSessionId, {
-              role: 'assistant',
-              content: `📊 **Processing Excel Files...**\n\n⏳ **Status:** Reading and analyzing uploaded Excel files\n🔍 **Processing:** Extracting data, formatting tables, and preparing for analysis\n\n*Please wait while I process your Excel data...*`
-            });
-          }
-        }
-        
+        // Don't add a separate processing message - process inline
         for (const attachment of attachments) {
           if (attachment.type === 'excel') {
             console.log('📊 Processing Excel file:', attachment.name);
@@ -499,7 +490,7 @@ export function ChatInterface() {
           }
         }
         
-        // FIRST: Add user message to storage
+        // Add user message to storage ONLY ONCE
         if (activeSessionId) {
           addMessage(activeSessionId, {
             role: 'user',
@@ -633,10 +624,21 @@ export function ChatInterface() {
               return;
             }
             
-            // Display thinking if enabled and present
+            // Display thinking if enabled and present - in a collapsible format
             if (data.thinking && modelConfig.enableThinking) {
-              observer.next(`💭 **Thinking:**\n${data.thinking}\n\n---\n\n`);
-              await new Promise(resolve => setTimeout(resolve, 500));
+              observer.next(`<details style="background: rgba(100, 100, 120, 0.1); border-left: 3px solid #6366f1; padding: 12px; margin: 12px 0; border-radius: 4px;">
+<summary style="cursor: pointer; font-size: 0.875rem; color: #9ca3af; user-select: none; font-weight: 500;">
+💭 Show thinking process...
+</summary>
+<div style="margin-top: 8px; font-size: 0.875rem; color: #9ca3af; line-height: 1.5;">
+
+${data.thinking}
+
+</div>
+</details>
+
+`);
+              await new Promise(resolve => setTimeout(resolve, 200));
             }
             
             // Stream the main response

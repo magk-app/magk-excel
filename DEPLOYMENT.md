@@ -15,6 +15,7 @@ This guide covers deploying the MAGK Excel application, which consists of:
 - [Environment Configuration](#environment-configuration)
 - [CI/CD Setup](#cicd-setup)
 - [Monitoring & Maintenance](#monitoring--maintenance)
+- [Troubleshooting](#troubleshooting)
 
 ## Prerequisites
 
@@ -30,6 +31,22 @@ git --version
 # Python 3.10+ (for server components)
 python --version
 ```
+
+### Platform-Specific Requirements
+
+#### Windows
+- Windows 10/11 (64-bit)
+- Administrator privileges (for code signing)
+- Visual Studio Build Tools (optional, for native modules)
+
+#### macOS
+- macOS 10.15+ (Catalina or later)
+- Xcode Command Line Tools: `xcode-select --install`
+- Apple Developer Account (for code signing)
+
+#### Linux
+- Ubuntu 18.04+ or equivalent
+- Build essentials: `sudo apt-get install build-essential`
 
 ### API Keys Required
 - **Anthropic API Key** (for Claude integration)
@@ -98,31 +115,65 @@ npm run electron:dev
 
 ### Building for Distribution
 
-#### Windows
+#### Quick Build (Recommended)
 ```bash
 cd apps/client/magk-excel
 
-# Build for Windows
-npm run build:win
-
-# Output: release/[version]/MAGK-Excel-Setup-[version].exe
+# Build and run without packaging
+npm run build:simple
+npm start
 ```
 
-#### macOS
+#### Platform-Specific Builds
+
+**Windows**
+```bash
+# Build for Windows (may require admin privileges)
+npm run build:win
+
+# Test Windows build
+npm run test:win
+
+# Output: release/[version]/MAGK-Excel-Windows-[version]-x64.exe
+```
+
+**macOS**
 ```bash
 # Build for macOS
 npm run build:mac
 
-# Output: release/[version]/MAGK-Excel-[version].dmg
+# Test Mac build
+npm run test:mac
+
+# Output: release/[version]/MAGK-Excel-Mac-[version]-[arch].dmg
 ```
 
-#### Linux
+**Linux**
 ```bash
 # Build for Linux
 npm run build:linux
 
-# Output: release/[version]/MAGK-Excel-[version].AppImage
+# Output: release/[version]/MAGK-Excel-Linux-[version]-x64.AppImage
 ```
+
+**All Platforms**
+```bash
+# Build for all platforms
+npm run build:all
+
+# Output: release/[version]/ with all platform artifacts
+```
+
+### Build Commands Reference
+
+| Command | Description | Output |
+|---------|-------------|---------|
+| `npm run build:simple` | Build app without packaging | `dist/` and `dist-electron/` |
+| `npm run build:win` | Build Windows installer | `.exe` and `.portable` |
+| `npm run build:mac` | Build macOS app | `.dmg` and `.zip` |
+| `npm run build:linux` | Build Linux app | `.AppImage` and `.deb` |
+| `npm run build:all` | Build all platforms | All artifacts |
+| `npm start` | Run built app | Launches Electron |
 
 ### Auto-Update Configuration
 ```json
@@ -130,13 +181,15 @@ npm run build:linux
 {
   "publish": {
     "provider": "github",
-    "owner": "your-org",
+    "owner": "magk-team",
     "repo": "magk-excel"
   }
 }
 ```
 
-### Code Signing (Windows)
+### Code Signing
+
+#### Windows Code Signing
 ```bash
 # Set environment variables before building
 export CSC_LINK="path/to/certificate.pfx"
@@ -144,7 +197,9 @@ export CSC_KEY_PASSWORD="your_password"
 npm run build:win
 ```
 
-### Code Signing (macOS)
+**Note**: Windows builds may fail due to permission issues with code signing tools. Use `npm run build:simple` and `npm start` as an alternative.
+
+#### macOS Code Signing
 ```bash
 # Set environment variables
 export APPLE_ID="your@email.com"
@@ -162,7 +217,7 @@ If deploying as a web application without Electron:
 cd apps/client/magk-excel
 
 # Build for web
-npm run build
+npm run build:simple
 
 # Output: dist/
 ```
@@ -179,7 +234,7 @@ vercel --prod
 Create `vercel.json`:
 ```json
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run build:simple",
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
@@ -203,7 +258,7 @@ netlify deploy --prod --dir=dist
 Create `netlify.toml`:
 ```toml
 [build]
-  command = "npm run build"
+  command = "npm run build:simple"
   publish = "dist"
 
 [build.environment]
@@ -422,7 +477,7 @@ jobs:
       - run: |
           cd apps/client/magk-excel
           npm ci
-          npm run build
+          npm run build:simple
       - uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
@@ -445,7 +500,14 @@ jobs:
       - run: |
           cd apps/client/magk-excel
           npm ci
-          npm run electron:build
+          npm run build:simple
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            npm run build:win
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            npm run build:mac
+          else
+            npm run build:linux
+          fi
       - uses: softprops/action-gh-release@v1
         with:
           files: apps/client/magk-excel/release/**/*
@@ -556,10 +618,41 @@ if (process.env.NODE_ENV !== 'production') {
 
 ### Common Issues
 
+#### Windows Build Issues
+
+**Problem**: Electron build fails with permission errors
+```
+ERROR: Cannot create symbolic link : A required privilege is not held by the client
+```
+
+**Solutions**:
+1. **Use simple build** (Recommended):
+   ```bash
+   npm run build:simple
+   npm start
+   ```
+
+2. **Run as Administrator**:
+   - Right-click PowerShell/Command Prompt
+   - Select "Run as Administrator"
+   - Try the build again
+
+3. **Clear electron-builder cache**:
+   ```bash
+   Remove-Item -Recurse -Force "$env:LOCALAPPDATA\electron-builder\Cache"
+   ```
+
+4. **Use portable target**:
+   ```bash
+   npm run build:win
+   # This creates a portable .exe that doesn't require installation
+   ```
+
 #### Backend won't start
 ```bash
 # Check if port is in use
-lsof -i :3001
+lsof -i :3001  # macOS/Linux
+netstat -ano | findstr :3001  # Windows
 
 # Check environment variables
 npm run env:check
@@ -578,14 +671,55 @@ curl -H "Origin: http://localhost:5173" \
   http://localhost:3001/chat
 ```
 
-#### Electron build fails
-```bash
-# Clear electron cache
-npm run electron:clear-cache
+#### Mac Build Issues
 
-# Rebuild native modules
-npm run electron:rebuild
+**Problem**: Code signing fails
+```bash
+# Set up code signing
+export APPLE_ID="your@email.com"
+export APPLE_ID_PASS="app-specific-password"
+export APPLE_TEAM_ID="XXXXXXXXXX"
+npm run build:mac
 ```
+
+**Problem**: Xcode tools missing
+```bash
+# Install Xcode Command Line Tools
+xcode-select --install
+```
+
+#### Linux Build Issues
+
+**Problem**: Missing dependencies
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install build-essential libgtk-3-dev libwebkit2gtk-4.0-dev
+
+# CentOS/RHEL
+sudo yum groupinstall "Development Tools"
+sudo yum install gtk3-devel webkitgtk3-devel
+```
+
+### Platform-Specific Testing
+
+#### Test Windows Build
+```bash
+npm run test:win
+```
+
+#### Test Mac Build
+```bash
+npm run test:mac
+```
+
+### Build Verification
+
+After building, verify these files exist:
+- ✅ `dist/index.html` - Frontend entry point
+- ✅ `dist-electron/main.js` - Electron main process
+- ✅ `dist-electron/preload.mjs` - Preload script
+- ✅ `release/[version]/` - Platform-specific artifacts
 
 ## 📚 Additional Resources
 
@@ -594,13 +728,16 @@ npm run electron:rebuild
 - [Hono.js Documentation](https://hono.dev/)
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
 - [AWS Lambda with Node.js](https://docs.aws.amazon.com/lambda/latest/dg/lambda-nodejs.html)
+- [macOS Code Signing Guide](https://developer.apple.com/support/code-signing/)
+- [Windows Code Signing Guide](https://docs.microsoft.com/en-us/windows/msix/package/sign-app-package-using-signtool)
 
 ## 🤝 Support
 
 For deployment issues:
 1. Check the [Issues](https://github.com/your-org/magk-excel/issues) page
 2. Review deployment logs in GitHub Actions
-3. Contact the development team
+3. Run platform-specific test scripts: `npm run test:win` or `npm run test:mac`
+4. Contact the development team
 
 ---
 

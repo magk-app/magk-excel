@@ -5,5 +5,11 @@
       "mcp__claude-flow"
     ],
     "deny": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "claude-flow",
+    "ruv-swarm",
+    "pdf-tools"
+  ],
+  "enableAllProjectMcpServers": true
 }
