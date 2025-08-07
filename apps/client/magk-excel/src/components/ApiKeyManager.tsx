@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -206,16 +206,16 @@ export function useApiKeys() {
     }
   }, []);
 
-  const checkRequiredKeys = (required: string[]): string[] => {
+  const checkRequiredKeys = useCallback((required: string[]): string[] => {
     const missing = required.filter(key => !apiKeys[key] || apiKeys[key]!.trim() === '');
     setMissingKeys(missing);
     return missing;
-  };
+  }, [apiKeys]);
 
-  const updateApiKeys = (keys: ApiKeyConfig) => {
+  const updateApiKeys = useCallback((keys: ApiKeyConfig) => {
     setApiKeys(keys);
     localStorage.setItem('magk_api_keys', JSON.stringify(keys));
-  };
+  }, []);
 
   return {
     apiKeys,

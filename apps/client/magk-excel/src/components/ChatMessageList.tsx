@@ -17,6 +17,18 @@ export const ChatMessageList = memo(function ChatMessageList({
   nluxKey,
   attachments = []
 }: ChatMessageListProps) {
+  // Debug: Log whenever messages change
+  React.useEffect(() => {
+    console.log('🔄 ChatMessageList - Messages updated:', {
+      count: messages.length,
+      messages: messages.map(m => ({
+        id: m.id,
+        role: m.role,
+        content: m.content?.substring(0, 30) + '...'
+      }))
+    });
+  }, [messages]);
+
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
       {messages.length === 0 ? (

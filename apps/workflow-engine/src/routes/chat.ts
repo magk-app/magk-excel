@@ -146,6 +146,16 @@ const chatRequestSchema = z.object({
     enabled: z.boolean(),
     tools: z.array(z.any())
   })).optional().default({}),
+  modelConfig: z.object({
+    model: z.string().optional(),
+    provider: z.string().optional(),
+    displayName: z.string().optional(),
+    enableThinking: z.boolean().optional(),
+    temperature: z.number().optional(),
+    maxTokens: z.number().optional(),
+    apiKey: z.string().optional()
+  }).optional(),
+  // Legacy fields for backward compatibility
   model: z.string().optional().default('claude-3-5-sonnet-20241022'),
   enableThinking: z.boolean().optional().default(true)
 });
@@ -159,6 +169,7 @@ chatRoute.post('/chat', async (c) => {
     let uploadedFiles: any[] = [];
     let model: string = 'claude-3-5-sonnet-20241022';
     let enableThinking: boolean = true;
+    let modelConfig: any = {};
 
     // Check if request is multipart/form-data (file upload) or JSON
     const contentType = c.req.header('content-type') || '';
@@ -251,17 +262,24 @@ chatRoute.post('/chat', async (c) => {
       mcpServers = parsed.mcpServers;
       
       // Extract model configuration from parsed JSON
-      modelConfig = {
-        model: parsed.model,
-        provider: parsed.provider,
-        enableThinking: parsed.enableThinking,
-        temperature: parsed.temperature,
-        maxTokens: parsed.maxTokens,
-        apiKey: parsed.apiKey
-      };
+      // Use modelConfig if provided, otherwise fall back to legacy fields
+      if (parsed.modelConfig) {
+        modelConfig = parsed.modelConfig;
+      } else {
+        modelConfig = {
+          model: parsed.model,
+          provider: 'anthropic', // Default provider
+          enableThinking: parsed.enableThinking,
+          displayName: 'Claude',
+          temperature: undefined,
+          maxTokens: undefined,
+          apiKey: undefined
+        };
+      }
     }
 
     console.log(`💬 Chat request: ${message}`);
+    console.log(`🤖 Model Config:`, modelConfig);
     console.log(`🛠️ Available MCP tools: ${mcpTools.length}`, mcpTools);
     console.log(`🖥️ MCP servers:`, Object.keys(mcpServers), mcpServers);
     console.log(`📁 Uploaded files: ${uploadedFiles.length}`);

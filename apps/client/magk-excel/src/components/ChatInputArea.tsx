@@ -5,7 +5,7 @@ import { FileAttachment } from '../hooks/useFileUpload';
 
 interface ChatInputAreaProps {
   attachments: FileAttachment[];
-  onAttachmentsChange: (files: File[]) => void;
+  onAttachmentsChange: (attachments: FileAttachment[] | File[]) => void;
   onSendMessage?: (message: string) => void;
   maxFiles?: number;
   maxFileSize?: number;
@@ -29,6 +29,7 @@ export const ChatInputArea = memo(function ChatInputArea({
 
   const handleSend = () => {
     if (message.trim() && onSendMessage) {
+      console.log('📤 Sending message:', message.trim());
       onSendMessage(message.trim());
       setMessage('');
     }
@@ -43,9 +44,8 @@ export const ChatInputArea = memo(function ChatInputArea({
 
   const removeAttachment = (index: number) => {
     const newAttachments = attachments.filter((_, i) => i !== index);
-    // Create a new FileList-like array for onAttachmentsChange
-    const files = newAttachments.map(att => att.file);
-    onAttachmentsChange(files);
+    // Pass the FileAttachment array to maintain IDs
+    onAttachmentsChange(newAttachments);
   };
 
   return (
@@ -59,7 +59,7 @@ export const ChatInputArea = memo(function ChatInputArea({
               className="flex items-center gap-1 bg-muted px-2 py-1 rounded-md text-sm"
             >
               <Paperclip className="h-3 w-3" />
-              <span className="truncate max-w-32">{attachment.file.name}</span>
+              <span className="truncate max-w-32">{attachment.name || attachment.file?.name || 'Unknown file'}</span>
               <Button
                 size="sm"
                 variant="ghost"

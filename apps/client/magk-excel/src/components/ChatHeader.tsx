@@ -1,5 +1,5 @@
 import React, { memo, useState } from 'react';
-import { MessageSquare, Menu, Settings, Server, Download, Cog } from 'lucide-react';
+import { MessageSquare, Menu, Settings, Server, Download, Cog, FileIcon } from 'lucide-react';
 import { Button } from './ui/button';
 import { ModelSelector, ModelConfig } from './ModelSelector';
 import { MCPServerToggle } from './MCPServerToggle';
@@ -20,6 +20,7 @@ interface ChatHeaderProps {
   onTogglePDFPanel: () => void;
   mcpToolCallsCount?: number;
   onToggleMCPStatus?: () => void;
+  onOpenFilePersistence?: () => void;
   children?: React.ReactNode;
 }
 
@@ -38,6 +39,7 @@ export const ChatHeader = memo(function ChatHeader({
   onTogglePDFPanel,
   mcpToolCallsCount = 0,
   onToggleMCPStatus,
+  onOpenFilePersistence,
   children
 }: ChatHeaderProps) {
   const [showMCPDialog, setShowMCPDialog] = useState(false);
@@ -78,6 +80,14 @@ export const ChatHeader = memo(function ChatHeader({
           <Button size="sm" variant="outline" onClick={onTogglePDFPanel}>
             PDF Extract
           </Button>
+          
+          {/* File Persistence Button */}
+          {onOpenFilePersistence && (
+            <Button size="sm" variant="outline" onClick={onOpenFilePersistence}>
+              <FileIcon className="h-4 w-4 mr-1" />
+              Files
+            </Button>
+          )}
           
           {/* MCP Servers Status */}
           <Dialog open={showMCPDialog} onOpenChange={setShowMCPDialog}>

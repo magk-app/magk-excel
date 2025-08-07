@@ -54,9 +54,17 @@ export interface MCPAPI {
   getSmitheryServers(): Promise<Record<string, MCPServerConfig>>;
 }
 
+export interface FileAPI {
+  downloadFile(filePath: string): Promise<{ success: boolean; savedPath?: string; error?: string }>;
+  openFile(filePath: string): Promise<{ success: boolean; error?: string }>;
+  showInFolder(filePath: string): Promise<{ success: boolean; error?: string }>;
+  getExcelDirectory(): Promise<string>;
+}
+
 declare global {
   interface Window {
     ipcRenderer: IpcRenderer;
     mcpAPI: MCPAPI;
+    fileAPI: FileAPI;
   }
 }

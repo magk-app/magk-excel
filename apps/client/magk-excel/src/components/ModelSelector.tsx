@@ -12,6 +12,7 @@ import { Switch } from './ui/switch';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Input } from './ui/input';
+import { RefreshCw } from 'lucide-react';
 
 export interface ModelConfig {
   provider: string;
@@ -360,7 +361,7 @@ const AVAILABLE_MODELS: ModelInfo[] = [
   }
 ];
 
-const PROVIDER_INFO = {
+const PROVIDER_INFO: Record<string, { name: string; icon: string; color: string }> = {
   anthropic: { name: 'Anthropic', icon: '🔴', color: 'text-red-600' },
   openai: { name: 'OpenAI', icon: '🟢', color: 'text-green-600' },
   google: { name: 'Google', icon: '🔵', color: 'text-blue-600' },
@@ -379,14 +380,18 @@ const TIER_BADGES = {
 };
 
 export function ModelSelector({ currentModel, onModelChange }: ModelSelectorProps) {
-  const [selectedModel, setSelectedModel] = useState(currentModel.model || 'eliza-4.0');
-  const [selectedProvider, setSelectedProvider] = useState<string>(currentModel.provider || 'anthropic');
-  const [enableThinking, setEnableThinking] = useState(currentModel.enableThinking);
-  const [temperature, setTemperature] = useState(currentModel.temperature || 0.7);
-  const [maxTokens, setMaxTokens] = useState(currentModel.maxTokens || 4096);
+  const [selectedModel, setSelectedModel] = useState(currentModel?.model || 'eliza-4.0');
+  const [selectedProvider, setSelectedProvider] = useState<string>(currentModel?.provider || 'anthropic');
+  const [enableThinking, setEnableThinking] = useState(currentModel?.enableThinking || false);
+  const [temperature, setTemperature] = useState(currentModel?.temperature || 0.7);
+  const [maxTokens, setMaxTokens] = useState(currentModel?.maxTokens || 4096);
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'models' | 'settings' | 'keys'>('models');
+  const [availableProviders, setAvailableProviders] = useState<Set<string>>(new Set());
+  const [backendModels, setBackendModels] = useState<string[]>([]);
+  const [modelAvailability, setModelAvailability] = useState<Record<string, boolean>>({});
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
 
   useEffect(() => {
     // Map the current model back to the selector value
@@ -402,9 +407,87 @@ export function ModelSelector({ currentModel, onModelChange }: ModelSelectorProp
     // Load saved API keys from localStorage
     const savedKeys = localStorage.getItem('magk-api-keys');
     if (savedKeys) {
-      setApiKeys(JSON.parse(savedKeys));
+      const keys = JSON.parse(savedKeys);
+      setApiKeys(keys);
+      checkModelAvailability(keys);
     }
   }, [currentModel]);
+
+  // Check model availability when dialog opens
+  useEffect(() => {
+    if (isOpen && !isCheckingAvailability) {
+      checkModelAvailability(apiKeys);
+    }
+  }, [isOpen]);
+
+  const checkModelAvailability = async (keys: Record<string, string>) => {
+    setIsCheckingAvailability(true);
+    const availability: Record<string, boolean> = {};
+    const providers = new Set<string>();
+
+    // Check which providers have API keys
+    AVAILABLE_MODELS.forEach(model => {
+      if (model.requiresApiKey) {
+        const hasKey = keys[model.provider] && keys[model.provider].trim() !== '';
+        availability[model.value] = hasKey;
+        if (hasKey) {
+          providers.add(model.provider);
+        }
+      } else {
+        // Local models or models without API key requirement
+        availability[model.value] = true;
+        if (model.provider === 'ollama') {
+          // Check if Ollama is running
+          checkOllamaAvailability().then(available => {
+            availability[model.value] = available;
+          });
+        } else {
+          providers.add(model.provider);
+        }
+      }
+    });
+
+    setAvailableProviders(providers);
+    setModelAvailability(availability);
+
+    // Check backend for supported models
+    try {
+      const response = await fetch('http://localhost:3000/api/models', {
+        method: 'GET',
+        signal: AbortSignal.timeout(2000)
+      }).catch(() => null);
+
+      if (response?.ok) {
+        const data = await response.json();
+        if (data.models) {
+          setBackendModels(data.models);
+          // Update availability based on backend support
+          AVAILABLE_MODELS.forEach(model => {
+            if (data.models.includes(model.baseModel)) {
+              availability[model.value] = availability[model.value] !== false;
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.warn('Could not fetch backend models:', error);
+    }
+
+    setModelAvailability(availability);
+    setIsCheckingAvailability(false);
+  };
+
+  const checkOllamaAvailability = async (): Promise<boolean> => {
+    try {
+      const response = await fetch('http://localhost:11434/api/tags', {
+        method: 'GET',
+        signal: AbortSignal.timeout(1000)
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  };
 
   const handleSave = () => {
     const selectedModelConfig = AVAILABLE_MODELS.find(m => m.value === selectedModel);
@@ -527,21 +610,31 @@ export function ModelSelector({ currentModel, onModelChange }: ModelSelectorProp
               
               {/* Model Grid */}
               <div className="grid gap-2">
-                {filteredModels.map((model) => (
-                  <div
-                    key={model.value}
-                    className={`p-3 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
-                      selectedModel === model.value
-                        ? 'border-primary bg-primary/5 shadow-sm'
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                    onClick={() => {
-                      setSelectedModel(model.value);
-                      if (!model.supportsThinking) {
-                        setEnableThinking(false);
-                      }
-                    }}
-                  >
+                {filteredModels.map((model) => {
+                  const isAvailable = modelAvailability[model.value] !== false;
+                  const needsApiKey = model.requiresApiKey && !apiKeys[model.provider];
+                  
+                  return (
+                    <div
+                      key={model.value}
+                      className={`p-3 rounded-lg border transition-all ${
+                        !isAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-md'
+                      } ${
+                        selectedModel === model.value
+                          ? 'border-primary bg-primary/5 shadow-sm'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                      onClick={() => {
+                        if (isAvailable) {
+                          setSelectedModel(model.value);
+                          if (!model.supportsThinking) {
+                            setEnableThinking(false);
+                          }
+                        } else if (needsApiKey) {
+                          setActiveTab('keys');
+                        }
+                      }}
+                    >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
@@ -571,8 +664,16 @@ export function ModelSelector({ currentModel, onModelChange }: ModelSelectorProp
                             </Badge>
                           )}
                           {model.requiresApiKey && (
-                            <Badge variant="outline" className="text-xs px-1.5 py-0">
-                              🔑 API Key
+                            <Badge 
+                              variant={apiKeys[model.provider] ? "outline" : "destructive"} 
+                              className="text-xs px-1.5 py-0"
+                            >
+                              🔑 {apiKeys[model.provider] ? 'API Key Set' : 'API Key Required'}
+                            </Badge>
+                          )}
+                          {!isAvailable && model.provider === 'ollama' && (
+                            <Badge variant="destructive" className="text-xs px-1.5 py-0">
+                              Ollama Offline
                             </Badge>
                           )}
                         </div>
@@ -584,7 +685,35 @@ export function ModelSelector({ currentModel, onModelChange }: ModelSelectorProp
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
+              </div>
+              
+              {/* Status bar */}
+              <div className="flex items-center justify-between px-2 py-2">
+                <div className="text-xs text-muted-foreground">
+                  {isCheckingAvailability ? (
+                    <span className="flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      Checking model availability...
+                    </span>
+                  ) : (
+                    <span>
+                      {Object.values(modelAvailability).filter(v => v).length} of {AVAILABLE_MODELS.length} models available
+                      {backendModels.length > 0 && ` • ${backendModels.length} backend models detected`}
+                    </span>
+                  )}
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-6 px-2"
+                  onClick={() => checkModelAvailability(apiKeys)}
+                  disabled={isCheckingAvailability}
+                >
+                  <RefreshCw className={`w-3 h-3 ${isCheckingAvailability ? 'animate-spin' : ''}`} />
+                  <span className="ml-1 text-xs">Refresh</span>
+                </Button>
               </div>
             </>
           )}
@@ -723,13 +852,19 @@ export function ModelSelector({ currentModel, onModelChange }: ModelSelectorProp
         {/* Action Buttons */}
         <div className="flex justify-between items-center mt-4">
           <div className="text-xs text-muted-foreground">
-            {filteredModels.length} models available
+            {Object.entries(modelAvailability)
+              .filter(([key, available]) => available && filteredModels.some(m => m.value === key))
+              .length} of {filteredModels.length} models ready
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setIsOpen(false)}>
               Cancel
             </Button>
-            <Button size="sm" onClick={handleSave}>
+            <Button 
+              size="sm" 
+              onClick={handleSave}
+              disabled={!modelAvailability[selectedModel]}
+            >
               Apply Changes
             </Button>
           </div>

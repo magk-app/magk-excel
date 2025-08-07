@@ -5,6 +5,8 @@ import { readFile, writeFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { excelMCPTool, ExcelMCPTool } from '../src/services/excel/ExcelMCPTool.js';
+import { pdfMCPTool, PDFMCPTool } from '../src/services/pdf/PDFMCPTool.js';
+import { persistenceMCPTool, PersistenceAccessTool } from '../src/services/persistence/PersistenceMCPTool.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -189,14 +191,14 @@ export class MCPManager {
     console.log(`🔄 Toggle request: ${serverName} -> ${enabled ? 'ON' : 'OFF'}`);
     
     try {
-      // Handle built-in Excel server
-      if (serverName === 'excel') {
+      // Handle built-in Excel, PDF, and Persistence servers
+      if (serverName === 'excel' || serverName === 'pdf' || serverName === 'persistence') {
         if (enabled) {
           this.enabledServers.add(serverName);
-          console.log(`✅ Built-in Excel server enabled`);
+          console.log(`✅ Built-in ${serverName} server enabled`);
         } else {
           this.enabledServers.delete(serverName);
-          console.log(`✅ Built-in Excel server disabled`);
+          console.log(`✅ Built-in ${serverName} server disabled`);
         }
         return;
       }
@@ -220,9 +222,31 @@ export class MCPManager {
 
   async callTool(serverName: string, toolName: string, args: any): Promise<any> {
     // Handle built-in Excel operations
-    if (serverName === 'excel' && toolName.startsWith('excel_')) {
+    if (serverName === 'excel' && (toolName.startsWith('excel_') || toolName === 'write_values')) {
       console.log('🔧 Handling built-in Excel operation:', toolName);
+      
+      // Map write_values to excel_write_to_sheet for compatibility
+      const mappedName = toolName === 'write_values' ? 'excel_write_to_sheet' : toolName;
+      
       return await excelMCPTool.handleToolCall({
+        name: mappedName,
+        arguments: args
+      });
+    }
+
+    // Handle built-in PDF operations
+    if (serverName === 'pdf' && toolName.startsWith('pdf_')) {
+      console.log('🔧 Handling built-in PDF operation:', toolName);
+      return await pdfMCPTool.handleToolCall({
+        name: toolName,
+        arguments: args
+      });
+    }
+
+    // Handle built-in Persistence operations
+    if (serverName === 'persistence' && toolName.startsWith('persistence_')) {
+      console.log('🔧 Handling built-in Persistence operation:', toolName);
+      return await persistenceMCPTool.handleToolCall({
         name: toolName,
         arguments: args
       });
@@ -256,6 +280,22 @@ export class MCPManager {
       }));
     }
 
+    if (serverName === 'pdf') {
+      // Return built-in PDF tools
+      return PDFMCPTool.getToolDefinitions().map(tool => ({
+        ...tool,
+        server: 'pdf'
+      }));
+    }
+
+    if (serverName === 'persistence') {
+      // Return built-in Persistence tools
+      return PersistenceAccessTool.getToolDefinitions().map(tool => ({
+        ...tool,
+        server: 'persistence'
+      }));
+    }
+
     if (serverName) {
       const client = this.clients.get(serverName);
       if (!client) {
@@ -273,6 +313,14 @@ export class MCPManager {
       allTools.push({
         ...tool,
         server: 'excel'
+      });
+    }
+    
+    // Add built-in PDF tools
+    for (const tool of PDFMCPTool.getToolDefinitions()) {
+      allTools.push({
+        ...tool,
+        server: 'pdf'
       });
     }
     
@@ -346,10 +394,13 @@ export class MCPManager {
   }
 
   getAvailableServers(): string[] {
-    const builtInServers = ['excel']; // Built-in Excel server
+    const builtInServers = ['excel', 'pdf']; // Built-in Excel and PDF servers
     const staticServers = this.config ? Object.keys(this.config.mcpServers) : [];
     const smitheryServerNames = Array.from(this.smitheryServers.keys());
-    return [...builtInServers, ...staticServers, ...smitheryServerNames];
+    
+    // Use a Set to remove duplicates (excel appears in both builtIn and static)
+    const allServers = new Set([...builtInServers, ...staticServers, ...smitheryServerNames]);
+    return Array.from(allServers);
   }
 
   /**

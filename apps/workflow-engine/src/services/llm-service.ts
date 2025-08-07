@@ -64,20 +64,21 @@ export class LLMService {
         } else if (!this.anthropic) {
           // No API key available
           console.log('⚠️ No Anthropic API key configured, using mock response...');
-          return this.generateMockWorkflowResponse(message);
+          return { response: this.generateMockWorkflowResponse(message) };
         }
       } else {
         // Other providers not yet implemented
         console.log(`⚠️ Provider ${config.provider} not yet implemented, using mock response...`);
-        return this.generateMockWorkflowResponse(message);
+        return { response: this.generateMockWorkflowResponse(message) };
       }
 
       if (!apiClient) {
         console.log('⚠️ No API client available, using mock response...');
-        return this.generateMockWorkflowResponse(message);
+        return { response: this.generateMockWorkflowResponse(message) };
       }
 
       console.log(`🤖 Sending request to ${config.provider} (${config.model})...`);
+      console.log(`🔑 API Key source: ${config.apiKey ? 'Client provided' : 'Environment variable'}`);
 
       // Convert history to Anthropic format
       const messages: Anthropic.Messages.MessageParam[] = [
@@ -99,6 +100,10 @@ IMPORTANT RULES:
 - Only ask questions when there are genuine ambiguities or missing required information
 - Be direct and action-oriented - assume reasonable defaults when possible
 - If the user uploads Excel files, focus on processing them immediately
+- ALWAYS format your responses using Markdown for better readability
+- Use **bold** for emphasis, \`code\` for technical terms, and proper headings
+- When creating tables, use markdown table syntax
+- When mentioning files, format them as links or use backticks
 
 You help users:
 - Extract data from websites, PDFs, APIs, and other sources
@@ -158,9 +163,19 @@ Be conversational and helpful, but prioritize action over questions. If the user
 
     } catch (error) {
       console.error('❌ LLM Service error:', error);
+      console.error('❌ Error details:', {
+        provider: config.provider,
+        model: config.model,
+        hasApiKey: !!config.apiKey,
+        hasEnvKey: !!process.env.ANTHROPIC_API_KEY
+      });
       
-      if (error instanceof Error && error.message.includes('api_key')) {
-        return { response: 'I\'m having trouble connecting to my AI service. Please check that the API key is configured correctly.' };
+      if (error instanceof Error) {
+        if (error.message.includes('api_key')) {
+          return { response: 'I\'m having trouble connecting to my AI service. Please check that the API key is configured correctly.' };
+        }
+        // Return more specific error message
+        return { response: `Error: ${error.message}. Please try again or check your configuration.` };
       }
       
       return { response: 'Sorry, I encountered an error while processing your request. Please try again.' };
@@ -169,106 +184,8 @@ Be conversational and helpful, but prioritize action over questions. If the user
 
   // Backwards compatibility method
   async chatWithSystemOld(systemPrompt: string | undefined, message: string, history: ChatMessage[] = []): Promise<string> {
-    const result = await this.chatWithSystem(systemPrompt, message, history, false);
+    const result = await this.chatWithSystem(systemPrompt, message, history, { enableThinking: false });
     return result.response;
-  }
-
-  private generateMockWorkflowResponse(message: string): string {
-    const lowerMessage = message.toLowerCase();
-    
-    // Generate contextual mock responses based on the user's request
-    if (lowerMessage.includes('random') || lowerMessage.includes('number')) {
-      return `I'll help you create a workflow to generate random numbers! Here's what I can build for you:
-
-**Random Number Generator Workflow:**
-
-1. **Input Configuration**
-   - Specify range (min/max values)
-   - Choose quantity of numbers to generate
-   - Select distribution type (uniform, normal, etc.)
-
-2. **Processing Steps**
-   - Generate random numbers using your specified parameters
-   - Apply any formatting or rounding rules
-   - Add optional seed for reproducible results
-
-3. **Excel Export**
-   - Create formatted Excel spreadsheet
-   - Include headers and metadata
-   - Add charts/visualizations if needed
-
-Would you like me to create this workflow for you? I can customize it based on:
-- What range of numbers do you need?
-- How many numbers should I generate?
-- Do you need them in any specific format?
-
-Just let me know your preferences and I'll build the complete automation!`;
-    }
-    
-    if (lowerMessage.includes('excel') || lowerMessage.includes('spreadsheet')) {
-      return `I can help you create Excel automation workflows! Here are some popular options:
-
-**Excel Workflow Options:**
-1. **Data Import & Processing** - Extract data from websites, APIs, or files
-2. **Report Generation** - Create formatted reports with charts and pivot tables  
-3. **Data Transformation** - Clean, merge, and restructure data
-4. **Automated Calculations** - Build complex formulas and calculations
-
-What type of Excel workflow would you like to create? For example:
-- "Import sales data from a website and create monthly reports"
-- "Process customer data and generate invoices"
-- "Extract financial data and create dashboard"
-
-Tell me more about your specific needs and I'll design the perfect workflow for you!`;
-    }
-    
-    if (lowerMessage.includes('website') || lowerMessage.includes('scrape') || lowerMessage.includes('web')) {
-      return `Perfect! I can create a web scraping workflow for you. Here's what I can build:
-
-**Web Data Extraction Workflow:**
-
-1. **Website Analysis**
-   - Identify target websites and data sources
-   - Handle authentication if needed
-   - Respect robots.txt and rate limits
-
-2. **Data Extraction**
-   - Scrape specific data fields (prices, text, images, etc.)
-   - Handle dynamic content and JavaScript
-   - Process multiple pages automatically
-
-3. **Data Processing**
-   - Clean and validate extracted data
-   - Apply filters and transformations
-   - Handle errors and missing data
-
-4. **Excel Export**
-   - Organize data in structured spreadsheet
-   - Add timestamps and source tracking
-   - Create summary reports and charts
-
-Which websites would you like to extract data from? What specific information are you looking for?`;
-    }
-    
-    // Default response for general requests
-    return `Hi! I'm your MAGK Excel workflow assistant. I can help you create automated workflows for:
-
-**🔄 Data Processing Workflows:**
-- Extract data from websites, APIs, PDFs, and databases
-- Clean and transform data automatically  
-- Generate Excel reports with custom formatting
-- Create automated data pipelines
-
-**🎯 Popular Workflow Types:**
-1. **Web Scraping** → Extract data from websites to Excel
-2. **API Integration** → Pull data from services and APIs
-3. **PDF Processing** → Extract tables and text from PDFs
-4. **Report Generation** → Create formatted Excel reports
-5. **Data Transformation** → Clean and restructure data
-
-What type of workflow would you like to create? Just describe what data you want to work with and where it comes from, and I'll build the automation for you!
-
-Example: "Extract product prices from Amazon and create a comparison spreadsheet"`;
   }
 
   private generateMockWorkflowResponse(message: string): string {

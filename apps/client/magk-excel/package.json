@@ -1,9 +1,9 @@
 {
-  "name": "magk-excel-electron",
-  "description": "MAGK Excel Desktop Client - Modern Electron frontend with open-source chat & workflow visualization",
+  "name": "magk-excel",
+  "description": "MAGK Excel Desktop Client - Modern desktop application with open-source chat & workflow visualization",
   "author": "MAGK Team",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "scripts": {
     "dev": "npx vite",
@@ -23,8 +23,7 @@
     "test:mac": "chmod +x scripts/test-mac-build.sh && scripts/test-mac-build.sh",
     "lint": "eslint . --max-warnings 0",
     "preview": "npx vite preview",
-    "icons:generate": "node scripts/generate-icons.js",
-    "icons:setup": "node scripts/setup-icons.js"
+    "icons:generate": "node scripts/generate-icons.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.1",
@@ -49,7 +48,11 @@
     "marked": "^16.1.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
     "reactflow": "^11.11.4",
+    "rehype-highlight": "^7.0.2",
+    "rehype-raw": "^7.0.0",
+    "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.3.1",
     "xlsx": "^0.18.5",
     "zustand": "^5.0.7"

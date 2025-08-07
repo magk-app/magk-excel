@@ -1,10 +1,10 @@
-# MAGK Excel - Electron Frontend
+# MAGK Excel - Desktop Application
 
-Modern Electron desktop application built with high-star open-source libraries for Excel workflow automation.
+Modern desktop application built with high-star open-source libraries for Excel workflow automation.
 
 ## Tech Stack
 
-- **Electron + Vite**: Lightning-fast development with hot reload
+- **Desktop Framework + Vite**: Lightning-fast development with hot reload
 - **React 18 + TypeScript**: Modern frontend with type safety
 - **@nlux/react**: Zero-dependency chat UI component (⭐ 20k stars)
 - **Shadcn UI**: Tailwind-based components (⭐ 66k stars)  
@@ -47,7 +47,7 @@ npm run dev
 ## Development Commands
 
 ```bash
-# Start development server (Electron + Vite)
+# Start development server
 npm run dev
 
 # Build for production
@@ -76,8 +76,8 @@ src/
 └── main.tsx            # React entry point
 
 electron/
-├── main.ts             # Electron main process
-└── preload.ts          # Electron preload script
+├── main.ts             # Main process
+└── preload.ts          # Preload script
 ```
 
 ## Expanding the ESLint configuration

@@ -16,6 +16,7 @@
     "exceljs": "^4.4.0",
     "hono": "^4.0.0",
     "playwright": "^1.40.0",
+    "ws": "^8.18.3",
     "zod": "^3.22.0"
   },
   "devDependencies": {

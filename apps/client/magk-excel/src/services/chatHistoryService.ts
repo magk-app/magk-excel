@@ -6,11 +6,22 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  
+  // Enhanced UI states
+  isThinking?: boolean;
+  isStreaming?: boolean;
+  isError?: boolean;
+  isComplete?: boolean;
+  thoughts?: string[];
+  
+  // File attachments
   attachments?: {
     name: string;
     type: 'pdf' | 'excel';
     size: number;
   }[];
+  
+  // MCP tool integration
   mcpToolCalls?: {
     server: string;
     tool: string;
@@ -18,6 +29,7 @@ export interface ChatMessage {
     result?: any;
     error?: string;
     duration?: number;
+    status?: 'pending' | 'running' | 'completed' | 'error';
   }[];
 }
 
@@ -41,7 +53,7 @@ interface ChatHistoryState {
   updateSessionTitle: (sessionId: string, title: string) => void;
   
   // Message management
-  addMessage: (sessionId: string, message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
+  addMessage: (sessionId: string, message: Omit<ChatMessage, 'id' | 'timestamp'> & { id?: string }) => string;
   updateMessage: (sessionId: string, messageId: string, updates: Partial<ChatMessage>) => void;
   clearSession: (sessionId: string) => void;
   
@@ -126,9 +138,19 @@ export const useChatHistory = create<ChatHistoryState>()(
         }));
       },
 
-      addMessage: (sessionId: string, message: Omit<ChatMessage, 'id' | 'timestamp'>) => {
-        const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      addMessage: (sessionId: string, message: Omit<ChatMessage, 'id' | 'timestamp'> & { id?: string }) => {
+        // Use provided ID or generate a new one
+        const messageId = message.id || `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const timestamp = Date.now();
+        
+        console.log('➕ Adding message to store:', { 
+          sessionId, 
+          messageId, 
+          role: message.role,
+          contentLength: message.content?.length || 0,
+          isStreaming: message.isStreaming,
+          isThinking: message.isThinking
+        });
 
         set(state => ({
           sessions: state.sessions.map(session =>
@@ -145,24 +167,43 @@ export const useChatHistory = create<ChatHistoryState>()(
               : session
           )
         }));
+        
+        // Return the message ID so caller knows what ID was used
+        return messageId;
       },
 
       updateMessage: (sessionId: string, messageId: string, updates: Partial<ChatMessage>) => {
-        set(state => ({
-          sessions: state.sessions.map(session =>
-            session.id === sessionId
-              ? {
-                  ...session,
-                  messages: session.messages.map(message =>
-                    message.id === messageId
-                      ? { ...message, ...updates }
-                      : message
-                  ),
-                  updatedAt: Date.now()
-                }
-              : session
-          )
-        }));
+        console.log('📝 Updating message:', { sessionId, messageId, updates });
+        
+        set(state => {
+          const session = state.sessions.find(s => s.id === sessionId);
+          if (!session) {
+            console.error('❌ Session not found:', sessionId);
+            return state;
+          }
+          
+          const messageExists = session.messages.some(m => m.id === messageId);
+          if (!messageExists) {
+            console.error('❌ Message not found:', messageId, 'in session:', sessionId);
+            console.log('Available message IDs:', session.messages.map(m => m.id));
+          }
+          
+          return {
+            sessions: state.sessions.map(s =>
+              s.id === sessionId
+                ? {
+                    ...s,
+                    messages: s.messages.map(message =>
+                      message.id === messageId
+                        ? { ...message, ...updates }
+                        : message
+                    ),
+                    updatedAt: Date.now()
+                  }
+                : s
+            )
+          };
+        });
       },
 
       clearSession: (sessionId: string) => {

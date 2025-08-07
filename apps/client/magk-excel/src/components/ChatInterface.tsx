@@ -19,6 +19,8 @@ import { useDemoFunctions } from '../hooks/useDemoFunctions';
 import { useChatAdapter } from '../hooks/useChatAdapter';
 import { MCPToolExecutionStatus, MCPToolCall } from './MCPToolExecutionStatus';
 import { ApiKeyManager, useApiKeys } from './ApiKeyManager';
+import { FilePersistenceManager } from './FilePersistenceManager';
+import { ExcelDownloadHandler } from './ExcelDownloadHandler';
 
 export function ChatInterface() {
   // Core state
@@ -38,6 +40,13 @@ export function ChatInterface() {
   // API Key management
   const { apiKeys, missingKeys, checkRequiredKeys, updateApiKeys } = useApiKeys();
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
+  const [hasShownApiKeyDialog, setHasShownApiKeyDialog] = useState(false);
+  
+  // File persistence management
+  const [showFilePersistenceDialog, setShowFilePersistenceDialog] = useState(false);
+  
+  // Excel download management
+  const [excelDownloadInfo, setExcelDownloadInfo] = useState<any>(null);
 
   // Custom hooks for state management
   const {
@@ -61,17 +70,18 @@ export function ChatInterface() {
     closeWindow
   } = useToolCallMonitor();
 
-  // Chat history management
-  const {
-    sessions,
-    activeSessionId,
-    createSession,
-    addMessage,
-    updateMessage,
-    updateSessionTitle,
-    getActiveSession
-  } = useChatHistory();
+  // Chat history management - subscribe to all changes
+  const sessions = useChatHistory(state => state.sessions);
+  const activeSessionId = useChatHistory(state => state.activeSessionId);
+  const createSession = useChatHistory(state => state.createSession);
+  const addMessage = useChatHistory(state => state.addMessage);
+  const updateMessage = useChatHistory(state => state.updateMessage);
+  const updateSessionTitle = useChatHistory(state => state.updateSessionTitle);
+  const getActiveSession = useChatHistory(state => state.getActiveSession);
 
+  // Get current session directly from store - this will be reactive
+  const currentSession = sessions.find(s => s.id === activeSessionId);
+  
   // Demo functions
   const { runHKPassengerDemo, runPDFBalanceSheetDemo } = useDemoFunctions({
     activeSessionId: activeSessionId || undefined,
@@ -79,6 +89,9 @@ export function ChatInterface() {
     updateMessage,
     getActiveSession
   });
+
+  // Direct addMessage without wrapper since we have proper reactivity now
+  const addMessageWithUpdate = addMessage;
 
   // Chat adapter with memoization
   const { streamText } = useChatAdapter({
@@ -88,10 +101,11 @@ export function ChatInterface() {
     modelConfig,
     tools,
     mcpServers,
-    addMessage,
+    addMessage: addMessageWithUpdate,
     updateMessage,
     getActiveSession,
     updateSessionTitle,
+    currentSession,
     onToolCallStart: (toolCall) => {
       console.log('🔧 Tool call started:', toolCall);
       handleToolCallStart(toolCall);
@@ -125,16 +139,24 @@ export function ChatInterface() {
     }
     
     // Check for MCP server keys
-    if (enabledServers.includes('firecrawl')) {
-      requiredKeys.push('firecrawl');
+    if (enabledServers) {
+      // Handle both Array and Set
+      const hasFirecrawl = Array.isArray(enabledServers) 
+        ? enabledServers.includes('firecrawl')
+        : enabledServers.has && enabledServers.has('firecrawl');
+      if (hasFirecrawl) {
+        requiredKeys.push('firecrawl');
+      }
     }
     
     const missing = checkRequiredKeys(requiredKeys);
-    if (missing.length > 0) {
+    // Only show the dialog once per session, not every time the effect runs
+    if (missing.length > 0 && !hasShownApiKeyDialog) {
       console.warn('⚠️ Missing API keys:', missing);
       setShowApiKeyDialog(true);
+      setHasShownApiKeyDialog(true);
     }
-  }, [modelConfig.provider, enabledServers]);
+  }, [modelConfig.provider, enabledServers, checkRequiredKeys, hasShownApiKeyDialog]);
 
   // Force NLUX to re-render when active session changes
   useEffect(() => {
@@ -184,6 +206,21 @@ export function ChatInterface() {
           : t
       )
     );
+    
+    // Check if this is an Excel creation tool with download info
+    if (toolCall.server === 'excel' && 
+        (toolCall.tool === 'excel_create' || 
+         toolCall.tool === 'excel_write' || 
+         toolCall.tool === 'excel_write_to_sheet')) {
+      // Extract download info from response if available
+      const response = toolCall.response;
+      if (response?.downloadInfo) {
+        setExcelDownloadInfo({
+          ...response.downloadInfo,
+          timestamp: Date.now()
+        });
+      }
+    }
   }, []);
 
   const handleToolCallError = useCallback((toolCall: MCPToolCall) => {
@@ -225,15 +262,11 @@ export function ChatInterface() {
   const mcpEnhancedAdapter = useMemo(() => ({
     streamText
   }), [streamText]);
-
-  // Session info for display
-  const currentSession = useMemo(() => getActiveSession(), [getActiveSession, activeSessionId]);
+  
+  // Session info derived from currentSession
   const sessionTitle = currentSession?.title || 'New Chat';
-  const messageCount = currentSession?.messages.length || 0;
-
-  // Debug logging
-  console.log('🔍 ChatInterface: Current enabled servers:', enabledServers);
-  console.log('🛠️ ChatInterface: Available tools:', tools.length);
+  const messageCount = currentSession?.messages?.length || 0;
+  const messages = currentSession?.messages || [];
 
   return (
     <div className="h-full w-full flex">
@@ -261,6 +294,7 @@ export function ChatInterface() {
           onTogglePDFPanel={pdfExtraction.togglePanel}
           mcpToolCallsCount={mcpToolCalls.length}
           onToggleMCPStatus={() => setMcpStatusVisible(!mcpStatusVisible)}
+          onOpenFilePersistence={() => setShowFilePersistenceDialog(true)}
         >
           <DemoControls
             onRunHKDemo={runHKPassengerDemo}
@@ -289,7 +323,7 @@ export function ChatInterface() {
         {/* Chat Message List */}
         <ChatMessageList
           adapter={mcpEnhancedAdapter}
-          messages={currentSession?.messages || []}
+          messages={messages}
           nluxKey={nluxKey}
           attachments={attachments}
         />
@@ -333,6 +367,22 @@ export function ChatInterface() {
           setShowApiKeyDialog(false);
         }}
       />
+      
+      {/* File Persistence Manager Dialog */}
+      <FilePersistenceManager
+        isOpen={showFilePersistenceDialog}
+        onClose={() => setShowFilePersistenceDialog(false)}
+        sessionId={activeSessionId || 'default'}
+        currentAttachments={attachments}
+      />
+      
+      {/* Excel Download Handler */}
+      {excelDownloadInfo && (
+        <ExcelDownloadHandler
+          downloadInfo={excelDownloadInfo}
+          onClose={() => setExcelDownloadInfo(null)}
+        />
+      )}
     </div>
   );
 }

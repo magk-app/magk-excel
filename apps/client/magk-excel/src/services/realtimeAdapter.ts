@@ -645,7 +645,10 @@ export class RealtimeAdapter {
       ...data,
     };
 
-    console[level as keyof Console](message, logData);
+    const logMethod = console[level as keyof Console] as (message?: any, ...optionalParams: any[]) => void;
+    if (typeof logMethod === 'function') {
+      logMethod(message, logData);
+    }
   }
 }
 

@@ -5,6 +5,7 @@ import { logger } from 'hono/logger';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { chatRoute } from './routes/chat.js';
+import { chatV2Route } from './routes/chat-v2.js';
 import { extractRoute } from './routes/extract.js';
 import { demoRoute } from './routes/demo.js';
 
@@ -12,9 +13,10 @@ const app = new Hono();
 
 // Middleware
 app.use('*', cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000'], // Electron dev server
-  allowHeaders: ['Content-Type', 'Authorization'],
+  origin: '*', // Allow all origins for development
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true
 }));
 app.use('*', logger());
 
@@ -38,11 +40,12 @@ app.use('/downloads/*', serveStatic({
 }));
 
 // Mount routes
-app.route('', chatRoute);
+app.route('/api', chatRoute);  // Legacy chat at /api/chat
+app.route('/api/v2', chatV2Route);  // New chat at /api/v2/chat
 app.route('', extractRoute);
 app.route('', demoRoute);
 
-const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
+const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 console.log(`🚀 MAGK Workflow Engine starting on http://localhost:${port}`);
 
 serve({

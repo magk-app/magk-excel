@@ -49,18 +49,27 @@ export function useMCPChat() {
     
     for (const call of toolCalls) {
       try {
-        const result = await callTool(call.server, call.tool, call.args);
+        console.log(`🔧 Executing tool: ${call.server}/${call.tool}`, call.args);
+        
+        // Ensure the tool name is correctly mapped
+        const toolName = call.tool || call.name;
+        const serverName = call.server || 'excel';
+        
+        const result = await callTool(serverName, toolName, call.args);
+        console.log(`✅ Tool result:`, result);
+        
         results.push({
           success: true,
-          server: call.server,
-          tool: call.tool,
+          server: serverName,
+          tool: toolName,
           result
         });
       } catch (error) {
+        console.error(`❌ Tool execution failed:`, error);
         results.push({
           success: false,
           server: call.server,
-          tool: call.tool,
+          tool: call.tool || call.name,
           error: error instanceof Error ? error.message : String(error)
         });
       }

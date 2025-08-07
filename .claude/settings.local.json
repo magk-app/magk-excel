@@ -8,14 +8,21 @@
       "mcp__context7__get-library-docs",
       "mcp__context7__resolve-library-id",
       "mcp__firecrawl__firecrawl_scrape",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(find:*)",
+      "Bash(npm test)",
+      "Bash(npm run build:*)",
+      "Bash(grep:*)",
+      "WebFetch(domain:github.com)",
+      "mcp__firecrawl__firecrawl_search",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ],
     "deny": []
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "claude-flow",
     "ruv-swarm",
     "pdf-tools"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
