@@ -5,6 +5,7 @@ import { spawn } from 'child_process';
 import { readFile, writeFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { excelMCPTool, ExcelMCPTool } from '../src/services/excel/ExcelMCPTool.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -189,6 +190,18 @@ export class MCPManager {
     console.log(`🔄 Toggle request: ${serverName} -> ${enabled ? 'ON' : 'OFF'}`);
     
     try {
+      // Handle built-in Excel server
+      if (serverName === 'excel') {
+        if (enabled) {
+          this.enabledServers.add(serverName);
+          console.log(`✅ Built-in Excel server enabled`);
+        } else {
+          this.enabledServers.delete(serverName);
+          console.log(`✅ Built-in Excel server disabled`);
+        }
+        return;
+      }
+
       if (enabled && !this.enabledServers.has(serverName)) {
         console.log(`📤 Enabling server: ${serverName}`);
         await this.connectToServer(serverName);
@@ -207,6 +220,15 @@ export class MCPManager {
   }
 
   async callTool(serverName: string, toolName: string, args: any): Promise<any> {
+    // Handle built-in Excel operations
+    if (serverName === 'excel' && toolName.startsWith('excel_')) {
+      console.log('🔧 Handling built-in Excel operation:', toolName);
+      return await excelMCPTool.handleToolCall({
+        name: toolName,
+        arguments: args
+      });
+    }
+
     const client = this.clients.get(serverName);
     if (!client) {
       throw new Error(`Not connected to server: ${serverName}`);
@@ -227,6 +249,14 @@ export class MCPManager {
   }
 
   async listTools(serverName?: string): Promise<any[]> {
+    if (serverName === 'excel') {
+      // Return built-in Excel tools
+      return ExcelMCPTool.getToolDefinitions().map(tool => ({
+        ...tool,
+        server: 'excel'
+      }));
+    }
+
     if (serverName) {
       const client = this.clients.get(serverName);
       if (!client) {
@@ -238,6 +268,15 @@ export class MCPManager {
 
     // List all tools from all connected servers
     const allTools = [];
+    
+    // Add built-in Excel tools
+    for (const tool of ExcelMCPTool.getToolDefinitions()) {
+      allTools.push({
+        ...tool,
+        server: 'excel'
+      });
+    }
+    
     for (const [name, client] of this.clients) {
       const tools = await client.listTools();
       for (const tool of (tools.tools || [])) {
@@ -308,9 +347,10 @@ export class MCPManager {
   }
 
   getAvailableServers(): string[] {
+    const builtInServers = ['excel']; // Built-in Excel server
     const staticServers = this.config ? Object.keys(this.config.mcpServers) : [];
     const smitheryServerNames = Array.from(this.smitheryServers.keys());
-    return [...staticServers, ...smitheryServerNames];
+    return [...builtInServers, ...staticServers, ...smitheryServerNames];
   }
 
   /**
