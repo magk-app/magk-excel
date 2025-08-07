@@ -54,11 +54,25 @@ export interface MCPAPI {
   getSmitheryServers(): Promise<Record<string, MCPServerConfig>>;
 }
 
+export interface PersistentFileInfo {
+  name: string;
+  size: number;
+  modified: Date;
+  path: string;
+}
+
 export interface FileAPI {
   downloadFile(filePath: string): Promise<{ success: boolean; savedPath?: string; error?: string }>;
   openFile(filePath: string): Promise<{ success: boolean; error?: string }>;
   showInFolder(filePath: string): Promise<{ success: boolean; error?: string }>;
   getExcelDirectory(): Promise<string>;
+  
+  // Persistent file operations
+  getAppDataDirectory(): Promise<string>;
+  writePersistentFile(fileName: string, content: string, subDir?: string): Promise<{ success: boolean; filePath?: string; error?: string }>;
+  readPersistentFile(fileName: string, subDir?: string): Promise<{ success: boolean; content?: string; error?: string }>;
+  listPersistentFiles(subDir?: string): Promise<{ success: boolean; files?: PersistentFileInfo[]; error?: string }>;
+  deletePersistentFile(fileName: string, subDir?: string): Promise<{ success: boolean; error?: string }>;
 }
 
 declare global {
@@ -66,5 +80,6 @@ declare global {
     ipcRenderer: IpcRenderer;
     mcpAPI: MCPAPI;
     fileAPI: FileAPI;
+    electronAPI?: FileAPI; // Alias for backward compatibility
   }
 }

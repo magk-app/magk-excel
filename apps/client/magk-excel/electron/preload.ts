@@ -50,8 +50,8 @@ contextBridge.exposeInMainWorld('mcpAPI', {
     ipcRenderer.invoke('mcp:get-smithery-servers')
 })
 
-// Expose File API for Excel downloads
-contextBridge.exposeInMainWorld('fileAPI', {
+// File API object
+const fileAPI = {
   downloadFile: (filePath: string) => 
     ipcRenderer.invoke('download-file', filePath),
   openFile: (filePath: string) => 
@@ -59,5 +59,23 @@ contextBridge.exposeInMainWorld('fileAPI', {
   showInFolder: (filePath: string) => 
     ipcRenderer.invoke('show-in-folder', filePath),
   getExcelDirectory: () => 
-    ipcRenderer.invoke('get-excel-directory')
-})
+    ipcRenderer.invoke('get-excel-directory'),
+  
+  // Persistent file operations
+  getAppDataDirectory: () => 
+    ipcRenderer.invoke('get-app-data-directory'),
+  writePersistentFile: (fileName: string, content: string, subDir?: string) => 
+    ipcRenderer.invoke('write-persistent-file', fileName, content, subDir),
+  readPersistentFile: (fileName: string, subDir?: string) => 
+    ipcRenderer.invoke('read-persistent-file', fileName, subDir),
+  listPersistentFiles: (subDir?: string) => 
+    ipcRenderer.invoke('list-persistent-files', subDir),
+  deletePersistentFile: (fileName: string, subDir?: string) => 
+    ipcRenderer.invoke('delete-persistent-file', fileName, subDir)
+}
+
+// Expose File API for Excel downloads and persistent file operations
+contextBridge.exposeInMainWorld('fileAPI', fileAPI)
+
+// Expose as electronAPI for backward compatibility
+contextBridge.exposeInMainWorld('electronAPI', fileAPI)

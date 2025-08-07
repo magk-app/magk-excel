@@ -40,6 +40,19 @@
       "type": "stdio",
       "displayName": "Fetch API",
       "description": "HTTP requests and API calling"
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "--yes",
+        "@modelcontextprotocol/server-filesystem"
+      ],
+      "type": "stdio",
+      "displayName": "Filesystem",
+      "description": "Read and write files in allowed directories",
+      "env": {
+        "FILESYSTEM_ALLOWED_DIRECTORIES": ""
+      }
     }
   }
 }

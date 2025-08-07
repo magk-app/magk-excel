@@ -27,6 +27,94 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 
 let win: BrowserWindow | null
 
+// App data directory for persistent storage
+const APP_DATA_DIR = path.join(app.getPath('userData'), 'PersistentFiles')
+const ALLOWED_DIRS_FILE = path.join(app.getPath('userData'), 'allowed-dirs.json')
+
+/**
+ * Set up the app data directory and configure filesystem MCP server
+ */
+function setupAppDataDirectory() {
+  try {
+    // Create the app data directory if it doesn't exist
+    if (!fs.existsSync(APP_DATA_DIR)) {
+      fs.mkdirSync(APP_DATA_DIR, { recursive: true })
+      console.log('✅ Created app data directory:', APP_DATA_DIR)
+    }
+
+    // Create subdirectories for different file types
+    const subDirs = ['excel', 'pdf', 'uploads', 'temp']
+    subDirs.forEach(subDir => {
+      const fullPath = path.join(APP_DATA_DIR, subDir)
+      if (!fs.existsSync(fullPath)) {
+        fs.mkdirSync(fullPath, { recursive: true })
+      }
+    })
+
+    // Configure allowed directories for filesystem MCP server
+    const allowedDirs = [APP_DATA_DIR]
+    
+    // Set environment variable for filesystem MCP server
+    process.env.FILESYSTEM_ALLOWED_DIRECTORIES = allowedDirs.join(';')
+    
+    // Save allowed directories to file for reference
+    fs.writeFileSync(ALLOWED_DIRS_FILE, JSON.stringify({
+      allowedDirectories: allowedDirs,
+      appDataDir: APP_DATA_DIR,
+      lastUpdated: new Date().toISOString()
+    }, null, 2))
+
+    console.log('✅ Configured filesystem MCP server with allowed directories:', allowedDirs)
+    return APP_DATA_DIR
+  } catch (error) {
+    console.error('❌ Failed to setup app data directory:', error)
+    throw error
+  }
+}
+
+/**
+ * Get the path to the app data directory
+ */
+function getAppDataDirectory(): string {
+  return APP_DATA_DIR
+}
+
+/**
+ * Write a file to the persistent storage directory
+ */
+function writeFileToPersistentStorage(fileName: string, content: string | Buffer, subDir?: string): string {
+  const targetDir = subDir ? path.join(APP_DATA_DIR, subDir) : APP_DATA_DIR
+  
+  // Ensure target directory exists
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true })
+  }
+  
+  const filePath = path.join(targetDir, fileName)
+  fs.writeFileSync(filePath, content)
+  console.log('💾 Saved file to persistent storage:', filePath)
+  return filePath
+}
+
+/**
+ * Read a file from the persistent storage directory
+ */
+function readFileFromPersistentStorage(fileName: string, subDir?: string): Buffer | null {
+  try {
+    const targetDir = subDir ? path.join(APP_DATA_DIR, subDir) : APP_DATA_DIR
+    const filePath = path.join(targetDir, fileName)
+    
+    if (fs.existsSync(filePath)) {
+      return fs.readFileSync(filePath)
+    }
+    
+    return null
+  } catch (error) {
+    console.error('❌ Failed to read file from persistent storage:', error)
+    return null
+  }
+}
+
 function createMenu() {
   const template: any[] = [
     {
@@ -318,9 +406,102 @@ function setupMCPHandlers() {
     
     return excelDir
   })
+
+  // File persistence handlers
+  ipcMain.handle('get-app-data-directory', () => {
+    return getAppDataDirectory()
+  })
+
+  ipcMain.handle('write-persistent-file', async (_, fileName: string, content: string, subDir?: string) => {
+    try {
+      // Decode base64 content if it's a data URL
+      let fileContent: Buffer
+      if (content.startsWith('data:')) {
+        const base64Data = content.split(',')[1]
+        fileContent = Buffer.from(base64Data, 'base64')
+      } else {
+        fileContent = Buffer.from(content, 'utf8')
+      }
+      
+      const filePath = writeFileToPersistentStorage(fileName, fileContent, subDir)
+      return { success: true, filePath }
+    } catch (error) {
+      console.error('❌ Failed to write persistent file:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
+  ipcMain.handle('read-persistent-file', async (_, fileName: string, subDir?: string) => {
+    try {
+      const content = readFileFromPersistentStorage(fileName, subDir)
+      if (content) {
+        return { success: true, content: content.toString('base64') }
+      } else {
+        return { success: false, error: 'File not found' }
+      }
+    } catch (error) {
+      console.error('❌ Failed to read persistent file:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
+  ipcMain.handle('list-persistent-files', async (_, subDir?: string) => {
+    try {
+      const targetDir = subDir ? path.join(APP_DATA_DIR, subDir) : APP_DATA_DIR
+      
+      if (!fs.existsSync(targetDir)) {
+        return { success: true, files: [] }
+      }
+      
+      const files = fs.readdirSync(targetDir).filter(file => {
+        const filePath = path.join(targetDir, file)
+        return fs.statSync(filePath).isFile()
+      }).map(file => {
+        const filePath = path.join(targetDir, file)
+        const stats = fs.statSync(filePath)
+        return {
+          name: file,
+          size: stats.size,
+          modified: stats.mtime,
+          path: filePath
+        }
+      })
+      
+      return { success: true, files }
+    } catch (error) {
+      console.error('❌ Failed to list persistent files:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
+  ipcMain.handle('delete-persistent-file', async (_, fileName: string, subDir?: string) => {
+    try {
+      const targetDir = subDir ? path.join(APP_DATA_DIR, subDir) : APP_DATA_DIR
+      const filePath = path.join(targetDir, fileName)
+      
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath)
+        console.log('🗑️ Deleted persistent file:', filePath)
+        return { success: true }
+      } else {
+        return { success: false, error: 'File not found' }
+      }
+    } catch (error) {
+      console.error('❌ Failed to delete persistent file:', error)
+      return { success: false, error: error.message }
+    }
+  })
 }
 
 app.whenReady().then(async () => {
+  // Setup app data directory and filesystem configuration
+  try {
+    setupAppDataDirectory()
+    console.log('✅ App data directory configured')
+  } catch (error) {
+    console.error('❌ Failed to setup app data directory:', error)
+  }
+
   // Initialize MCP manager
   try {
     await mcpManager.initialize()

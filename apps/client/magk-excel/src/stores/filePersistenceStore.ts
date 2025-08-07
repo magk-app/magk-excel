@@ -120,6 +120,21 @@ export const useFilePersistenceStore = create<FilePersistenceState>()(
           sessionId,
           isPersistent: finalPersistence
         };
+
+        // If persistent, also save to app data directory via file API
+        if (finalPersistence && window.fileAPI) {
+          try {
+            const dataUrl = `data:${file.type};base64,${content}`;
+            const result = await window.fileAPI.writePersistentFile(file.name, dataUrl);
+            if (result.success) {
+              console.log('📁 File saved to app data directory:', result.filePath);
+            } else {
+              console.warn('⚠️ Failed to save to app data directory:', result.error);
+            }
+          } catch (error) {
+            console.warn('⚠️ Error saving to app data directory:', error);
+          }
+        }
         
         set((state) => {
           const newState = { ...state };
@@ -149,8 +164,20 @@ export const useFilePersistenceStore = create<FilePersistenceState>()(
           const newTemporaryFiles = new Map(state.temporaryFiles);
           const newPersistentFiles = new Map(state.persistentFiles);
           
+          // Get file info before removing to delete from app data directory
+          const tempFile = state.temporaryFiles.get(fileId);
+          const persistFile = state.persistentFiles.get(fileId);
+          const fileToRemove = tempFile || persistFile;
+          
           newTemporaryFiles.delete(fileId);
           newPersistentFiles.delete(fileId);
+          
+          // If it was a persistent file, also delete from app data directory
+          if (fileToRemove?.isPersistent && window.fileAPI) {
+            window.fileAPI.deletePersistentFile(fileToRemove.name).catch(error => {
+              console.warn('⚠️ Failed to delete from app data directory:', error);
+            });
+          }
           
           console.log(`🗑️ File removed: ${fileId}`);
           
@@ -176,6 +203,14 @@ export const useFilePersistenceStore = create<FilePersistenceState>()(
             newTemporaryFiles.delete(fileId);
             tempFile.isPersistent = true;
             newPersistentFiles.set(fileId, tempFile);
+
+            // Save to app data directory
+            if (window.fileAPI) {
+              const dataUrl = `data:${tempFile.type};base64,${tempFile.content}`;
+              window.fileAPI.writePersistentFile(tempFile.name, dataUrl).catch(error => {
+                console.warn('⚠️ Failed to save to app data directory:', error);
+              });
+            }
             
             console.log(`📌 File made persistent: ${tempFile.name}`);
             
@@ -192,6 +227,13 @@ export const useFilePersistenceStore = create<FilePersistenceState>()(
             newPersistentFiles.delete(fileId);
             persistFile.isPersistent = false;
             newTemporaryFiles.set(fileId, persistFile);
+
+            // Delete from app data directory
+            if (window.fileAPI) {
+              window.fileAPI.deletePersistentFile(persistFile.name).catch(error => {
+                console.warn('⚠️ Failed to delete from app data directory:', error);
+              });
+            }
             
             console.log(`📎 File made temporary: ${persistFile.name}`);
             
