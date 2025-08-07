@@ -10,11 +10,19 @@
     "build": "tsc && npx vite build && electron-builder",
     "build:app": "tsc --skipLibCheck && npx vite build && electron-builder",
     "build:electron": "npx vite build && electron-builder",
-    "lint": "eslint . --max-warnings 0",
-    "preview": "npx vite preview",
+    "build:simple": "npx vite build",
+    "build:win": "npx vite build && electron-builder --win",
+    "build:mac": "npx vite build && electron-builder --mac",
+    "build:linux": "npx vite build && electron-builder --linux",
+    "build:all": "npx vite build && electron-builder -mwl",
+    "start": "npx electron dist-electron/main.js",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:mcp": "jest electron/__tests__/mcp-manager.test.ts"
+    "test:mcp": "jest electron/__tests__/mcp-manager.test.ts",
+    "test:win": "scripts\\test-win-build.bat",
+    "test:mac": "chmod +x scripts/test-mac-build.sh && scripts/test-mac-build.sh",
+    "lint": "eslint . --max-warnings 0",
+    "preview": "npx vite preview"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.1",
