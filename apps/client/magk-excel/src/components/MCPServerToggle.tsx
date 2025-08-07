@@ -9,7 +9,11 @@ import { Dialog, DialogContent, DialogTrigger } from './ui/dialog';
 import { Loader2, Server, AlertCircle, Plus, ExternalLink, Trash2, Settings } from 'lucide-react';
 import { SmitheryServerBrowser } from './SmitheryServerBrowser';
 
-export function MCPServerToggle() {
+interface MCPServerToggleProps {
+  enabledServers?: Set<string>;
+}
+
+export function MCPServerToggle({ enabledServers: propEnabledServers }: MCPServerToggleProps = {}) {
   const {
     availableServers,
     enabledServers,
@@ -102,7 +106,7 @@ export function MCPServerToggle() {
         )}
 
         <div className="space-y-3">
-          {availableServers.map((serverName) => {
+          {availableServers.map((serverName, index) => {
             const isEnabled = enabledServers.includes(serverName);
             const serverTools = tools.filter(t => t.server === serverName);
             const serverConfig = serverConfigs[serverName];
@@ -112,7 +116,7 @@ export function MCPServerToggle() {
             
             return (
               <div
-                key={serverName}
+                key={`${serverName}-${index}`}
                 className="flex items-center justify-between p-3 rounded-lg border"
               >
                 <div className="flex-1">
