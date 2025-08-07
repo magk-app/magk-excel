@@ -102,14 +102,14 @@ export class WorkflowGenerator {
       "filters": ["list of filters"]
     }`;
 
-    const response = await this.llmService.chatWithSystem(
+    const result = await this.llmService.chatWithSystem(
       'You are a workflow intent extractor. Extract structured intent from natural language.',
       prompt,
       []
     );
 
     try {
-      return JSON.parse(response);
+      return JSON.parse(result.response);
     } catch {
       // Fallback to basic intent
       return {

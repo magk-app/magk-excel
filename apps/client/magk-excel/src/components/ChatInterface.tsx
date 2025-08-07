@@ -28,6 +28,21 @@ export function ChatInterface() {
     enableThinking: true
   });
   
+  // Add request tracking to prevent duplicate sends
+  const activeRequestRef = useRef<AbortController | null>(null);
+  const lastMessageRef = useRef<string>('');
+  const lastMessageTimeRef = useRef<number>(0);
+  
+  // Cleanup on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (activeRequestRef.current) {
+        activeRequestRef.current.abort();
+        activeRequestRef.current = null;
+      }
+    };
+  }, []);
+  
   // Tool call monitoring
   const {
     toolCalls,
@@ -410,6 +425,38 @@ export function ChatInterface() {
     streamText: (message: string, observer: any) => {
       console.log('🚀 Frontend: Starting local Excel-enhanced chat request for message:', message);
       
+      // Prevent duplicate requests
+      const now = Date.now();
+      const timeSinceLastMessage = now - lastMessageTimeRef.current;
+      
+      // Create hash including message and attachments for better deduplication
+      const messageHash = JSON.stringify({ 
+        message, 
+        attachmentCount: attachments.length,
+        attachmentNames: attachments.map(a => a.name).sort()
+      });
+      
+      // Check for duplicate message within 500ms window
+      if (messageHash === lastMessageRef.current && timeSinceLastMessage < 500) {
+        console.log('⚠️ Frontend: Duplicate request detected, ignoring');
+        observer.complete();
+        return;
+      }
+      
+      // Cancel any active request
+      if (activeRequestRef.current) {
+        console.log('🚫 Frontend: Canceling previous request');
+        activeRequestRef.current.abort();
+      }
+      
+      // Update tracking refs with hash
+      lastMessageRef.current = messageHash;
+      lastMessageTimeRef.current = now;
+      
+      // Create new abort controller for this request
+      const abortController = new AbortController();
+      activeRequestRef.current = abortController;
+      
       // Get current session
       const currentSession = getActiveSession();
       if (!currentSession) {
@@ -522,9 +569,7 @@ export function ChatInterface() {
             if (modelConfig.maxTokens !== undefined) {
               formData.append('maxTokens', modelConfig.maxTokens.toString());
             }
-            if (modelConfig.apiKey) {
-              formData.append('apiKey', modelConfig.apiKey);
-            }
+            // API keys removed - managed server-side only
             if (excelData.length > 0) {
               formData.append('excelData', JSON.stringify(excelData));
             }
@@ -552,8 +597,8 @@ export function ChatInterface() {
               provider: modelConfig.provider,
               enableThinking: modelConfig.enableThinking,
               temperature: modelConfig.temperature,
-              maxTokens: modelConfig.maxTokens,
-              apiKey: modelConfig.apiKey
+              maxTokens: modelConfig.maxTokens
+              // API keys removed - managed server-side only
             });
           }
 
@@ -565,7 +610,8 @@ export function ChatInterface() {
             const response = await fetch('http://localhost:3001/chat', {
               method: 'POST',
               headers: requestHeaders,
-              body: requestBody
+              body: requestBody,
+              signal: abortController.signal
             });
             
             console.log('📨 Frontend: Received response with status:', response.status);
@@ -651,9 +697,21 @@ export function ChatInterface() {
               setAttachments([]);
             }
             
+            // Clear active request reference
+            if (activeRequestRef.current === abortController) {
+              activeRequestRef.current = null;
+            }
+            
             observer.complete();
             
           } catch (error) {
+            // CRITICAL: Check abort first before any state changes
+            if (error instanceof Error && error.name === 'AbortError') {
+              console.log('⚠️ Frontend: Request was aborted');
+              observer.complete();
+              return;
+            }
+            
             console.error('❌ Frontend: Chat adapter error:', error);
             console.error('❌ Frontend: Error details:', {
               name: error instanceof Error ? error.name : 'Unknown',
@@ -662,6 +720,11 @@ export function ChatInterface() {
             });
             
             const errorMessage = error instanceof Error ? error.message : String(error);
+            
+            // Clear active request reference on error
+            if (activeRequestRef.current === abortController) {
+              activeRequestRef.current = null;
+            }
             
             // Provide a helpful fallback response
             if (errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch') || errorMessage.includes('ERR_CONNECTION_REFUSED')) {
@@ -674,6 +737,13 @@ export function ChatInterface() {
           }
 
         } catch (error) {
+          // CRITICAL: Check abort first before any state changes
+          if (error instanceof Error && error.name === 'AbortError') {
+            console.log('⚠️ Frontend: Request was aborted (outer)');
+            observer.complete();
+            return;
+          }
+          
           console.error('❌ Frontend: Chat adapter error:', error);
           console.error('❌ Frontend: Error details:', {
             name: error instanceof Error ? error.name : 'Unknown',
@@ -682,6 +752,11 @@ export function ChatInterface() {
           });
           
           const errorMessage = error instanceof Error ? error.message : String(error);
+          
+          // Clear active request reference on error
+          if (activeRequestRef.current === abortController) {
+            activeRequestRef.current = null;
+          }
           
           // Provide a helpful fallback response instead of just throwing an error
           if (errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch') || errorMessage.includes('ERR_CONNECTION_REFUSED')) {

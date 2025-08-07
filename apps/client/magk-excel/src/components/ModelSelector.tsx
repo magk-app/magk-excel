@@ -20,7 +20,7 @@ export interface ModelConfig {
   enableThinking: boolean;
   temperature?: number;
   maxTokens?: number;
-  apiKey?: string;
+  // API keys should only be managed server-side via environment variables
 }
 
 interface ModelSelectorProps {

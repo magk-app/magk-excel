@@ -9,7 +9,27 @@
       "displayName": "Context7",
       "description": "Fetch up-to-date, version-specific documentation and code examples directly into your prompts. Enhance your coding experience by eliminating outdated information and hallucinated APIs. Simply add `use context7` to your questions for accurate and relevant answers.",
       "config": {}
+    },
+    "desktop-commander": {
+      "command": "",
+      "type": "http",
+      "url": "https://server.smithery.ai/@wonderwhy-er/desktop-commander/mcp?api_key=f1dbfea0-d2ab-462a-b9b1-6b87028964f0",
+      "isSmithery": true,
+      "qualifiedName": "@wonderwhy-er/desktop-commander",
+      "displayName": "Desktop Commander",
+      "description": "**Execute terminal commands** and manage files with diff editing capabilities. Coding, shell and terminal, task automation",
+      "config": {}
+    },
+    "exa-search": {
+      "command": "",
+      "type": "http",
+      "url": "https://server.smithery.ai/exa/mcp?api_key=f1dbfea0-d2ab-462a-b9b1-6b87028964f0",
+      "isSmithery": true,
+      "qualifiedName": "exa",
+      "displayName": "Exa Search",
+      "description": "Fast, intelligent web search and crawling.\n\nExa combines embeddings and traditional search to deliver the best results for LLMs.",
+      "config": {}
     }
   },
-  "lastUpdated": "2025-08-05T04:10:52.791Z"
+  "lastUpdated": "2025-08-07T01:18:48.929Z"
 }
