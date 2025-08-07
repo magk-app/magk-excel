@@ -9,6 +9,7 @@ import { ToolCallStatusWindow, useToolCallMonitor } from './ToolCallStatusWindow
 import { useChatHistory, chatHistoryHelpers } from '../services/chatHistoryService';
 import { PDFExtractionService, ClientExcelService } from '../services/pdfExtractionService';
 import { ExcelService } from '../services/excelService';
+import { ModelSelector, ModelConfig } from './ModelSelector';
 
 
 export function ChatInterface() {
@@ -20,6 +21,12 @@ export function ChatInterface() {
   const [extractionPrompt, setExtractionPrompt] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
   const [nluxKey, setNluxKey] = useState(0); // Force NLUX re-render when switching sessions
+  const [modelConfig, setModelConfig] = useState<ModelConfig>({
+    provider: 'anthropic',
+    model: 'claude-3-5-sonnet-20241022',
+    displayName: 'Claude 3.5 Sonnet',
+    enableThinking: true
+  });
   
   // Tool call monitoring
   const {
@@ -506,6 +513,18 @@ export function ChatInterface() {
             formData.append('mcpTools', JSON.stringify(tools));
             formData.append('mcpServers', JSON.stringify(mcpServers));
             formData.append('history', JSON.stringify(history));
+            formData.append('model', modelConfig.model);
+            formData.append('provider', modelConfig.provider);
+            formData.append('enableThinking', modelConfig.enableThinking.toString());
+            if (modelConfig.temperature !== undefined) {
+              formData.append('temperature', modelConfig.temperature.toString());
+            }
+            if (modelConfig.maxTokens !== undefined) {
+              formData.append('maxTokens', modelConfig.maxTokens.toString());
+            }
+            if (modelConfig.apiKey) {
+              formData.append('apiKey', modelConfig.apiKey);
+            }
             if (excelData.length > 0) {
               formData.append('excelData', JSON.stringify(excelData));
             }
@@ -528,110 +547,131 @@ export function ChatInterface() {
               history: history,
               mcpTools: tools, // Send ALL available MCP tools (including Smithery!)
               mcpServers: mcpServers, // Dynamic server detection
-              excelData: excelData.length > 0 ? excelData : undefined // Include Excel data if available
+              excelData: excelData.length > 0 ? excelData : undefined, // Include Excel data if available
+              model: modelConfig.model,
+              provider: modelConfig.provider,
+              enableThinking: modelConfig.enableThinking,
+              temperature: modelConfig.temperature,
+              maxTokens: modelConfig.maxTokens,
+              apiKey: modelConfig.apiKey
             });
           }
 
-          // Handle Excel operations locally without backend
-          console.log('🔧 Frontend: Processing Excel request locally...');
-          
-          // Simulate a response for Excel operations
-          const lowerMessage = message.toLowerCase();
-          let response = '';
-          let mcpToolCalls = [];
-          
-          if (lowerMessage.includes('excel') || lowerMessage.includes('spreadsheet') || 
-              lowerMessage.includes('create') || lowerMessage.includes('data') ||
-              lowerMessage.includes('tiger') || lowerMessage.includes('population')) {
+          // Send to backend for LLM processing with dynamic MCP tool context
+          try {
+            console.log('📡 Frontend: Making fetch request to backend...');
+            console.log('📊 Frontend: Sending model config:', modelConfig);
             
-            response = `I'll help you create an Excel file with the requested data. Let me use the Excel tools to generate a spreadsheet for you.`;
+            const response = await fetch('http://localhost:3001/chat', {
+              method: 'POST',
+              headers: requestHeaders,
+              body: requestBody
+            });
             
-            // Find Excel tools
-            const excelTools = tools.filter(t => t.server === 'excel');
-            console.log('🔧 Available Excel tools:', excelTools);
+            console.log('📨 Frontend: Received response with status:', response.status);
             
-            if (excelTools.length > 0) {
-              // Use excel_sample tool to create a sample file
-              mcpToolCalls = [{
-                server: 'excel',
-                tool: 'excel_sample',
-                args: {
-                  filePath: `./public/downloads/sample_${Date.now()}.xlsx`
-                }
-              }];
+            if (!response.ok) {
+              console.error('❌ Frontend: HTTP error:', response.status, response.statusText);
+              observer.next(`❌ **Connection Error**: HTTP ${response.status} - ${response.statusText}\n\n`);
+              observer.error(new Error(`HTTP Error ${response.status}: ${response.statusText}`));
+              return;
             }
-          } else {
-            response = `I'm an Excel workflow assistant. I can help you create Excel files, read spreadsheet data, and perform various Excel operations. Try asking me to "create an Excel file" or "generate a sample spreadsheet".`;
-          }
-          
-          const data = {
-            response,
-            status: 'success',
-            mcpToolCalls
-          };
-
-          // Skip status messages - process files silently
-
-          // Skip thinking display - go straight to response
-
-          // Simple response handling - just stream the response
-          if (!data.response) {
-            console.error('❌ Frontend: No response field in data:', data);
-            observer.error(new Error('Backend did not return a response field'));
-            return;
-          }
-
-          console.log('✅ Frontend: Got response, streaming...', data.response.length, 'chars');
-          
-          // Just stream the response word by word - keep it simple
-          const words = data.response.split(' ');
-          for (const word of words) {
-            observer.next(word + ' ');
-            await new Promise(resolve => setTimeout(resolve, 30));
-          }
-
-          // Handle MCP tool calls if present (simplified)
-          if (data.mcpToolCalls && data.mcpToolCalls.length > 0) {
-            observer.next(`\n\n🔧 **Using ${data.mcpToolCalls.length} MCP tool(s)...**\n\n`);
             
-            for (const toolCall of data.mcpToolCalls) {
-              try {
-                const result = await callTool(toolCall.server, toolCall.tool, toolCall.args);
-                observer.next(`✅ ${toolCall.tool}: Success\n`);
-              } catch (error) {
-                observer.next(`❌ ${toolCall.tool}: ${error}\n`);
+            const data = await response.json();
+            console.log('📋 Frontend: Parsed response data:', data);
+
+            if (data.status === 'error') {
+              console.error('❌ Frontend: Backend returned error:', data.error);
+              observer.next(`❌ **Backend Error**: ${data.error || 'Unknown error occurred'}\n\n`);
+              observer.error(new Error(`Backend Error: ${data.error || 'Unknown error occurred'}`));
+              return;
+            }
+            
+            // Display thinking if enabled and present
+            if (data.thinking && modelConfig.enableThinking) {
+              observer.next(`💭 **Thinking:**\n${data.thinking}\n\n---\n\n`);
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            // Stream the main response
+            if (!data.response) {
+              console.error('❌ Frontend: No response field in data:', data);
+              observer.error(new Error('Backend did not return a response field'));
+              return;
+            }
+            
+            console.log('✅ Frontend: Got response, streaming...', data.response.length, 'chars');
+            
+            // Stream the response word by word
+            const words = data.response.split(' ');
+            for (const word of words) {
+              observer.next(word + ' ');
+              await new Promise(resolve => setTimeout(resolve, 30));
+            }
+            
+            // Handle MCP tool calls if present
+            if (data.mcpToolCalls && data.mcpToolCalls.length > 0) {
+              observer.next(`\n\n🔧 **Using ${data.mcpToolCalls.length} MCP tool(s)...**\n\n`);
+              
+              for (const toolCall of data.mcpToolCalls) {
+                try {
+                  const result = await callTool(toolCall.server, toolCall.tool, toolCall.args);
+                  observer.next(`✅ ${toolCall.tool}: Success\n`);
+                } catch (error) {
+                  observer.next(`❌ ${toolCall.tool}: ${error}\n`);
+                }
               }
             }
-          }
           
-          console.log('✅ Frontend: Finished streaming response');
-          
-          // Save assistant response to chat history (simplified)
-          if (activeSessionId) {
-            const assistantMessage = {
-              role: 'assistant' as const,
-              content: data.response || 'Response processed successfully',
-              mcpToolCalls: data.mcpToolCalls || []
-            };
+            console.log('✅ Frontend: Finished streaming response');
             
-            addMessage(activeSessionId, assistantMessage);
-            console.log('💾 Saved assistant message to chat history');
-            
-            // Auto-generate session title from first user message
-            if (currentSession.messages.length <= 2) {
-              const title = chatHistoryHelpers.generateSessionTitle(message);
-              updateSessionTitle(activeSessionId, title);
-              console.log('📝 Updated session title:', title);
+            // Save assistant response to chat history
+            if (activeSessionId) {
+              const assistantMessage = {
+                role: 'assistant' as const,
+                content: data.response || 'Response processed successfully',
+                mcpToolCalls: data.mcpToolCalls || [],
+                thinking: data.thinking
+              };
+              
+              addMessage(activeSessionId, assistantMessage);
+              console.log('💾 Saved assistant message to chat history');
+              
+              // Auto-generate session title from first user message
+              if (currentSession.messages.length <= 2) {
+                const title = chatHistoryHelpers.generateSessionTitle(message);
+                updateSessionTitle(activeSessionId, title);
+                console.log('📝 Updated session title:', title);
+              }
             }
+            
+            // Clear attachments after successful processing
+            if (attachments.length > 0) {
+              console.log('🧹 Frontend: Clearing attachments after successful processing');
+              setAttachments([]);
+            }
+            
+            observer.complete();
+            
+          } catch (error) {
+            console.error('❌ Frontend: Chat adapter error:', error);
+            console.error('❌ Frontend: Error details:', {
+              name: error instanceof Error ? error.name : 'Unknown',
+              message: error instanceof Error ? error.message : String(error),
+              stack: error instanceof Error ? error.stack : undefined
+            });
+            
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            
+            // Provide a helpful fallback response
+            if (errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch') || errorMessage.includes('ERR_CONNECTION_REFUSED')) {
+              observer.next(`❌ **Backend Connection Failed**\n\n**Issue:** Cannot connect to the workflow engine at http://localhost:3001\n\n**Quick Solutions:**\n1. **Start the workflow engine:**\n   \`\`\`bash\n   cd apps/workflow-engine\n   npm run dev\n   \`\`\`\n\n2. **Check if port 3001 is available**\n\n3. **Make sure you have set up the .env file with your API key:**\n   \`\`\`bash\n   # In apps/workflow-engine/.env\n   ANTHROPIC_API_KEY=your_api_key_here\n   \`\`\`\n\n**Note:** The demo buttons above work independently and don't require the backend.`);
+            } else {
+              observer.next(`❌ **Processing Error**: ${errorMessage}\n\n**Suggestions:**\n- Check your API key configuration\n- Try rephrasing your question\n- Use the demo buttons above\n\n*If the issue persists, check the backend logs.*`);
+            }
+            
+            observer.complete(); // Complete the stream instead of erroring
           }
-          
-          // Clear attachments after successful processing
-          if (attachments.length > 0) {
-            console.log('🧹 Frontend: Clearing attachments after successful processing');
-            setAttachments([]);
-          }
-          
-          observer.complete();
 
         } catch (error) {
           console.error('❌ Frontend: Chat adapter error:', error);
@@ -691,6 +731,12 @@ export function ChatInterface() {
                 )}
               </p>
             </div>
+            
+            {/* Model Selector */}
+            <ModelSelector 
+              currentModel={modelConfig}
+              onModelChange={setModelConfig}
+            />
             
             {/* Demo Buttons */}
             <div className="flex gap-2">

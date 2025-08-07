@@ -5,38 +5,79 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface ModelConfig {
+  provider: string;
+  model: string;
+  enableThinking?: boolean;
+  temperature?: number;
+  maxTokens?: number;
+  apiKey?: string;
+}
+
 export class LLMService {
-  private anthropic: Anthropic;
+  private anthropic: Anthropic | null = null;
+  private defaultProvider: string;
+  private defaultModel: string;
 
   constructor() {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY environment variable is required');
-    }
+    // Set defaults from environment
+    this.defaultProvider = process.env.DEFAULT_AI_PROVIDER || 'anthropic';
+    this.defaultModel = process.env.DEFAULT_AI_MODEL || 'claude-3-5-sonnet-20241022';
     
-    // Only initialize Anthropic if we have a real API key
-    if (apiKey !== 'your_anthropic_api_key_here') {
+    // Initialize Anthropic if API key is available
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    if (anthropicKey && anthropicKey !== '' && anthropicKey !== 'your_anthropic_api_key_here') {
       this.anthropic = new Anthropic({
-        apiKey: apiKey,
+        apiKey: anthropicKey,
       });
     }
   }
 
-  async chat(message: string, history: ChatMessage[] = [], model: string = 'claude-3-5-sonnet-20241022'): Promise<string> {
-    const result = await this.chatWithSystem(undefined, message, history, true, model);
+  async chat(message: string, history: ChatMessage[] = [], modelConfig?: Partial<ModelConfig>): Promise<string> {
+    const result = await this.chatWithSystem(undefined, message, history, modelConfig);
     return result.response;
   }
 
-  async chatWithSystem(systemPrompt: string | undefined, message: string, history: ChatMessage[] = [], enableThinking: boolean = true, model: string = 'claude-3-5-sonnet-20241022'): Promise<{ response: string, thinking?: string }> {
+  async chatWithSystem(
+    systemPrompt: string | undefined, 
+    message: string, 
+    history: ChatMessage[] = [], 
+    modelConfig?: Partial<ModelConfig>
+  ): Promise<{ response: string, thinking?: string }> {
+    // Merge with defaults
+    const config: ModelConfig = {
+      provider: modelConfig?.provider || this.defaultProvider,
+      model: modelConfig?.model || this.defaultModel,
+      enableThinking: modelConfig?.enableThinking ?? true,
+      temperature: modelConfig?.temperature ?? 0.7,
+      maxTokens: modelConfig?.maxTokens ?? 4096,
+      apiKey: modelConfig?.apiKey
+    };
     try {
-      // Check if we're in mock mode (placeholder API key)
-      const apiKey = process.env.ANTHROPIC_API_KEY;
-      if (apiKey === 'your_anthropic_api_key_here') {
-        console.log('🤖 Using mock response (no API key configured)...');
+      // Use provided API key or fall back to environment
+      let apiClient: Anthropic | null = this.anthropic;
+      
+      if (config.provider === 'anthropic') {
+        if (config.apiKey) {
+          // Use provided API key
+          apiClient = new Anthropic({ apiKey: config.apiKey });
+        } else if (!this.anthropic) {
+          // No API key available
+          console.log('⚠️ No Anthropic API key configured, using mock response...');
+          return this.generateMockWorkflowResponse(message);
+        }
+      } else {
+        // Other providers not yet implemented
+        console.log(`⚠️ Provider ${config.provider} not yet implemented, using mock response...`);
         return this.generateMockWorkflowResponse(message);
       }
 
-      console.log('🤖 Sending request to Claude...');
+      if (!apiClient) {
+        console.log('⚠️ No API client available, using mock response...');
+        return this.generateMockWorkflowResponse(message);
+      }
+
+      console.log(`🤖 Sending request to ${config.provider} (${config.model})...`);
 
       // Convert history to Anthropic format
       const messages: Anthropic.Messages.MessageParam[] = [
@@ -58,7 +99,7 @@ You help users:
 - Export results to Excel with custom formatting
 - Build data processing pipelines
 
-${enableThinking ? `
+${config.enableThinking ? `
 
 When thinking through complex requests, use <thinking> tags to reason through your approach:
 
@@ -74,9 +115,10 @@ Then provide your helpful response.` : ''}
 
 Be conversational, helpful, and focus on understanding what data they want to work with and where it comes from. Ask clarifying questions when needed.`;
 
-      const response = await this.anthropic.messages.create({
-        model: model,
-        max_tokens: 2000, // Increased for thinking mode
+      const response = await apiClient.messages.create({
+        model: config.model,
+        max_tokens: config.maxTokens || 4096,
+        temperature: config.temperature || 0.7,
         system: systemPrompt || defaultSystemPrompt,
         messages: messages
       });

@@ -46,7 +46,7 @@ Return JSON array with tool selections including appropriate file paths:
     console.log('🔍 DEBUG: Tool selection prompt:', toolSelectionPrompt);
     console.log('🔍 DEBUG: Available tools catalog:', toolCatalog);
     
-    const llmResult = await llmService.chatWithSystem(toolSelectionPrompt, '', [], false); // Disable thinking for tool selection
+    const llmResult = await llmService.chatWithSystem(toolSelectionPrompt, '', [], { enableThinking: false }); // Disable thinking for tool selection
     const response = llmResult.response;
     console.log('🔍 DEBUG: Raw AI response:', JSON.stringify(response));
     
@@ -199,10 +199,14 @@ chatRoute.post('/chat', async (c) => {
         mcpServers = {};
       }
       
-      // Extract model and enableThinking
-      model = (formData.get('model') as string) || 'claude-3-5-sonnet-20241022';
+      // Extract model configuration from form data
+      modelConfig.model = formData.get('model') as string || undefined;
+      modelConfig.provider = formData.get('provider') as string || undefined;
       const enableThinkingStr = formData.get('enableThinking') as string;
-      enableThinking = enableThinkingStr === 'true' || enableThinkingStr === '1' || !enableThinkingStr;
+      modelConfig.enableThinking = enableThinkingStr === 'true' || enableThinkingStr === '1';
+      modelConfig.temperature = formData.get('temperature') ? parseFloat(formData.get('temperature') as string) : undefined;
+      modelConfig.maxTokens = formData.get('maxTokens') ? parseInt(formData.get('maxTokens') as string) : undefined;
+      modelConfig.apiKey = formData.get('apiKey') as string || undefined;
       
       const fileCount = parseInt(formData.get('fileCount') as string || '0');
       console.log(`📄 File count: ${fileCount}`);
@@ -245,8 +249,16 @@ chatRoute.post('/chat', async (c) => {
       history = parsed.history;
       mcpTools = parsed.mcpTools;
       mcpServers = parsed.mcpServers;
-      model = parsed.model;
-      enableThinking = parsed.enableThinking;
+      
+      // Extract model configuration from parsed JSON
+      modelConfig = {
+        model: parsed.model,
+        provider: parsed.provider,
+        enableThinking: parsed.enableThinking,
+        temperature: parsed.temperature,
+        maxTokens: parsed.maxTokens,
+        apiKey: parsed.apiKey
+      };
     }
 
     console.log(`💬 Chat request: ${message}`);
@@ -377,7 +389,7 @@ chatRoute.post('/chat', async (c) => {
     
     // Generate response with MCP context and selected tools
     const systemPrompt = generateMCPSystemPrompt(mcpTools, mcpServers, mcpToolCalls);
-    const llmResult = await llmService.chatWithSystem(systemPrompt, message, history, enableThinking, model);
+    const llmResult = await llmService.chatWithSystem(systemPrompt, message, history, modelConfig);
 
     // AI has already determined if tools are needed
     const shouldUseMCP = mcpToolCalls.length > 0;
