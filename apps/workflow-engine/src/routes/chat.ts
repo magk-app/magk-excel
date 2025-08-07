@@ -145,7 +145,9 @@ const chatRequestSchema = z.object({
   mcpServers: z.record(z.object({
     enabled: z.boolean(),
     tools: z.array(z.any())
-  })).optional().default({})
+  })).optional().default({}),
+  model: z.string().optional().default('claude-3-5-sonnet-20241022'),
+  enableThinking: z.boolean().optional().default(true)
 });
 
 chatRoute.post('/chat', async (c) => {
@@ -155,6 +157,8 @@ chatRoute.post('/chat', async (c) => {
     let mcpTools: any[];
     let mcpServers: any;
     let uploadedFiles: any[] = [];
+    let model: string = 'claude-3-5-sonnet-20241022';
+    let enableThinking: boolean = true;
 
     // Check if request is multipart/form-data (file upload) or JSON
     const contentType = c.req.header('content-type') || '';
@@ -194,6 +198,11 @@ chatRoute.post('/chat', async (c) => {
         console.error('❌ Error parsing mcpServers JSON:', error);
         mcpServers = {};
       }
+      
+      // Extract model and enableThinking
+      model = (formData.get('model') as string) || 'claude-3-5-sonnet-20241022';
+      const enableThinkingStr = formData.get('enableThinking') as string;
+      enableThinking = enableThinkingStr === 'true' || enableThinkingStr === '1' || !enableThinkingStr;
       
       const fileCount = parseInt(formData.get('fileCount') as string || '0');
       console.log(`📄 File count: ${fileCount}`);
@@ -236,6 +245,8 @@ chatRoute.post('/chat', async (c) => {
       history = parsed.history;
       mcpTools = parsed.mcpTools;
       mcpServers = parsed.mcpServers;
+      model = parsed.model;
+      enableThinking = parsed.enableThinking;
     }
 
     console.log(`💬 Chat request: ${message}`);
@@ -366,7 +377,7 @@ chatRoute.post('/chat', async (c) => {
     
     // Generate response with MCP context and selected tools
     const systemPrompt = generateMCPSystemPrompt(mcpTools, mcpServers, mcpToolCalls);
-    const llmResult = await llmService.chatWithSystem(systemPrompt, message, history, true);
+    const llmResult = await llmService.chatWithSystem(systemPrompt, message, history, enableThinking, model);
 
     // AI has already determined if tools are needed
     const shouldUseMCP = mcpToolCalls.length > 0;

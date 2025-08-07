@@ -22,11 +22,12 @@ export class LLMService {
     }
   }
 
-  async chat(message: string, history: ChatMessage[] = []): Promise<string> {
-    return this.chatWithSystem(undefined, message, history);
+  async chat(message: string, history: ChatMessage[] = [], model: string = 'claude-3-5-sonnet-20241022'): Promise<string> {
+    const result = await this.chatWithSystem(undefined, message, history, true, model);
+    return result.response;
   }
 
-  async chatWithSystem(systemPrompt: string | undefined, message: string, history: ChatMessage[] = [], enableThinking: boolean = true): Promise<{ response: string, thinking?: string }> {
+  async chatWithSystem(systemPrompt: string | undefined, message: string, history: ChatMessage[] = [], enableThinking: boolean = true, model: string = 'claude-3-5-sonnet-20241022'): Promise<{ response: string, thinking?: string }> {
     try {
       // Check if we're in mock mode (placeholder API key)
       const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -74,7 +75,7 @@ Then provide your helpful response.` : ''}
 Be conversational, helpful, and focus on understanding what data they want to work with and where it comes from. Ask clarifying questions when needed.`;
 
       const response = await this.anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+        model: model,
         max_tokens: 2000, // Increased for thinking mode
         system: systemPrompt || defaultSystemPrompt,
         messages: messages
