@@ -22,7 +22,9 @@
     "test:win": "scripts\\test-win-build.bat",
     "test:mac": "chmod +x scripts/test-mac-build.sh && scripts/test-mac-build.sh",
     "lint": "eslint . --max-warnings 0",
-    "preview": "npx vite preview"
+    "preview": "npx vite preview",
+    "icons:generate": "node scripts/generate-icons.js",
+    "icons:setup": "node scripts/setup-icons.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.1",

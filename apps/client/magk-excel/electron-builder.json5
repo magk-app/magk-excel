@@ -24,7 +24,7 @@
     ],
     "artifactName": "${productName}-Mac-${version}-${arch}.${ext}",
     "category": "public.app-category.productivity",
-    "icon": "public/icon.icns"
+    "icon": "public/icons/icon.icns"
   },
   "win": {
     "target": [
@@ -38,7 +38,8 @@
       }
     ],
     "artifactName": "${productName}-Windows-${version}-${arch}.${ext}",
-    "sign": false
+    "sign": false,
+    "icon": "public/icons/icon.ico"
   },
   "linux": {
     "target": [
@@ -52,7 +53,8 @@
       }
     ],
     "artifactName": "${productName}-Linux-${version}-${arch}.${ext}",
-    "category": "Utility"
+    "category": "Utility",
+    "icon": "public/icons/icon.png"
   },
   "nsis": {
     "oneClick": false,
