@@ -1,5 +1,5 @@
 // Test script to verify MCP server integration
-import { MCPManager } from './electron/mcp-manager.js';
+import { MCPManager } from '../electron/mcp-manager.js';
 
 async function testMCPIntegration() {
   console.log('🧪 Testing MCP Integration...\n');

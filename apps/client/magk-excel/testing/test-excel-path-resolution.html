@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Path Resolution Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; color: #0c5460; }
+        pre { background-color: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .log { max-height: 300px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Excel File Path Resolution Test</h1>
+    <p>This test validates that Excel file path resolution works correctly between frontend and backend.</p>
+
+    <div class="test-section info">
+        <h3>Test Configuration</h3>
+        <div id="config-display">
+            <strong>Workflow API:</strong> https://b1fcb47dfd4d.ngrok-free.app<br>
+            <strong>Test Files:</strong> Simulated Excel uploads
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>Path Resolution Tests</h3>
+        <button onclick="runPathResolutionTests()">Run Path Resolution Tests</button>
+        <div id="path-test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Excel Tool Integration Test</h3>
+        <button onclick="testExcelToolIntegration()">Test Excel MCP Tool</button>
+        <div id="excel-test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Full Workflow Test</h3>
+        <button onclick="testFullWorkflow()">Test Complete Excel Workflow</button>
+        <div id="workflow-test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Live Test Log</h3>
+        <button onclick="clearLog()">Clear Log</button>
+        <div id="test-log" class="log"></div>
+    </div>
+
+    <script>
+        const WORKFLOW_API = 'https://b1fcb47dfd4d.ngrok-free.app';
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('test-log');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            logEntry.style.color = type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#6c757d';
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('test-log').innerHTML = '';
+        }
+        
+        // Simulate file upload data
+        function createMockExcelFile(filename) {
+            // Create a minimal Excel file in base64 (empty workbook)
+            const excelBase64 = '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';
+            
+            return {
+                name: filename,
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                size: 1234,
+                content: excelBase64
+            };
+        }
+        
+        async function runPathResolutionTests() {
+            const resultsDiv = document.getElementById('path-test-results');
+            resultsDiv.innerHTML = '<p>Running path resolution tests...</p>';
+            log('Starting path resolution tests', 'info');
+            
+            try {
+                // Test 1: Basic path resolution
+                const testCases = [
+                    { input: 'test.xlsx', expected: 'temp path mapping' },
+                    { input: '/tmp/upload_123_abc.xlsx', expected: 'absolute path' },
+                    { input: 'Alibaba_Revenue.xlsx', expected: 'fuzzy matching' }
+                ];
+                
+                let results = '<h4>Path Resolution Test Results:</h4><ul>';
+                
+                // Simulate file mapping (like what backend creates)
+                const mockFileMapping = {
+                    'test.xlsx': '/tmp/upload_1234_abc.xlsx',
+                    'Alibaba_Revenue.xlsx': '/tmp/upload_5678_def.xlsx',
+                    'sales_data.xlsx': '/tmp/upload_9012_ghi.xlsx'
+                };
+                
+                for (const testCase of testCases) {
+                    let resolvedPath = testCase.input;
+                    let method = 'fallback';
+                    
+                    // Simulate resolution logic
+                    if (testCase.input.startsWith('/')) {
+                        method = 'absolute_path';
+                    } else if (mockFileMapping[testCase.input]) {
+                        resolvedPath = mockFileMapping[testCase.input];
+                        method = 'exact_match';
+                    } else {
+                        // Fuzzy matching
+                        for (const [key, value] of Object.entries(mockFileMapping)) {
+                            if (key.includes(testCase.input) || testCase.input.includes(key)) {
+                                resolvedPath = value;
+                                method = 'fuzzy_match';
+                                break;
+                            }
+                        }
+                    }
+                    
+                    results += `<li><strong>${testCase.input}</strong> → <code>${resolvedPath}</code> (${method})</li>`;
+                    log(`Path resolution: ${testCase.input} -> ${resolvedPath} (${method})`, 'success');
+                }
+                
+                results += '</ul>';
+                resultsDiv.innerHTML = results;
+                resultsDiv.className = 'test-section success';
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<p><strong>Error:</strong> ${error.message}</p>`;
+                resultsDiv.className = 'test-section error';
+                log(`Path resolution test failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testExcelToolIntegration() {
+            const resultsDiv = document.getElementById('excel-test-results');
+            resultsDiv.innerHTML = '<p>Testing Excel MCP tool integration...</p>';
+            log('Starting Excel tool integration test', 'info');
+            
+            try {
+                // Simulate Excel file upload and processing
+                const mockFile = createMockExcelFile('test_excel.xlsx');
+                
+                const request = {
+                    message: 'Please analyze the uploaded Excel file',
+                    modelConfig: {
+                        provider: 'anthropic',
+                        model: 'claude-3-5-sonnet-20241022',
+                        enableThinking: false
+                    },
+                    attachments: [mockFile],
+                    mcpTools: [
+                        {
+                            name: 'excel_describe_sheets',
+                            server: 'excel',
+                            description: 'Get information about sheets in an Excel workbook'
+                        },
+                        {
+                            name: 'excel_read_sheet',
+                            server: 'excel',
+                            description: 'Read data from an Excel sheet'
+                        }
+                    ],
+                    mcpServers: {
+                        excel: { enabled: true }
+                    }
+                };
+                
+                log('Sending Excel processing request to backend', 'info');
+                
+                // Test the API call
+                const response = await fetch(`${WORKFLOW_API}/api/v2/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(request)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                log('Received response from backend', 'success');
+                
+                let results = '<h4>Excel Tool Integration Results:</h4>';
+                results += `<p><strong>Success:</strong> ${data.success}</p>`;
+                
+                if (data.mcpToolCalls) {
+                    results += `<p><strong>MCP Tool Calls:</strong> ${data.mcpToolCalls.length}</p>`;
+                    results += '<pre>' + JSON.stringify(data.mcpToolCalls, null, 2) + '</pre>';
+                }
+                
+                if (data.savedFiles) {
+                    results += '<p><strong>File Mappings:</strong></p>';
+                    results += '<pre>' + JSON.stringify(data.savedFiles, null, 2) + '</pre>';
+                }
+                
+                results += `<p><strong>Response:</strong></p><pre>${data.response}</pre>`;
+                
+                resultsDiv.innerHTML = results;
+                resultsDiv.className = 'test-section success';
+                log('Excel tool integration test completed successfully', 'success');
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<p><strong>Error:</strong> ${error.message}</p>`;
+                resultsDiv.className = 'test-section error';
+                log(`Excel tool integration test failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testFullWorkflow() {
+            const resultsDiv = document.getElementById('workflow-test-results');
+            resultsDiv.innerHTML = '<p>Testing complete Excel workflow...</p>';
+            log('Starting full workflow test', 'info');
+            
+            try {
+                // Test complete workflow: upload -> process -> download
+                const mockFiles = [
+                    createMockExcelFile('Sales_Report_2024.xlsx'),
+                    createMockExcelFile('Revenue_Analysis.xlsx')
+                ];
+                
+                const request = {
+                    message: 'Analyze these Excel files and create a summary report',
+                    modelConfig: {
+                        provider: 'anthropic',
+                        model: 'claude-3-5-sonnet-20241022',
+                        enableThinking: false
+                    },
+                    attachments: mockFiles,
+                    mcpTools: [
+                        {
+                            name: 'excel_describe_sheets',
+                            server: 'excel',
+                            description: 'Get information about sheets in an Excel workbook'
+                        },
+                        {
+                            name: 'excel_read_sheet',
+                            server: 'excel',
+                            description: 'Read data from an Excel sheet'
+                        },
+                        {
+                            name: 'excel_write_to_sheet',
+                            server: 'excel',
+                            description: 'Write data to an Excel sheet'
+                        }
+                    ],
+                    mcpServers: {
+                        excel: { enabled: true }
+                    }
+                };
+                
+                log('Sending full workflow request', 'info');
+                
+                // Use streaming API for full test
+                const response = await fetch(`${WORKFLOW_API}/api/v2/chat/stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(request)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Streaming API call failed: ${response.status} ${response.statusText}`);
+                }
+                
+                let results = '<h4>Full Workflow Test Results:</h4>';
+                results += '<div id="streaming-log"><p>Processing streaming response...</p></div>';
+                resultsDiv.innerHTML = results;
+                
+                // Process streaming response
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let streamingLog = '';
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                streamingLog += `<p><strong>${data.type}:</strong> ${JSON.stringify(data, null, 2)}</p>`;
+                                log(`Streaming event: ${data.type}`, 'info');
+                                
+                                // Update display
+                                document.getElementById('streaming-log').innerHTML = streamingLog;
+                            } catch (e) {
+                                // Ignore parsing errors
+                            }
+                        }
+                    }
+                }
+                
+                resultsDiv.className = 'test-section success';
+                log('Full workflow test completed successfully', 'success');
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<p><strong>Error:</strong> ${error.message}</p>`;
+                resultsDiv.className = 'test-section error';
+                log(`Full workflow test failed: ${error.message}`, 'error');
+            }
+        }
+        
+        // Auto-run basic tests on page load
+        window.addEventListener('load', () => {
+            log('Test page loaded', 'info');
+        });
+    </script>
+</body>
+</html>

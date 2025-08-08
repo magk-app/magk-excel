@@ -4,8 +4,32 @@
  */
 
 import ExcelJS from 'exceljs';
-import { promises as fs } from 'fs';
-import path from 'path';
+
+// Renderer-safe helpers to access Electron file APIs when available
+function hasFileAPI(): boolean {
+  return typeof window !== 'undefined' && typeof (window as any).fileAPI !== 'undefined';
+}
+
+function isRenderer(): boolean {
+  return typeof window !== 'undefined';
+}
+
+async function readFileBase64(fileName: string, subDir?: string): Promise<string | null> {
+  if (!hasFileAPI()) return null;
+  const result = await (window as any).fileAPI.readPersistentFile(fileName, subDir);
+  return result?.success && result.content ? result.content : null;
+}
+
+async function writeFileFromBuffer(
+  fileName: string,
+  buffer: ArrayBuffer | Buffer,
+  mimeType: string,
+  subDir?: string
+): Promise<{ success: boolean; filePath?: string; error?: string }> {
+  if (!hasFileAPI()) return { success: false, error: 'File API not available in this environment' };
+  const base64 = Buffer.from(buffer as ArrayBuffer).toString('base64');
+  return (window as any).fileAPI.writePersistentFile(fileName, `data:${mimeType};base64,${base64}`, subDir);
+}
 
 export interface ExcelReadOptions {
   filePath: string;
@@ -50,6 +74,10 @@ export interface ExcelOperationResult {
   filePath?: string;
   rowsAffected?: number;
   columnsAffected?: number;
+  fileContent?: Buffer;
+  mimeType?: string;
+  fileName?: string;
+  size?: number;
 }
 
 export class ExcelService {
@@ -66,18 +94,17 @@ export class ExcelService {
     try {
       console.log('📖 Reading Excel file:', options.filePath);
 
-      // Check if file exists
-      try {
-        await fs.access(options.filePath);
-      } catch {
-        return {
-          success: false,
-          error: `File not found: ${options.filePath}`
-        };
+      // Renderer/browser via fileAPI; Node/Electron-main via direct disk access
+      if (hasFileAPI()) {
+        const base64 = await readFileBase64(options.filePath);
+        if (!base64) {
+          return { success: false, error: `File not found: ${options.filePath}` };
+        }
+        const buffer = Buffer.from(base64, 'base64');
+        await this.workbook.xlsx.load(buffer);
+      } else {
+        await this.workbook.xlsx.readFile(options.filePath);
       }
-
-      // Load the workbook
-      await this.workbook.xlsx.readFile(options.filePath);
 
       // Get the worksheet
       const worksheet = options.sheetName 
@@ -133,18 +160,8 @@ export class ExcelService {
     try {
       console.log('📝 Writing Excel file:', options.filePath);
 
-      // Create a new workbook or load existing one
-      if (!options.overwrite) {
-        try {
-          await fs.access(options.filePath);
-          await this.workbook.xlsx.readFile(options.filePath);
-        } catch {
-          // File doesn't exist, create new workbook
-          this.workbook = new ExcelJS.Workbook();
-        }
-      } else {
-        this.workbook = new ExcelJS.Workbook();
-      }
+      // Create a new workbook or reset for overwrite
+      this.workbook = new ExcelJS.Workbook();
 
       // Get or create worksheet
       let worksheet = this.workbook.getWorksheet(options.sheetName || 'Sheet1');
@@ -188,12 +205,20 @@ export class ExcelService {
         column.width = Math.min(Math.max(maxLength + 2, 10), 50);
       });
 
-      // Ensure the directory exists
-      const dir = path.dirname(options.filePath);
-      await fs.mkdir(dir, { recursive: true });
-
-      // Save the file
-      await this.workbook.xlsx.writeFile(options.filePath);
+      // Save the file: renderer via fileAPI, Node/Electron via direct write
+      if (hasFileAPI()) {
+        const arrayBuffer = await this.workbook.xlsx.writeBuffer();
+        const writeResult = await writeFileFromBuffer(
+          options.filePath,
+          arrayBuffer,
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        if (!writeResult.success) {
+          return { success: false, error: writeResult.error || 'Failed to save file' };
+        }
+      } else {
+        await this.workbook.xlsx.writeFile(options.filePath);
+      }
 
       console.log(`✅ Successfully wrote ${options.data.length} rows to Excel file`);
 
@@ -254,7 +279,19 @@ export class ExcelService {
       }
 
       // Save the file
-      await this.workbook.xlsx.writeFile(options.filePath);
+      if (hasFileAPI()) {
+        const arrayBuffer = await this.workbook.xlsx.writeBuffer();
+        const writeResult = await writeFileFromBuffer(
+          options.filePath,
+          arrayBuffer,
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        if (!writeResult.success) {
+          return { success: false, error: writeResult.error || 'Failed to save file' };
+        }
+      } else {
+        await this.workbook.xlsx.writeFile(options.filePath);
+      }
 
       console.log(`✅ Successfully formatted ${cellsFormatted} cells`);
 
@@ -281,8 +318,17 @@ export class ExcelService {
     try {
       console.log('🧮 Performing calculation in Excel file:', options.filePath);
 
-      // Load the workbook
-      await this.workbook.xlsx.readFile(options.filePath);
+      // Load workbook
+      if (hasFileAPI()) {
+        const base64 = await readFileBase64(options.filePath);
+        if (!base64) {
+          return { success: false, error: `File not found: ${options.filePath}` };
+        }
+        const buffer = Buffer.from(base64, 'base64');
+        await this.workbook.xlsx.load(buffer);
+      } else {
+        await this.workbook.xlsx.readFile(options.filePath);
+      }
 
       // Get the worksheet
       const worksheet = options.sheetName 
@@ -304,7 +350,19 @@ export class ExcelService {
       cell.value = { formula: options.formula };
 
       // Save the file
-      await this.workbook.xlsx.writeFile(options.filePath);
+      if (hasFileAPI()) {
+        const arrayBuffer = await this.workbook.xlsx.writeBuffer();
+        const writeResult = await writeFileFromBuffer(
+          options.filePath,
+          arrayBuffer,
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        if (!writeResult.success) {
+          return { success: false, error: writeResult.error || 'Failed to save file' };
+        }
+      } else {
+        await this.workbook.xlsx.writeFile(options.filePath);
+      }
 
       console.log(`✅ Successfully added formula ${options.formula} to cell ${targetCell}`);
 
@@ -374,6 +432,176 @@ export class ExcelService {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
+   * Create Excel file in memory and return as buffer for download
+   */
+  async createExcelBuffer(options: Omit<ExcelWriteOptions, 'filePath'>): Promise<ExcelOperationResult> {
+    try {
+      console.log('📝 Creating Excel buffer in memory');
+
+      // Create a new workbook
+      const workbook = new ExcelJS.Workbook();
+      
+      // Get or create worksheet
+      const worksheet = workbook.addWorksheet(options.sheetName || 'Sheet1');
+
+      // Add headers if provided
+      let startRow = 1;
+      if (options.headers) {
+        worksheet.addRow(options.headers);
+        startRow = 2;
+        
+        // Format headers
+        const headerRow = worksheet.getRow(1);
+        headerRow.font = { bold: true };
+        headerRow.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFE0E0E0' }
+        };
+      }
+
+      // Add data rows
+      options.data.forEach((rowData) => {
+        worksheet.addRow(rowData);
+      });
+
+      // Auto-fit columns
+      worksheet.columns.forEach((column) => {
+        let maxLength = 0;
+        column.eachCell?.({ includeEmpty: true }, (cell) => {
+          const cellValue = cell.value ? cell.value.toString() : '';
+          maxLength = Math.max(maxLength, cellValue.length);
+        });
+        column.width = Math.min(Math.max(maxLength + 2, 10), 50);
+      });
+
+      // Generate buffer
+      const buffer = await workbook.xlsx.writeBuffer() as Buffer;
+      const fileName = `excel_export_${Date.now()}.xlsx`;
+
+      console.log(`✅ Successfully created Excel buffer (${buffer.length} bytes)`);
+
+      return {
+        success: true,
+        message: `Successfully created Excel file with ${options.data.length} rows`,
+        fileContent: buffer,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        fileName,
+        size: buffer.length,
+        rowsAffected: options.data.length,
+        columnsAffected: options.data[0]?.length || 0
+      };
+
+    } catch (error) {
+      console.error('❌ Error creating Excel buffer:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
+   * Convert data to CSV format
+   */
+  createCSVContent(data: any[][], headers?: string[]): string {
+    let csvContent = '';
+    
+    // Add headers if provided
+    if (headers) {
+      csvContent += headers.map(header => `"${header.replace(/"/g, '""')}"`).join(',') + '\n';
+    }
+    
+    // Add data rows
+    data.forEach(row => {
+      const csvRow = row.map(cell => {
+        const cellValue = cell != null ? cell.toString() : '';
+        return `"${cellValue.replace(/"/g, '""')}"`;
+      }).join(',');
+      csvContent += csvRow + '\n';
+    });
+    
+    return csvContent;
+  }
+
+  /**
+   * Create CSV file buffer for download
+   */
+  createCSVBuffer(data: any[][], headers?: string[]): ExcelOperationResult {
+    try {
+      const csvContent = this.createCSVContent(data, headers);
+      const buffer = Buffer.from(csvContent, 'utf8');
+      const fileName = `csv_export_${Date.now()}.csv`;
+
+      return {
+        success: true,
+        message: `Successfully created CSV file with ${data.length} rows`,
+        fileContent: buffer,
+        mimeType: 'text/csv',
+        fileName,
+        size: buffer.length,
+        rowsAffected: data.length,
+        columnsAffected: data[0]?.length || 0
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create CSV'
+      };
+    }
+  }
+
+  /**
+   * Create downloadable content from various data formats
+   */
+  async createDownloadableContent(
+    data: any[], 
+    format: 'xlsx' | 'csv' = 'xlsx',
+    options?: {
+      headers?: string[];
+      sheetName?: string;
+      fileName?: string;
+    }
+  ): Promise<ExcelOperationResult> {
+    try {
+      // Convert single-dimensional data to 2D if needed
+      const processedData = Array.isArray(data[0]) ? data : data.map(item => 
+        typeof item === 'object' ? Object.values(item) : [item]
+      );
+
+      // Generate headers from data if not provided
+      const headers = options?.headers || (
+        typeof data[0] === 'object' && !Array.isArray(data[0]) 
+          ? Object.keys(data[0]) 
+          : undefined
+      );
+
+      if (format === 'csv') {
+        const result = this.createCSVBuffer(processedData, headers);
+        if (options?.fileName) {
+          result.fileName = options.fileName.endsWith('.csv') ? options.fileName : `${options.fileName}.csv`;
+        }
+        return result;
+      } else {
+        const result = await this.createExcelBuffer({
+          data: processedData,
+          headers,
+          sheetName: options?.sheetName
+        });
+        if (options?.fileName) {
+          result.fileName = options.fileName.endsWith('.xlsx') ? options.fileName : `${options.fileName}.xlsx`;
+        }
+        return result;
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create downloadable content'
       };
     }
   }

@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Filesystem MCP Integration</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007acc;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #555;
+            margin-top: 20px;
+        }
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #005a9e;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .file-list {
+            list-style: none;
+            padding: 0;
+        }
+        .file-list li {
+            padding: 8px;
+            margin: 4px 0;
+            background: #f8f9fa;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .file-info {
+            font-size: 12px;
+            color: #6c757d;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            resize: vertical;
+        }
+        input[type="text"], input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        #output {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Filesystem MCP Integration Test</h1>
+        <p>Test the MCP filesystem server integration with persistent file storage.</p>
+    </div>
+
+    <div class="container">
+        <h2>📁 Test App Data Directory Setup</h2>
+        <button onclick="testAppDataSetup()">Test App Data Setup</button>
+        <button onclick="getAppPaths()">Get App Paths</button>
+        <div id="appDataResult"></div>
+    </div>
+
+    <div class="container">
+        <h2>📝 Test File Operations</h2>
+        
+        <div class="test-section">
+            <h3>Write File</h3>
+            <input type="text" id="fileName" placeholder="File name (e.g., test.txt)" value="test.txt">
+            <textarea id="fileContent" rows="4" placeholder="File content">Hello from MCP filesystem test!
+This is a test file created through the filesystem MCP integration.
+Timestamp: </textarea>
+            <button onclick="writeTestFile()">Write File</button>
+        </div>
+
+        <div class="test-section">
+            <h3>Upload File</h3>
+            <input type="file" id="fileUpload" accept=".txt,.json,.pdf,.xlsx,.xls,.csv">
+            <button onclick="uploadFile()">Upload & Persist</button>
+        </div>
+
+        <div class="test-section">
+            <h3>File Operations</h3>
+            <button onclick="listFiles()">List All Files</button>
+            <button onclick="searchFiles()">Search Files (*.txt)</button>
+            <button onclick="readTextFile()">Read test.txt</button>
+            <button onclick="getFileInfo()">Get File Info</button>
+            <button onclick="deleteTestFile()">Delete test.txt</button>
+        </div>
+
+        <div id="fileOpResult"></div>
+    </div>
+
+    <div class="container">
+        <h2>🔧 Test MCP Tools</h2>
+        <button onclick="testMCPTools()">Run All MCP Tool Tests</button>
+        <button onclick="testFilesystemServer()">Test Filesystem Server</button>
+        <button onclick="toggleFilesystemServer()">Toggle Filesystem Server</button>
+        <div id="mcpResult"></div>
+    </div>
+
+    <div class="container">
+        <h2>💾 Test Persistence Store Integration</h2>
+        <button onclick="testStoreIntegration()">Test Store Integration</button>
+        <button onclick="syncWithFilesystem()">Sync Store with Filesystem</button>
+        <div id="storeResult"></div>
+    </div>
+
+    <div class="container">
+        <h2>📊 Output Log</h2>
+        <div id="output"></div>
+    </div>
+
+    <script>
+        // Logging helper
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            output.appendChild(div);
+            output.scrollTop = output.scrollHeight;
+            console.log(message);
+        }
+
+        // Test app data directory setup
+        async function testAppDataSetup() {
+            try {
+                log('Testing app data directory setup...');
+                
+                // Check if electronAPI is available
+                if (!window.electronAPI) {
+                    throw new Error('Electron API not available');
+                }
+
+                // Test creating directories
+                const result = await window.electronAPI.setupPersistentDirectories();
+                log(`App data setup result: ${JSON.stringify(result, null, 2)}`, 'success');
+                
+                document.getElementById('appDataResult').innerHTML = `
+                    <div class="test-result success">
+                        <strong>Persistent storage ready!</strong><br>
+                        Base Path: ${result.basePath}<br>
+                        Directories: ${result.directories.join(', ')}
+                    </div>
+                `;
+            } catch (error) {
+                log(`App data setup failed: ${error.message}`, 'error');
+                document.getElementById('appDataResult').innerHTML = `
+                    <div class="test-result error">Setup failed: ${error.message}</div>
+                `;
+            }
+        }
+
+        // Get app paths
+        async function getAppPaths() {
+            try {
+                const paths = await window.electronAPI.getAppPaths();
+                log(`App paths: ${JSON.stringify(paths, null, 2)}`, 'info');
+                document.getElementById('appDataResult').innerHTML = `
+                    <div class="test-result info">
+                        <strong>App Paths:</strong><br>
+                        ${Object.entries(paths).map(([key, value]) => `${key}: ${value}`).join('<br>')}
+                    </div>
+                `;
+            } catch (error) {
+                log(`Failed to get app paths: ${error.message}`, 'error');
+            }
+        }
+
+        // Write test file
+        async function writeTestFile() {
+            try {
+                const fileName = document.getElementById('fileName').value;
+                const content = document.getElementById('fileContent').value + new Date().toISOString();
+                
+                log(`Writing file: ${fileName}`);
+                
+                // Determine file type for proper directory
+                const ext = fileName.split('.').pop()?.toLowerCase();
+                let subdir = 'uploads';
+                if (['xlsx', 'xls', 'csv'].includes(ext)) subdir = 'excel';
+                else if (ext === 'pdf') subdir = 'pdf';
+                
+                const result = await window.electronAPI.writePersistentFile({
+                    fileName,
+                    content: btoa(content), // Convert to base64
+                    subdir
+                });
+                
+                log(`File written successfully: ${result.path}`, 'success');
+                document.getElementById('fileOpResult').innerHTML = `
+                    <div class="test-result success">
+                        File saved: ${result.path}
+                    </div>
+                `;
+            } catch (error) {
+                log(`Write file failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Upload file
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileUpload');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                log('No file selected', 'error');
+                return;
+            }
+
+            try {
+                log(`Uploading file: ${file.name} (${file.size} bytes)`);
+                
+                // Check size limit
+                if (file.size > 2.5 * 1024 * 1024) {
+                    throw new Error('File exceeds 2.5MB limit');
+                }
+                
+                // Read file as base64
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const base64 = e.target.result.split(',')[1];
+                    
+                    // Determine subdirectory
+                    const ext = file.name.split('.').pop()?.toLowerCase();
+                    let subdir = 'uploads';
+                    if (['xlsx', 'xls', 'csv'].includes(ext)) subdir = 'excel';
+                    else if (ext === 'pdf') subdir = 'pdf';
+                    
+                    const result = await window.electronAPI.writePersistentFile({
+                        fileName: file.name,
+                        content: base64,
+                        subdir
+                    });
+                    
+                    log(`File uploaded: ${result.path}`, 'success');
+                    document.getElementById('fileOpResult').innerHTML = `
+                        <div class="test-result success">
+                            File uploaded: ${result.path}
+                        </div>
+                    `;
+                };
+                reader.readAsDataURL(file);
+            } catch (error) {
+                log(`Upload failed: ${error.message}`, 'error');
+            }
+        }
+
+        // List files
+        async function listFiles() {
+            try {
+                log('Listing all persistent files...');
+                const files = await window.electronAPI.listPersistentFiles();
+                
+                log(`Found ${files.length} files`, 'success');
+                
+                const html = files.map(file => `
+                    <li>
+                        <span>${file.name}</span>
+                        <span class="file-info">${file.size} bytes | ${file.path}</span>
+                    </li>
+                `).join('');
+                
+                document.getElementById('fileOpResult').innerHTML = `
+                    <div class="test-result info">
+                        <strong>Persistent Files:</strong>
+                        <ul class="file-list">${html || '<li>No files found</li>'}</ul>
+                    </div>
+                `;
+            } catch (error) {
+                log(`List files failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Search files
+        async function searchFiles() {
+            try {
+                log('Searching for *.txt files...');
+                const files = await window.electronAPI.searchPersistentFiles('*.txt');
+                
+                log(`Found ${files.length} .txt files`, 'success');
+                
+                const html = files.map(file => `
+                    <li>
+                        <span>${file.name}</span>
+                        <span class="file-info">${file.path}</span>
+                    </li>
+                `).join('');
+                
+                document.getElementById('fileOpResult').innerHTML = `
+                    <div class="test-result info">
+                        <strong>Text Files:</strong>
+                        <ul class="file-list">${html || '<li>No .txt files found</li>'}</ul>
+                    </div>
+                `;
+            } catch (error) {
+                log(`Search failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Read text file
+        async function readTextFile() {
+            try {
+                log('Reading test.txt...');
+                const content = await window.electronAPI.readPersistentFile({
+                    fileName: 'test.txt',
+                    subdir: 'uploads'
+                });
+                
+                // Decode from base64
+                const text = atob(content);
+                
+                log('File read successfully', 'success');
+                document.getElementById('fileOpResult').innerHTML = `
+                    <div class="test-result info">
+                        <strong>test.txt content:</strong><br>
+                        <pre>${text}</pre>
+                    </div>
+                `;
+            } catch (error) {
+                log(`Read file failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Get file info
+        async function getFileInfo() {
+            try {
+                log('Getting file info for test.txt...');
+                const info = await window.electronAPI.getFileInfo({
+                    fileName: 'test.txt',
+                    subdir: 'uploads'
+                });
+                
+                log('File info retrieved', 'success');
+                document.getElementById('fileOpResult').innerHTML = `
+                    <div class="test-result info">
+                        <strong>File Info:</strong><br>
+                        ${JSON.stringify(info, null, 2).replace(/\n/g, '<br>').replace(/ /g, '&nbsp;')}
+                    </div>
+                `;
+            } catch (error) {
+                log(`Get file info failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Delete test file
+        async function deleteTestFile() {
+            try {
+                log('Deleting test.txt...');
+                await window.electronAPI.deletePersistentFile({
+                    fileName: 'test.txt',
+                    subdir: 'uploads'
+                });
+                
+                log('File deleted successfully', 'success');
+                document.getElementById('fileOpResult').innerHTML = `
+                    <div class="test-result success">
+                        test.txt deleted successfully
+                    </div>
+                `;
+            } catch (error) {
+                log(`Delete file failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Test MCP tools
+        async function testMCPTools() {
+            try {
+                log('Testing MCP filesystem tools...');
+                
+                if (!window.electronAPI?.callMCPTool) {
+                    throw new Error('MCP tool API not available');
+                }
+
+                // Test list_directory
+                log('Testing list_directory tool...');
+                const listResult = await window.electronAPI.callMCPTool('filesystem', 'list_directory', {
+                    path: '/'
+                });
+                log(`list_directory result: ${JSON.stringify(listResult)}`, 'success');
+
+                // Test write_file
+                log('Testing write_file tool...');
+                const writeResult = await window.electronAPI.callMCPTool('filesystem', 'write_file', {
+                    path: '/uploads/mcp-test.txt',
+                    content: 'Test content from MCP tool'
+                });
+                log(`write_file result: ${JSON.stringify(writeResult)}`, 'success');
+
+                // Test read_text_file
+                log('Testing read_text_file tool...');
+                const readResult = await window.electronAPI.callMCPTool('filesystem', 'read_text_file', {
+                    path: '/uploads/mcp-test.txt'
+                });
+                log(`read_text_file result: ${JSON.stringify(readResult)}`, 'success');
+
+                document.getElementById('mcpResult').innerHTML = `
+                    <div class="test-result success">
+                        All MCP tools tested successfully!
+                    </div>
+                `;
+            } catch (error) {
+                log(`MCP tools test failed: ${error.message}`, 'error');
+                document.getElementById('mcpResult').innerHTML = `
+                    <div class="test-result error">
+                        MCP tools test failed: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Test filesystem server
+        async function testFilesystemServer() {
+            try {
+                log('Testing filesystem server status...');
+                
+                const servers = await window.electronAPI.getEnabledServers();
+                const isEnabled = servers.includes('filesystem');
+                
+                log(`Filesystem server is ${isEnabled ? 'ENABLED' : 'DISABLED'}`, isEnabled ? 'success' : 'info');
+                
+                if (isEnabled) {
+                    const tools = await window.electronAPI.listTools('filesystem');
+                    log(`Available tools: ${tools.map(t => t.name).join(', ')}`, 'info');
+                }
+                
+                document.getElementById('mcpResult').innerHTML = `
+                    <div class="test-result ${isEnabled ? 'success' : 'info'}">
+                        Filesystem server: ${isEnabled ? 'ENABLED' : 'DISABLED'}<br>
+                        ${isEnabled ? `Tools: ${tools?.length || 0}` : 'Enable server to use tools'}
+                    </div>
+                `;
+            } catch (error) {
+                log(`Server test failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Toggle filesystem server
+        async function toggleFilesystemServer() {
+            try {
+                const servers = await window.electronAPI.getEnabledServers();
+                const isEnabled = servers.includes('filesystem');
+                
+                log(`Toggling filesystem server from ${isEnabled ? 'ON' : 'OFF'} to ${!isEnabled ? 'ON' : 'OFF'}...`);
+                
+                await window.electronAPI.toggleServer('filesystem', !isEnabled);
+                
+                log(`Filesystem server ${!isEnabled ? 'enabled' : 'disabled'}`, 'success');
+                await testFilesystemServer();
+            } catch (error) {
+                log(`Toggle failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Test store integration
+        async function testStoreIntegration() {
+            try {
+                log('Testing FilePersistenceStore integration...');
+                
+                // This would normally interact with the store
+                // For testing, we'll just verify the APIs work
+                
+                log('Store integration test placeholder - implement with store access', 'info');
+                
+                document.getElementById('storeResult').innerHTML = `
+                    <div class="test-result info">
+                        Store integration test requires store access from renderer
+                    </div>
+                `;
+            } catch (error) {
+                log(`Store test failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Sync with filesystem
+        async function syncWithFilesystem() {
+            try {
+                log('Syncing store with filesystem...');
+                
+                // This would trigger store sync
+                log('Sync placeholder - implement with store access', 'info');
+                
+                document.getElementById('storeResult').innerHTML = `
+                    <div class="test-result info">
+                        Sync requires store access from renderer
+                    </div>
+                `;
+            } catch (error) {
+                log(`Sync failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Run initial setup test on load
+        window.addEventListener('DOMContentLoaded', () => {
+            log('Filesystem MCP test page loaded', 'info');
+            
+            // Check if Electron APIs are available
+            if (window.electronAPI) {
+                log('Electron API detected', 'success');
+                testAppDataSetup();
+            } else {
+                log('Electron API not available - run in Electron app', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

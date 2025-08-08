@@ -50,14 +50,58 @@ contextBridge.exposeInMainWorld('mcpAPI', {
     ipcRenderer.invoke('mcp:get-smithery-servers')
 })
 
-// Expose File API for Excel downloads
-contextBridge.exposeInMainWorld('fileAPI', {
-  downloadFile: (filePath: string) => 
-    ipcRenderer.invoke('download-file', filePath),
+// File API object
+const fileAPI = {
+  downloadFile: (filePath: string, options?: { defaultPath?: string, showDialog?: boolean, autoSave?: boolean }) => 
+    ipcRenderer.invoke('download-file', filePath, options),
+  downloadFromContent: (options: { content: string | Buffer, fileName: string, mimeType?: string, encoding?: 'base64' | 'utf8' | 'binary', autoSave?: boolean }) => 
+    ipcRenderer.invoke('download-from-content', options),
   openFile: (filePath: string) => 
     ipcRenderer.invoke('open-file', filePath),
   showInFolder: (filePath: string) => 
     ipcRenderer.invoke('show-in-folder', filePath),
   getExcelDirectory: () => 
-    ipcRenderer.invoke('get-excel-directory')
+    ipcRenderer.invoke('get-excel-directory'),
+  
+  // Persistent file operations
+  getAppDataDirectory: () => 
+    ipcRenderer.invoke('get-app-data-directory'),
+  writePersistentFile: (fileName: string, content: string, subDir?: string) => 
+    ipcRenderer.invoke('write-persistent-file', fileName, content, subDir),
+  readPersistentFile: (fileName: string, subDir?: string) => 
+    ipcRenderer.invoke('read-persistent-file', fileName, subDir),
+  listPersistentFiles: (subDir?: string) => 
+    ipcRenderer.invoke('list-persistent-files', subDir),
+  deletePersistentFile: (fileName: string, subDir?: string) => 
+    ipcRenderer.invoke('delete-persistent-file', fileName, subDir),
+  
+  // Temporary file operations
+  saveTempFile: (params: { fileId: string, fileName: string, content: string }) => 
+    ipcRenderer.invoke('save-temp-file', params),
+  cleanupTempFiles: (olderThanHours?: number) => 
+    ipcRenderer.invoke('cleanup-temp-files', olderThanHours),
+  findFileByName: (fileName: string) => 
+    ipcRenderer.invoke('find-file-by-name', fileName)
+}
+
+// Expose File API for Excel downloads and persistent file operations
+contextBridge.exposeInMainWorld('fileAPI', fileAPI)
+
+// Expose as electronAPI for backward compatibility  
+contextBridge.exposeInMainWorld('electronAPI', {
+  ...fileAPI,
+  
+  // Test executor APIs
+  readFile: (filePath: string) => 
+    ipcRenderer.invoke('test:read-file', filePath),
+  readDirectory: (dirPath: string) => 
+    ipcRenderer.invoke('test:read-directory', dirPath),
+  saveTestArtifact: (params: { testId: string, artifactName: string, content: string, type: string }) => 
+    ipcRenderer.invoke('test:save-artifact', params),
+  listTestArtifacts: (testId: string) => 
+    ipcRenderer.invoke('test:list-artifacts', testId),
+  cleanupTestArtifacts: (testId?: string) => 
+    ipcRenderer.invoke('test:cleanup-artifacts', testId),
+  getTestEnvironmentInfo: () => 
+    ipcRenderer.invoke('test:get-environment-info')
 })

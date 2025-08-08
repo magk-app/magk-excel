@@ -2,6 +2,11 @@ import { useState, useRef } from 'react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
+import { Switch } from './ui/switch';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { FileUploadProgressComponent, FileUploadProgress } from './FileUploadProgress';
+import { claudeFilesService } from '../services/claude/ClaudeFilesService';
+import { Info, Cloud, Server } from 'lucide-react';
 
 export interface FileAttachment {
   file: File;
@@ -16,16 +21,24 @@ interface FileUploadAreaProps {
   onAttachmentsChange: (attachments: FileAttachment[]) => void;
   maxFiles?: number;
   maxFileSize?: number; // in bytes
+  useDirectClaudeApi?: boolean;
+  onDirectClaudeApiChange?: (enabled: boolean) => void;
+  onFileUploadProgress?: (fileId: string, progress: FileUploadProgress) => void;
 }
 
 export function FileUploadArea({ 
   attachments, 
   onAttachmentsChange, 
   maxFiles = 5,
-  maxFileSize = 50 * 1024 * 1024 // 50MB default
+  maxFileSize = 50 * 1024 * 1024, // 50MB default
+  useDirectClaudeApi = false,
+  onDirectClaudeApiChange,
+  onFileUploadProgress
 }: FileUploadAreaProps) {
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<FileUploadProgress[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const hasClaudeApiKey = !!claudeFilesService.getApiKey();
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -42,25 +55,51 @@ export function FileUploadArea({
         return;
       }
 
-      // Check file type
-      const isValidType = 
-        file.type === 'application/pdf' ||
-        file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-        file.type === 'application/vnd.ms-excel' ||
-        file.name.toLowerCase().endsWith('.pdf') ||
-        file.name.toLowerCase().endsWith('.xlsx') ||
-        file.name.toLowerCase().endsWith('.xls');
+      // Check file type - expand support for Claude API
+      let isValidType = false;
+      
+      if (useDirectClaudeApi && hasClaudeApiKey) {
+        // Use Claude API validation for supported files
+        isValidType = claudeFilesService.isFileSupported(file);
+        const validationError = claudeFilesService.getFileValidationError(file);
+        if (validationError) {
+          errors.push(validationError);
+          return;
+        }
+      } else {
+        // Legacy validation for backend processing
+        isValidType = 
+          file.type === 'application/pdf' ||
+          file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+          file.type === 'application/vnd.ms-excel' ||
+          file.name.toLowerCase().endsWith('.pdf') ||
+          file.name.toLowerCase().endsWith('.xlsx') ||
+          file.name.toLowerCase().endsWith('.xls');
+      }
 
       if (!isValidType) {
-        errors.push(`${file.name} is not a supported file type (PDF, Excel only)`);
+        const supportedTypes = useDirectClaudeApi && hasClaudeApiKey 
+          ? 'PDF, Images (JPEG, PNG, GIF, WebP), Text files (TXT, CSV, HTML, Markdown)'
+          : 'PDF, Excel only';
+        errors.push(`${file.name} is not a supported file type (${supportedTypes})`);
         return;
       }
 
-      // Determine file type
-      const fileType: 'pdf' | 'excel' = 
-        file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf') 
-          ? 'pdf' 
-          : 'excel';
+      // Determine file type - expand for Claude API
+      let fileType: 'pdf' | 'excel' | 'image' | 'text' = 'pdf';
+      
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        fileType = 'pdf';
+      } else if (file.type.startsWith('image/')) {
+        fileType = 'image';
+      } else if (file.type.startsWith('text/') || 
+                 file.name.toLowerCase().endsWith('.txt') || 
+                 file.name.toLowerCase().endsWith('.csv') || 
+                 file.name.toLowerCase().endsWith('.md')) {
+        fileType = 'text';
+      } else {
+        fileType = 'excel';
+      }
 
       // Check if we're at max files
       if (attachments.length + newAttachments.length >= maxFiles) {
@@ -68,15 +107,8 @@ export function FileUploadArea({
         return;
       }
 
-      // Check for duplicates
-      const isDuplicate = attachments.some(existing => 
-        existing.name === file.name && existing.size === file.size
-      );
-      
-      if (isDuplicate) {
-        errors.push(`${file.name} is already attached`);
-        return;
-      }
+      // Remove duplicate check to allow re-uploading same files
+      // This fixes Issue #1: Allow re-uploading the same file multiple times
 
       newAttachments.push({
         file,
@@ -114,12 +146,43 @@ export function FileUploadArea({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const getFileIcon = (type: 'pdf' | 'excel'): string => {
-    return type === 'pdf' ? '📄' : '📊';
+  const getFileIcon = (type: 'pdf' | 'excel' | 'image' | 'text'): string => {
+    switch (type) {
+      case 'pdf': return '📄';
+      case 'excel': return '📊';
+      case 'image': return '🖼️';
+      case 'text': return '📝';
+      default: return '📄';
+    }
   };
 
-  const getFileTypeColor = (type: 'pdf' | 'excel'): 'default' | 'secondary' | 'destructive' | 'outline' => {
-    return type === 'pdf' ? 'destructive' : 'secondary';
+  const getFileTypeColor = (type: 'pdf' | 'excel' | 'image' | 'text'): 'default' | 'secondary' | 'destructive' | 'outline' => {
+    switch (type) {
+      case 'pdf': return 'destructive';
+      case 'excel': return 'secondary';
+      case 'image': return 'default';
+      case 'text': return 'outline';
+      default: return 'destructive';
+    }
+  };
+
+  const handleFileUploadProgress = (fileId: string, progress: FileUploadProgress) => {
+    setUploadProgress(prev => {
+      const existing = prev.find(p => p.fileId === fileId);
+      if (existing) {
+        return prev.map(p => p.fileId === fileId ? progress : p);
+      } else {
+        return [...prev, progress];
+      }
+    });
+    
+    if (onFileUploadProgress) {
+      onFileUploadProgress(fileId, progress);
+    }
+  };
+
+  const clearUploadProgress = (fileId: string) => {
+    setUploadProgress(prev => prev.filter(p => p.fileId !== fileId));
   };
 
   return (
@@ -131,7 +194,10 @@ export function FileUploadArea({
             type="file"
             ref={fileInputRef}
             onChange={handleFileUpload}
-            accept=".pdf,.xlsx,.xls,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+            accept={useDirectClaudeApi && hasClaudeApiKey 
+              ? '.pdf,.jpg,.jpeg,.png,.gif,.webp,.txt,.csv,.html,.md,application/pdf,image/*,text/*'
+              : '.pdf,.xlsx,.xls,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel'
+            }
             multiple
             className="hidden"
           />
@@ -145,15 +211,57 @@ export function FileUploadArea({
             📎 Attach Files
           </Button>
           <span className="text-sm text-muted-foreground">
-            PDF and Excel files • Max {maxFiles} files • {Math.round(maxFileSize / 1024 / 1024)}MB each
+            {useDirectClaudeApi && hasClaudeApiKey 
+              ? 'PDF, Images, Text files • Max 100MB each'
+              : 'PDF and Excel files • Max 50MB each'
+            } • Max {maxFiles} files
           </span>
         </div>
         
-        {attachments.length > 0 && (
-          <div className="text-sm text-muted-foreground">
-            {attachments.length}/{maxFiles} files attached
-          </div>
-        )}
+        <div className="flex items-center gap-4">
+          {hasClaudeApiKey && onDirectClaudeApiChange && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="direct-claude-api"
+                      checked={useDirectClaudeApi}
+                      onCheckedChange={onDirectClaudeApiChange}
+                    />
+                    <label 
+                      htmlFor="direct-claude-api" 
+                      className="text-sm font-medium flex items-center gap-1"
+                    >
+                      {useDirectClaudeApi ? (
+                        <><Cloud className="w-3 h-3" /> Claude API</>
+                      ) : (
+                        <><Server className="w-3 h-3" /> Backend</>
+                      )}
+                    </label>
+                    <Info className="w-3 h-3 text-muted-foreground" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="left" className="max-w-64">
+                  <div className="space-y-1">
+                    <p className="font-semibold">File Upload Method</p>
+                    <p className="text-sm">
+                      {useDirectClaudeApi
+                        ? 'Files are sent directly to Claude API with support for images, PDFs, and text files. Large files use Files API for efficient processing.'
+                        : 'Files are processed by the backend server and converted for Claude. Supports PDF and Excel files only.'}
+                    </p>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          
+          {attachments.length > 0 && (
+            <div className="text-sm text-muted-foreground">
+              {attachments.length}/{maxFiles} files attached
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Error Display */}
@@ -161,6 +269,25 @@ export function FileUploadArea({
         <Alert variant="destructive">
           <AlertDescription>{uploadError}</AlertDescription>
         </Alert>
+      )}
+
+      {/* Upload Progress */}
+      {uploadProgress.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-foreground">Upload Progress:</h4>
+          <FileUploadProgressComponent
+            uploads={uploadProgress}
+            onClear={clearUploadProgress}
+            onRetry={(fileId) => {
+              // Find the corresponding attachment and retry upload
+              const progressItem = uploadProgress.find(p => p.fileId === fileId);
+              if (progressItem) {
+                // This would need to be implemented based on your retry logic
+                console.log('Retry upload for:', progressItem.fileName);
+              }
+            }}
+          />
+        </div>
       )}
 
       {/* Attached Files Display */}
@@ -213,10 +340,16 @@ export function FileUploadArea({
           <div className="space-y-2">
             <div className="text-2xl">📁</div>
             <p className="text-sm text-muted-foreground">
-              Drop PDF or Excel files here, or click "Attach Files" to browse
+              {useDirectClaudeApi && hasClaudeApiKey
+                ? 'Drop files here, or click "Attach Files" to browse'
+                : 'Drop PDF or Excel files here, or click "Attach Files" to browse'
+              }
             </p>
             <p className="text-xs text-muted-foreground">
-              Supported: .pdf, .xlsx, .xls
+              {useDirectClaudeApi && hasClaudeApiKey
+                ? 'Supported: PDF, Images (JPEG, PNG, GIF, WebP), Text (TXT, CSV, HTML, MD)'
+                : 'Supported: .pdf, .xlsx, .xls'
+              }
             </p>
           </div>
         </div>

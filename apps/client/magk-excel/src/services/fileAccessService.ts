@@ -19,6 +19,20 @@ export interface FileAccessResult {
   error?: string;
 }
 
+export interface TestFileAccessResult {
+  success: boolean;
+  files?: string[];
+  testContent?: Map<string, string>;
+  error?: string;
+}
+
+export interface FileWatchOptions {
+  directory: string;
+  extensions?: string[];
+  recursive?: boolean;
+  debounceMs?: number;
+}
+
 export interface FileContent {
   id: string;
   name: string;
@@ -28,6 +42,9 @@ export interface FileContent {
 }
 
 class FileAccessService {
+  private fileWatchers: Map<string, any> = new Map();
+  private watchCallbacks: Map<string, Array<(files: string[]) => void>> = new Map();
+  
   constructor() {
     // Initialize service
   }
@@ -158,6 +175,21 @@ class FileAccessService {
   }
 
   /**
+   * Add a file to the persistence store
+   */
+  async addFile(file: File, isPersistent: boolean, sessionId: string): Promise<string | null> {
+    try {
+      const store = useFilePersistenceStore.getState();
+      const fileId = await store.addFile(file, isPersistent, sessionId);
+      console.log(`📁 File added to ${isPersistent ? 'persistent' : 'temporary'} storage: ${file.name}`);
+      return fileId;
+    } catch (error) {
+      console.error('Error adding file:', error);
+      return null;
+    }
+  }
+
+  /**
    * Clean up old temporary files (delegated to Electron main process)
    */
   async cleanupTempFiles(olderThanHours: number = 24): Promise<void> {
@@ -168,6 +200,229 @@ class FileAccessService {
       }
     } catch (error) {
       console.error('Error cleaning up temp files:', error);
+    }
+  }
+
+  /**
+   * Discover test files in the testing directory
+   * Integrated with Electron file system APIs for test discovery
+   */
+  async discoverTestFiles(forceRefresh: boolean = false): Promise<TestFileAccessResult> {
+    try {
+      console.log('🔍 Discovering test files via file access service...');
+      
+      // Use enhanced Electron API for directory reading
+      if (window.electronAPI?.readDirectory) {
+        const result = await window.electronAPI.readDirectory('testing');
+        if (result.success && result.files) {
+          // Filter for test files
+          const testFiles = result.files.filter(file => 
+            /\.(html|js|md|xlsx)$/i.test(file) && 
+            (file.includes('test') || file.startsWith('test-'))
+          );
+          
+          // Optionally load content for small files
+          const testContent = new Map<string, string>();
+          if (forceRefresh) {
+            for (const filename of testFiles.slice(0, 10)) { // Limit to first 10 files
+              try {
+                const contentResult = await window.electronAPI.readFile(`testing/${filename}`);
+                if (contentResult.success && contentResult.content) {
+                  testContent.set(filename, contentResult.content);
+                }
+              } catch (error) {
+                console.warn(`Could not read content for ${filename}:`, error);
+              }
+            }
+          }
+          
+          return {
+            success: true,
+            files: testFiles,
+            testContent: testContent.size > 0 ? testContent : undefined
+          };
+        } else {
+          console.warn('Could not read testing directory:', result.error);
+        }
+      }
+      
+      // Fallback for browser environment or when Electron API fails
+      return {
+        success: false,
+        error: 'Electron API not available or failed to read directory'
+      };
+      
+    } catch (error) {
+      console.error('Error discovering test files:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown discovery error'
+      };
+    }
+  }
+
+  /**
+   * Read test file content with enhanced error handling
+   */
+  async readTestFile(filename: string): Promise<{ success: boolean; content?: string; error?: string }> {
+    try {
+      if (window.electronAPI?.readFile) {
+        const result = await window.electronAPI.readFile(`testing/${filename}`);
+        if (result.success && result.content) {
+          return { success: true, content: result.content };
+        } else {
+          return { success: false, error: result.error || 'File not found' };
+        }
+      }
+      
+      return { success: false, error: 'Electron API not available' };
+    } catch (error) {
+      console.error(`Error reading test file ${filename}:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Save test artifact with proper file organization
+   */
+  async saveTestArtifact(testId: string, artifactName: string, content: string, type: string): Promise<string | null> {
+    try {
+      if (window.electronAPI?.saveTestArtifact) {
+        const result = await window.electronAPI.saveTestArtifact({
+          testId,
+          artifactName,
+          content,
+          type
+        });
+        
+        if (result.success && result.path) {
+          console.log(`📁 Test artifact saved: ${result.path}`);
+          return result.path;
+        } else {
+          console.error('Failed to save test artifact:', result.error);
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error saving test artifact:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Watch test directory for file changes
+   */
+  async watchTestFiles(callback: (files: string[]) => void, options: FileWatchOptions = { directory: 'testing' }): Promise<string | null> {
+    try {
+      const watchId = `test-watch-${Date.now()}`;
+      
+      // Store callback for this watcher
+      if (!this.watchCallbacks.has(watchId)) {
+        this.watchCallbacks.set(watchId, []);
+      }
+      this.watchCallbacks.get(watchId)?.push(callback);
+      
+      // Set up periodic polling (since true file watching requires native implementation)
+      const pollInterval = setInterval(async () => {
+        try {
+          const result = await this.discoverTestFiles(true);
+          if (result.success && result.files) {
+            callback(result.files);
+          }
+        } catch (error) {
+          console.warn('Error during test file polling:', error);
+        }
+      }, options.debounceMs || 5000);
+      
+      this.fileWatchers.set(watchId, pollInterval);
+      console.log(`👀 Started watching test files: ${watchId}`);
+      
+      return watchId;
+      
+    } catch (error) {
+      console.error('Error setting up test file watcher:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Stop watching test files
+   */
+  stopWatching(watchId: string): void {
+    try {
+      const watcher = this.fileWatchers.get(watchId);
+      if (watcher) {
+        clearInterval(watcher);
+        this.fileWatchers.delete(watchId);
+        this.watchCallbacks.delete(watchId);
+        console.log(`⏹️ Stopped watching test files: ${watchId}`);
+      }
+    } catch (error) {
+      console.error('Error stopping file watcher:', error);
+    }
+  }
+
+  /**
+   * Get test environment information
+   */
+  async getTestEnvironmentInfo(): Promise<any> {
+    try {
+      if (window.electronAPI?.getTestEnvironmentInfo) {
+        const result = await window.electronAPI.getTestEnvironmentInfo();
+        if (result.success) {
+          return result.info;
+        }
+      }
+      
+      // Fallback environment info
+      return {
+        platform: navigator.platform,
+        userAgent: navigator.userAgent,
+        testingSupported: !!window.electronAPI,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Error getting test environment info:', error);
+      return null;
+    }
+  }
+
+  /**
+   * List test artifacts for a specific test
+   */
+  async listTestArtifacts(testId: string): Promise<any[]> {
+    try {
+      if (window.electronAPI?.listTestArtifacts) {
+        const result = await window.electronAPI.listTestArtifacts(testId);
+        if (result.success) {
+          return result.artifacts || [];
+        }
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error listing test artifacts:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Cleanup resources and watchers
+   */
+  cleanup(): void {
+    try {
+      // Stop all file watchers
+      for (const watchId of this.fileWatchers.keys()) {
+        this.stopWatching(watchId);
+      }
+      
+      console.log('🧹 File access service cleaned up');
+    } catch (error) {
+      console.error('Error during cleanup:', error);
     }
   }
 
@@ -225,6 +480,19 @@ export function useFileAccess() {
     saveToTempStorage: (fileId: string) => fileAccessService.saveToTempStorage(fileId),
     getFileStats: (sessionId: string) => fileAccessService.getFileStats(sessionId),
     formatFileListForChat: (sessionId: string) => fileAccessService.formatFileListForChat(sessionId),
+    
+    // Test-specific methods
+    discoverTestFiles: (forceRefresh?: boolean) => fileAccessService.discoverTestFiles(forceRefresh),
+    readTestFile: (filename: string) => fileAccessService.readTestFile(filename),
+    saveTestArtifact: (testId: string, artifactName: string, content: string, type: string) => 
+      fileAccessService.saveTestArtifact(testId, artifactName, content, type),
+    watchTestFiles: (callback: (files: string[]) => void, options?: FileWatchOptions) => 
+      fileAccessService.watchTestFiles(callback, options),
+    stopWatching: (watchId: string) => fileAccessService.stopWatching(watchId),
+    getTestEnvironmentInfo: () => fileAccessService.getTestEnvironmentInfo(),
+    listTestArtifacts: (testId: string) => fileAccessService.listTestArtifacts(testId),
+    cleanup: () => fileAccessService.cleanup(),
+    
     store
   };
 }

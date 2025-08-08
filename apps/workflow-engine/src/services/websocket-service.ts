@@ -7,6 +7,7 @@ export interface WebSocketMessage {
   nodeId?: string;
   data?: any;
   timestamp: Date;
+  naturalLanguage?: string; // Natural language description of the event
 }
 
 export interface ClientConnection {
@@ -116,8 +117,11 @@ export class WorkflowWebSocketService extends EventEmitter {
    * Broadcast workflow event to subscribed clients
    */
   broadcastWorkflowEvent(workflowId: string, event: WebSocketMessage): void {
+    // Add natural language description if not already present
+    const enhancedEvent = event.naturalLanguage ? event : this.addNaturalLanguageDescription(event);
+    
     const message = {
-      ...event,
+      ...enhancedEvent,
       workflowId,
       timestamp: new Date()
     };
@@ -129,6 +133,105 @@ export class WorkflowWebSocketService extends EventEmitter {
     });
 
     console.log(`📡 Broadcasted ${event.type} to ${this.getSubscriberCount(workflowId)} clients`);
+  }
+
+  /**
+   * Add natural language descriptions to workflow events
+   */
+  private addNaturalLanguageDescription(event: WebSocketMessage): WebSocketMessage {
+    let naturalLanguage = '';
+    
+    switch (event.type) {
+      case 'workflow_start':
+        naturalLanguage = `🚀 Starting workflow execution...`;
+        break;
+      
+      case 'node_start':
+        const nodeType = event.data?.nodeType || event.data?.type || 'processing';
+        naturalLanguage = this.getNodeStartDescription(nodeType, event.data);
+        break;
+      
+      case 'node_progress':
+        naturalLanguage = this.getNodeProgressDescription(event.data);
+        break;
+      
+      case 'node_complete':
+        naturalLanguage = this.getNodeCompleteDescription(event.data);
+        break;
+      
+      case 'node_error':
+        naturalLanguage = `❌ Error occurred: ${event.data?.error || 'Unknown error'}`;
+        break;
+      
+      case 'workflow_complete':
+        naturalLanguage = `✅ Workflow completed successfully! ${event.data?.summary || ''}`;
+        break;
+      
+      case 'workflow_error':
+        naturalLanguage = `❌ Workflow failed: ${event.data?.error || 'Unknown error'}`;
+        break;
+      
+      default:
+        naturalLanguage = `Processing ${event.type}...`;
+    }
+    
+    return {
+      ...event,
+      naturalLanguage
+    };
+  }
+
+  /**
+   * Get natural language description for node start
+   */
+  private getNodeStartDescription(nodeType: string, data: any): string {
+    const descriptions: Record<string, string> = {
+      'web-scraping': `🌐 Starting to scrape data from ${data?.url || 'webpage'}...`,
+      'pdf-extract': `📄 Beginning PDF extraction from ${data?.fileName || 'document'}...`,
+      'api-call': `🔌 Making API call to ${data?.endpoint || 'external service'}...`,
+      'data-transform': `🔄 Transforming data with ${data?.transformations?.length || 0} operations...`,
+      'excel-export': `📊 Preparing Excel export to ${data?.fileName || 'spreadsheet'}...`
+    };
+    
+    return descriptions[nodeType] || `⚙️ Starting ${nodeType} operation...`;
+  }
+
+  /**
+   * Get natural language description for node progress
+   */
+  private getNodeProgressDescription(data: any): string {
+    if (data?.progress !== undefined) {
+      const percentage = Math.round(data.progress * 100);
+      return `⏳ Processing... ${percentage}% complete`;
+    }
+    
+    if (data?.message) {
+      return `⏳ ${data.message}`;
+    }
+    
+    if (data?.itemsProcessed !== undefined && data?.totalItems !== undefined) {
+      return `⏳ Processed ${data.itemsProcessed} of ${data.totalItems} items`;
+    }
+    
+    return `⏳ Operation in progress...`;
+  }
+
+  /**
+   * Get natural language description for node completion
+   */
+  private getNodeCompleteDescription(data: any): string {
+    const nodeType = data?.nodeType || data?.type;
+    const result = data?.result;
+    
+    const descriptions: Record<string, string> = {
+      'web-scraping': `✅ Successfully scraped ${result?.recordCount || 0} records`,
+      'pdf-extract': `✅ Extracted ${result?.pageCount || 0} pages with ${result?.tableCount || 0} tables`,
+      'api-call': `✅ API call completed with status ${result?.status || 200}`,
+      'data-transform': `✅ Transformed ${result?.recordCount || 0} records`,
+      'excel-export': `✅ Excel file created: ${result?.fileName || 'output.xlsx'}`
+    };
+    
+    return descriptions[nodeType] || `✅ ${nodeType || 'Operation'} completed successfully`;
   }
 
   /**

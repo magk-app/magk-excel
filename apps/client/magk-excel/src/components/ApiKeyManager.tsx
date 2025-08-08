@@ -4,18 +4,16 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Alert, AlertDescription } from './ui/alert';
 import { Key, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
+import { loadApiKeys, saveApiKeys, type ApiKeyConfig } from '../utils/apiKeyStorage';
+import { claudeFilesService } from '../services/claude/ClaudeFilesService';
 
-interface ApiKeyConfig {
-  anthropic?: string;
-  openai?: string;
-  firecrawl?: string;
-  [key: string]: string | undefined;
-}
+// ApiKeyConfig is now imported from utils/apiKeyStorage
 
 interface ApiKeyManagerProps {
   isOpen: boolean;
   onClose: () => void;
   requiredKeys: string[];
+  optionalKeys?: string[];
   onKeysSet: (keys: ApiKeyConfig) => void;
 }
 
@@ -37,26 +35,30 @@ const API_KEY_INFO = {
     url: 'https://firecrawl.dev/dashboard',
     envVar: 'FIRECRAWL_API_KEY',
     description: 'Required for web scraping'
+  },
+  smithery: {
+    name: 'Smithery',
+    url: 'https://smithery.ai/dashboard',
+    envVar: 'SMITHERY_API_KEY',
+    description: 'Required for MCP server registry access'
   }
 };
 
-export function ApiKeyManager({ isOpen, onClose, requiredKeys, onKeysSet }: ApiKeyManagerProps) {
+export function ApiKeyManager({ isOpen, onClose, requiredKeys, optionalKeys = [], onKeysSet }: ApiKeyManagerProps) {
   const [apiKeys, setApiKeys] = useState<ApiKeyConfig>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    // Load existing keys from localStorage
-    const savedKeys = localStorage.getItem('magk_api_keys');
-    if (savedKeys) {
-      try {
-        const parsed = JSON.parse(savedKeys);
-        setApiKeys(parsed);
-      } catch (e) {
-        console.error('Failed to parse saved API keys');
-      }
+    // Load existing keys using the utility function
+    const keys = loadApiKeys();
+    setApiKeys(keys);
+    
+    // Notify parent component of loaded keys
+    if (Object.keys(keys).length > 0) {
+      onKeysSet(keys);
     }
-  }, []);
+  }, [onKeysSet]);
 
   const handleKeyChange = (provider: string, value: string) => {
     setApiKeys(prev => ({ ...prev, [provider]: value }));
@@ -67,10 +69,18 @@ export function ApiKeyManager({ isOpen, onClose, requiredKeys, onKeysSet }: ApiK
   const validateAndSave = () => {
     const newErrors: Record<string, string> = {};
     
+    // Only validate required keys, not optional ones
     requiredKeys.forEach(key => {
       if (!apiKeys[key] || apiKeys[key]!.trim() === '') {
         newErrors[key] = 'This API key is required';
       } else if (apiKeys[key]!.length < 20) {
+        newErrors[key] = 'API key seems too short';
+      }
+    });
+    
+    // Validate optional keys only if they are provided
+    optionalKeys.forEach(key => {
+      if (apiKeys[key] && apiKeys[key]!.trim() !== '' && apiKeys[key]!.length < 20) {
         newErrors[key] = 'API key seems too short';
       }
     });
@@ -80,11 +90,13 @@ export function ApiKeyManager({ isOpen, onClose, requiredKeys, onKeysSet }: ApiK
       return;
     }
 
-    // Save to localStorage
-    localStorage.setItem('magk_api_keys', JSON.stringify(apiKeys));
+    // Save using the utility function
+    saveApiKeys(apiKeys);
     
-    // Also save to sessionStorage for immediate use
-    sessionStorage.setItem('magk_api_keys', JSON.stringify(apiKeys));
+    // Set API key for Claude Files Service if anthropic key is provided
+    if (apiKeys.anthropic) {
+      claudeFilesService.setApiKey(apiKeys.anthropic);
+    }
     
     setSaved(true);
     onKeysSet(apiKeys);
@@ -110,50 +122,99 @@ export function ApiKeyManager({ isOpen, onClose, requiredKeys, onKeysSet }: ApiK
             API Key Configuration
           </DialogTitle>
           <DialogDescription>
-            {missingKeys.length > 0 
-              ? `Please configure the following API keys to continue:`
+            {requiredKeys.length > 0 
+              ? `Please configure at least the required API keys to continue. Optional keys can be added later.`
               : 'Manage your API keys for various services'
             }
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 my-4">
-          {requiredKeys.map(key => {
-            const info = API_KEY_INFO[key as keyof typeof API_KEY_INFO];
-            if (!info) return null;
+          {/* Required Keys */}
+          {requiredKeys.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-gray-700">Required API Keys</h3>
+              {requiredKeys.map(key => {
+                const info = API_KEY_INFO[key as keyof typeof API_KEY_INFO];
+                if (!info) return null;
 
-            return (
-              <div key={key} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">
-                    {info.name}
-                  </label>
-                  <a
-                    href={info.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                  >
-                    Get API Key
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-                <Input
-                  type="password"
-                  placeholder={`Enter your ${info.name} API key`}
-                  value={apiKeys[key] || ''}
-                  onChange={(e) => handleKeyChange(key, e.target.value)}
-                  className={errors[key] ? 'border-red-500' : ''}
-                />
-                {errors[key] && (
-                  <p className="text-xs text-red-500">{errors[key]}</p>
-                )}
-                <p className="text-xs text-gray-500">
-                  {info.description} • Environment variable: {info.envVar}
-                </p>
-              </div>
-            );
-          })}
+                return (
+                  <div key={key} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">
+                        {info.name} <span className="text-red-500">*</span>
+                      </label>
+                      <a
+                        href={info.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                      >
+                        Get API Key
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                    <Input
+                      type="password"
+                      placeholder={`Enter your ${info.name} API key`}
+                      value={apiKeys[key] || ''}
+                      onChange={(e) => handleKeyChange(key, e.target.value)}
+                      className={errors[key] ? 'border-red-500' : ''}
+                    />
+                    {errors[key] && (
+                      <p className="text-xs text-red-500">{errors[key]}</p>
+                    )}
+                    <p className="text-xs text-gray-500">
+                      {info.description} • Environment variable: {info.envVar}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          
+          {/* Optional Keys */}
+          {optionalKeys.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-gray-700">Optional API Keys</h3>
+              {optionalKeys.map(key => {
+                const info = API_KEY_INFO[key as keyof typeof API_KEY_INFO];
+                if (!info) return null;
+
+                return (
+                  <div key={key} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">
+                        {info.name} <span className="text-gray-400">(Optional)</span>
+                      </label>
+                      <a
+                        href={info.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                      >
+                        Get API Key
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                    <Input
+                      type="password"
+                      placeholder={`Enter your ${info.name} API key (optional)`}
+                      value={apiKeys[key] || ''}
+                      onChange={(e) => handleKeyChange(key, e.target.value)}
+                      className={errors[key] ? 'border-red-500' : ''}
+                    />
+                    {errors[key] && (
+                      <p className="text-xs text-red-500">{errors[key]}</p>
+                    )}
+                    <p className="text-xs text-gray-500">
+                      {info.description} • Environment variable: {info.envVar}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {missingKeys.length > 0 && (
@@ -194,16 +255,9 @@ export function useApiKeys() {
   const [missingKeys, setMissingKeys] = useState<string[]>([]);
 
   useEffect(() => {
-    // Load from localStorage
-    const saved = localStorage.getItem('magk_api_keys');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setApiKeys(parsed);
-      } catch (e) {
-        console.error('Failed to load API keys');
-      }
-    }
+    // Load from storage using the utility function
+    const keys = loadApiKeys();
+    setApiKeys(keys);
   }, []);
 
   const checkRequiredKeys = useCallback((required: string[]): string[] => {
@@ -214,7 +268,12 @@ export function useApiKeys() {
 
   const updateApiKeys = useCallback((keys: ApiKeyConfig) => {
     setApiKeys(keys);
-    localStorage.setItem('magk_api_keys', JSON.stringify(keys));
+    saveApiKeys(keys);
+    
+    // Set API key for Claude Files Service if anthropic key is provided
+    if (keys.anthropic) {
+      claudeFilesService.setApiKey(keys.anthropic);
+    }
   }, []);
 
   return {

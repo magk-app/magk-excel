@@ -2,6 +2,7 @@ import React, { memo, useState } from 'react';
 import { Button } from './ui/button';
 import { Send, Paperclip, X } from 'lucide-react';
 import { FileAttachment } from '../hooks/useFileUpload';
+import { FileUploadArea } from './FileUploadArea';
 
 interface ChatInputAreaProps {
   attachments: FileAttachment[];
@@ -10,6 +11,9 @@ interface ChatInputAreaProps {
   maxFiles?: number;
   maxFileSize?: number;
   disabled?: boolean;
+  useDirectClaudeApi?: boolean;
+  onDirectClaudeApiChange?: (enabled: boolean) => void;
+  onFileUploadProgress?: (fileId: string, progress: any) => void;
 }
 
 export const ChatInputArea = memo(function ChatInputArea({
@@ -18,7 +22,10 @@ export const ChatInputArea = memo(function ChatInputArea({
   onSendMessage,
   maxFiles = 5,
   maxFileSize = 50 * 1024 * 1024,
-  disabled = false
+  disabled = false,
+  useDirectClaudeApi = false,
+  onDirectClaudeApiChange,
+  onFileUploadProgress
 }: ChatInputAreaProps) {
   const [message, setMessage] = useState('');
 
@@ -49,80 +56,43 @@ export const ChatInputArea = memo(function ChatInputArea({
   };
 
   return (
-    <div className="border-t p-4 bg-background">
-      {/* Attachments Display */}
-      {attachments.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          {attachments.map((attachment, index) => (
-            <div
-              key={attachment.id}
-              className="flex items-center gap-1 bg-muted px-2 py-1 rounded-md text-sm"
-            >
-              <Paperclip className="h-3 w-3" />
-              <span className="truncate max-w-32">{attachment.name || attachment.file?.name || 'Unknown file'}</span>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                onClick={() => removeAttachment(index)}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="border-t bg-background">
+      {/* File Upload Area - Integrated */}
+      <FileUploadArea
+        attachments={attachments}
+        onAttachmentsChange={onAttachmentsChange}
+        maxFiles={maxFiles}
+        maxFileSize={maxFileSize}
+        useDirectClaudeApi={useDirectClaudeApi}
+        onDirectClaudeApiChange={onDirectClaudeApiChange}
+        onFileUploadProgress={onFileUploadProgress}
+      />
+      
+      {/* Message Input Area */}
+      <div className="p-4">
+        <div className="flex gap-2">
+          {/* Text Input */}
+          <div className="flex-1">
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={handleKeyPress}
+              placeholder="Ask me to create Excel files, extract data from PDFs, or scrape websites..."
+              className="w-full min-h-[40px] max-h-32 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={disabled}
+              rows={1}
+            />
+          </div>
 
-      {/* Input Area */}
-      <div className="flex gap-2">
-        {/* File Upload Button */}
-        <div className="relative">
-          <input
-            type="file"
-            multiple
-            onChange={handleFileChange}
-            className="hidden"
-            id="file-upload"
-            accept=".xlsx,.xls,.pdf,.csv,.txt"
-            disabled={attachments.length >= maxFiles}
-          />
-          <label htmlFor="file-upload">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              disabled={disabled || attachments.length >= maxFiles}
-              className="cursor-pointer"
-              asChild
-            >
-              <div>
-                <Paperclip className="h-4 w-4" />
-              </div>
-            </Button>
-          </label>
+          {/* Send Button */}
+          <Button
+            onClick={handleSend}
+            disabled={disabled || !message.trim()}
+            size="icon"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
         </div>
-
-        {/* Text Input */}
-        <div className="flex-1">
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={handleKeyPress}
-            placeholder="Ask me to create Excel files, extract data from PDFs, or scrape websites..."
-            className="w-full min-h-[40px] max-h-32 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={disabled}
-            rows={1}
-          />
-        </div>
-
-        {/* Send Button */}
-        <Button
-          onClick={handleSend}
-          disabled={disabled || !message.trim()}
-          size="icon"
-        >
-          <Send className="h-4 w-4" />
-        </Button>
       </div>
     </div>
   );

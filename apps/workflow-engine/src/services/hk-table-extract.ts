@@ -28,7 +28,7 @@ export class HKTableExtractService {
   /**
    * Initialize the browser instance
    */
-  private async initBrowser(): Promise<Browser> {
+  async initBrowser(): Promise<Browser> {
     if (!this.browser) {
       console.log('🚀 Initializing Playwright browser...');
       this.browser = await chromium.launch({
@@ -122,7 +122,7 @@ export class HKTableExtractService {
    * Extract Immigration Clearance statistics table data (legacy web scraping method)
    * Targets the specific table with columns: 2023 (Million), 2024 (Million)
    */
-  private async extractImmigrationClearanceData(page: Page): Promise<TableData> {
+  async extractImmigrationClearanceData(page: Page): Promise<TableData> {
     const tableData = await page.evaluate(() => {
       // Find table containing "Statistics on Immigration Clearance" or similar headers
       const tables = Array.from(document.querySelectorAll('table'));
@@ -160,7 +160,7 @@ export class HKTableExtractService {
 
         const allRows: string[][] = [];
         
-        rows.forEach((row, index) => {
+        rows.forEach((row) => {
           const cells = Array.from(row.querySelectorAll('th, td'));
           const rowData = cells.map(cell => cell.textContent?.trim() || '');
           
@@ -206,7 +206,7 @@ export class HKTableExtractService {
   /**
    * Extract table data from the page (legacy method for compatibility)
    */
-  private async extractTableData(page: Page): Promise<TableData> {
+  async extractTableData(page: Page): Promise<TableData> {
     const tableData = await page.evaluate(() => {
       // Find table containing "Control Point" in header
       const tables = Array.from(document.querySelectorAll('table'));
@@ -299,7 +299,7 @@ export class HKTableExtractService {
   /**
    * Process and structure the table data similar to Python script (legacy method)
    */
-  private processTableData(tableData: TableData): { headers: string[][], data: string[][] } {
+  processTableData(tableData: TableData): { headers: string[][], data: string[][] } {
     const { headers, rows } = tableData;
     
     // Manual header adjustment (equivalent to Python script lines 48-51)

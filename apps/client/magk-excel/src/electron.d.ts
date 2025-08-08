@@ -54,11 +54,126 @@ export interface MCPAPI {
   getSmitheryServers(): Promise<Record<string, MCPServerConfig>>;
 }
 
+export interface PersistentFileInfo {
+  name: string;
+  size: number;
+  modified: Date;
+  path: string;
+}
+
+export interface FoundFileInfo {
+  path: string;
+  size: number;
+  modified: Date;
+}
+
+export interface DownloadOptions {
+  defaultPath?: string;
+  showDialog?: boolean;
+  autoSave?: boolean;
+}
+
+export interface DownloadFromContentOptions {
+  content: string | Buffer;
+  fileName: string;
+  mimeType?: string;
+  encoding?: 'base64' | 'utf8' | 'binary';
+  autoSave?: boolean;
+}
+
+export interface DownloadResult {
+  success: boolean;
+  savedPath?: string;
+  fileName?: string;
+  error?: string;
+}
+
+export interface TestArtifactInfo {
+  name: string;
+  path: string;
+  size: number;
+  modified: Date;
+  type: string;
+}
+
+export interface TestEnvironmentInfo {
+  platform: string;
+  arch: string;
+  nodeVersion: string;
+  electronVersion: string;
+  chromeVersion: string;
+  appDataDir: string;
+  testingDir: string;
+  artifactsDir: string;
+  tempDir: string;
+  availableMemory: number;
+  totalMemory: number;
+}
+
+export interface TestFileWatchOptions {
+  directory: string;
+  extensions?: string[];
+  recursive?: boolean;
+  debounceMs?: number;
+}
+
+export interface TestDiscoveryResult {
+  success: boolean;
+  files?: string[];
+  testContent?: { [filename: string]: string };
+  error?: string;
+}
+
 export interface FileAPI {
-  downloadFile(filePath: string): Promise<{ success: boolean; savedPath?: string; error?: string }>;
+  downloadFile(filePath: string, options?: DownloadOptions): Promise<DownloadResult>;
+  downloadFromContent(options: DownloadFromContentOptions): Promise<DownloadResult>;
   openFile(filePath: string): Promise<{ success: boolean; error?: string }>;
   showInFolder(filePath: string): Promise<{ success: boolean; error?: string }>;
   getExcelDirectory(): Promise<string>;
+  
+  // Persistent file operations
+  getAppDataDirectory(): Promise<string>;
+  writePersistentFile(fileName: string, content: string, subDir?: string): Promise<{ success: boolean; filePath?: string; error?: string }>;
+  readPersistentFile(fileName: string, subDir?: string): Promise<{ success: boolean; content?: string; error?: string }>;
+  listPersistentFiles(subDir?: string): Promise<{ success: boolean; files?: PersistentFileInfo[]; error?: string }>;
+  deletePersistentFile(fileName: string, subDir?: string): Promise<{ success: boolean; error?: string }>;
+  
+  // Temporary file operations
+  saveTempFile(params: { fileId: string, fileName: string, content: string }): Promise<{ success: boolean; tempFilePath?: string; error?: string }>;
+  cleanupTempFiles(olderThanHours?: number): Promise<{ success: boolean; cleaned?: number; error?: string }>;
+  findFileByName(fileName: string): Promise<{ success: boolean; files?: FoundFileInfo[]; error?: string }>;
+  
+  // Directory operations (for test discovery)
+  readDirectory(dirPath: string): Promise<{ success: boolean; files?: string[]; error?: string }>;
+  readFile(filePath: string): Promise<{ success: boolean; content?: string; error?: string }>;
+  
+  // Enhanced test discovery operations
+  discoverTestFiles(options?: { forceRefresh?: boolean; loadContent?: boolean }): Promise<TestDiscoveryResult>;
+  watchTestFiles(options: TestFileWatchOptions): Promise<{ success: boolean; watchId?: string; error?: string }>;
+  stopWatchingFiles(watchId: string): Promise<{ success: boolean; error?: string }>;
+  
+  // Test Executor APIs
+  saveTestArtifact(params: { 
+    testId: string; 
+    artifactName: string; 
+    content: string; 
+    type: string; 
+  }): Promise<{ success: boolean; path?: string; error?: string }>;
+  listTestArtifacts(testId: string): Promise<{ 
+    success: boolean; 
+    artifacts?: TestArtifactInfo[]; 
+    error?: string; 
+  }>;
+  cleanupTestArtifacts(testId?: string): Promise<{ success: boolean; error?: string }>;
+  getTestEnvironmentInfo(): Promise<{ 
+    success: boolean; 
+    info?: TestEnvironmentInfo; 
+    error?: string; 
+  }>;
+  
+  // File system integration helpers
+  validateTestEnvironment(): Promise<{ success: boolean; issues?: string[]; recommendations?: string[] }>;
+  optimizeTestFileAccess(): Promise<{ success: boolean; optimizations?: string[]; error?: string }>;
 }
 
 declare global {
@@ -66,5 +181,6 @@ declare global {
     ipcRenderer: IpcRenderer;
     mcpAPI: MCPAPI;
     fileAPI: FileAPI;
+    electronAPI?: FileAPI; // Alias for backward compatibility
   }
 }

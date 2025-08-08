@@ -1,10 +1,12 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { LLMService } from '../services/llm-service.js';
+import { WorkflowGenerator } from '../services/workflow-generator.js';
 import { rateLimiter } from '../middleware/rateLimiter.js';
 
 const chatRoute = new Hono();
 const llmService = new LLMService();
+const workflowGenerator = new WorkflowGenerator();
 
 // Intelligent MCP tool selection using LLM
 async function selectMCPToolsWithAI(message: string, mcpTools: any[], llmService: LLMService, uploadedFiles: any[] = []): Promise<any[]> {
@@ -36,6 +38,9 @@ For Excel data extraction/processing, use:
 - excel/excel_write_to_sheet (save to: ${outputPath})
 - excel/excel_read_sheet (read existing files)
 - excel/excel_describe_sheets (get sheet info)
+ 
+For dynamic code execution with ExcelJS, use:
+- executor/run_ts (provide a module exporting async function main(ctx) and return JSON)
 
 For web scraping, use: fetch/fetch or puppeteer/navigate
 For HTTP requests, use: fetch/fetch
@@ -175,8 +180,7 @@ chatRoute.post('/chat', async (c) => {
     let mcpTools: any[];
     let mcpServers: any;
     let uploadedFiles: any[] = [];
-    let model: string = 'claude-3-5-sonnet-20241022';
-    let enableThinking: boolean = true;
+    // Note: model and enableThinking are configured via modelConfig; avoid unused locals
     let modelConfig: any = {};
 
     // Check if request is multipart/form-data (file upload) or JSON
@@ -291,6 +295,12 @@ chatRoute.post('/chat', async (c) => {
     console.log(`🛠️ Available MCP tools: ${mcpTools.length}`, mcpTools);
     console.log(`🖥️ MCP servers:`, Object.keys(mcpServers), mcpServers);
     console.log(`📁 Uploaded files: ${uploadedFiles.length}`);
+
+    // Check if message indicates workflow generation intent
+    const workflowKeywords = ['workflow', 'automate', 'extract and save', 'process', 'scrape and export', 'convert', 'export to excel', 'build a workflow', 'create workflow'];
+    const shouldGenerateWorkflow = workflowKeywords.some(keyword => 
+      message.toLowerCase().includes(keyword)
+    );
 
     // Use AI to intelligently select MCP tools, with fallback to pattern matching
     console.log('🤖 Using AI to select appropriate MCP tools...');
@@ -413,8 +423,38 @@ chatRoute.post('/chat', async (c) => {
     
     console.log('📊 Final tool calls selected:', mcpToolCalls.length, mcpToolCalls);
     
+    // Generate workflow if needed
+    let workflowGenerated = null;
+    if (shouldGenerateWorkflow) {
+      console.log('🎯 Generating workflow from message...');
+      try {
+        const workflow = await workflowGenerator.generateFromChat(message, mcpTools);
+        
+        if (workflowGenerator.validateWorkflow(workflow)) {
+          workflowGenerated = {
+            id: workflow.id,
+            name: workflow.name,
+            description: workflow.description,
+            nodes: workflow.nodes,
+            edges: workflow.edges,
+            metadata: workflow.metadata,
+            naturalLanguageDescription: `I've created a workflow "${workflow.name}" with ${workflow.nodes.length} steps: ${workflow.nodes.map((n: any) => n.label).join(' → ')}`
+          };
+          console.log('✅ Workflow generated successfully:', workflow.name);
+        }
+      } catch (error) {
+        console.error('❌ Workflow generation failed:', error);
+      }
+    }
+
     // Generate response with MCP context and selected tools
-    const systemPrompt = generateMCPSystemPrompt(mcpTools, mcpServers, mcpToolCalls);
+    let systemPrompt = generateMCPSystemPrompt(mcpTools, mcpServers, mcpToolCalls);
+    
+    // Add workflow context to system prompt if workflow was generated
+    if (workflowGenerated) {
+      systemPrompt = systemPrompt + `\n\nI've generated a workflow for you: ${workflowGenerated.naturalLanguageDescription}\nThe workflow is ready to be executed in the workflow canvas.`;
+    }
+    
     const llmResult = await llmService.chatWithSystem(systemPrompt, message, history, modelConfig);
 
     // AI has already determined if tools are needed
@@ -448,13 +488,20 @@ chatRoute.post('/chat', async (c) => {
       enhancedResponse += `\n\n*Files are saved to the downloads folder and can be accessed directly.*`;
     }
 
+    // Add workflow to response if generated
+    const finalResponse = workflowGenerated 
+      ? `${enhancedResponse}\n\n🎯 **Workflow Generated:** ${workflowGenerated.naturalLanguageDescription}`
+      : enhancedResponse;
+
     return c.json({
-      response: enhancedResponse,
+      response: finalResponse,
       thinking: llmResult.thinking,
+      isMock: llmResult.isMock,
       status: 'success',
       mcpToolCalls: shouldUseMCP ? mcpToolCalls : [],
       downloadLinks: downloadLinks,
-      summary: shouldUseMCP ? `I'll use the available MCP tools to help you with this request.` : undefined
+      summary: shouldUseMCP ? `I'll use the available MCP tools to help you with this request.` : undefined,
+      workflowGenerated: workflowGenerated
       // Later we'll add: action, workflowId, requiresConfirmation
     });
 

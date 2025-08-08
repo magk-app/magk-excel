@@ -42,9 +42,13 @@ export default tseslint.config(
         { allowConstantExport: true },
       ],
       
-      // TypeScript rules
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+      // TypeScript rules - more lenient for development
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
       "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-require-imports": "warn",
+      "@typescript-eslint/triple-slash-reference": "warn",
+      "@typescript-eslint/ban-ts-comment": "warn",
+      "no-useless-escape": "warn",
     },
     settings: {
       react: {

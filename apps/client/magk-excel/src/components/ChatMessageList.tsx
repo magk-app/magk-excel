@@ -86,6 +86,9 @@ export const ChatMessageList = memo(function ChatMessageList({
                     isError={message.isError}
                     role={message.role}
                     mcpToolCalls={message.mcpToolCalls}
+                    thinking={message.thinking}
+                    thinkingHistory={message.thinkingHistory}
+                    isMock={(message as any).isMock}
                   />
                 )}
                 <div className={`text-xs mt-2 opacity-70 ${

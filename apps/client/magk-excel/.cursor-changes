@@ -1,0 +1,10 @@
+Excel runtime fixes (v0.1.0)
+- Before: `apps/client/magk-excel/src/services/excel/ExcelService.ts` only supported writes via `window.fileAPI` (renderer). Calls from Electron main/Node (e.g., MCP manager) returned an error and did not write Excel files.
+- After: Added Node/Electron-main fallback paths. `readExcel`, `writeExcel`, `formatExcel`, and `calculateExcel` now use direct disk I/O when `fileAPI` is unavailable. Impact: Excel MCP tools can create/read/write files when invoked from Electron main.
+
+React import corrections (v0.1.0)
+- Before: `ExcelDownloadHandler*.tsx` imported default React, causing TS errors with the project's React typings.
+- After: Switched to named hooks import (`useEffect`, `useState`) without default import. Impact: Eliminates linter/TS errors; component compiles.
+
+Version bump: 0.0.0 → 0.1.0
+

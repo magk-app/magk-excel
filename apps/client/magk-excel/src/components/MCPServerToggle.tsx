@@ -97,7 +97,7 @@ export function MCPServerToggle({ enabledServers: propEnabledServers }: MCPServe
           Enable AI-powered tools for Excel, PDF extraction, and web scraping. Browse the Smithery registry to discover more servers.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 max-h-[400px] overflow-y-auto">
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />

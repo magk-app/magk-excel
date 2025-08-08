@@ -1,8 +1,109 @@
-# Real-time Connection Services
+# MAGK Excel Services
 
-This directory contains robust real-time connection services for the MAGK Excel application, providing WebSocket and EventSource connectivity with comprehensive error handling and automatic reconnection.
+This directory contains comprehensive services for the MAGK Excel application, including real-time connections, test discovery, and file management capabilities.
 
-## Overview
+## Service Overview
+
+### 🔍 Test Discovery Service
+Comprehensive test file discovery and management system for the developer test panel. Automatically discovers, categorizes, and manages all test files with advanced search and filtering capabilities.
+
+### 🔄 Real-time Connection Services
+Robust real-time connection services providing WebSocket and EventSource connectivity with comprehensive error handling and automatic reconnection.
+
+---
+
+## 🔍 Test Discovery Service
+
+The TestDiscoveryService provides comprehensive test file discovery and management for the MAGK Excel developer test panel. It automatically discovers, categorizes, and manages all test files in the `testing/` directory with advanced metadata extraction, search capabilities, and real-time monitoring.
+
+### Key Features
+
+- **🔍 Automatic Discovery**: Scans all test files with smart metadata extraction
+- **📊 Smart Categorization**: Automatically categorizes tests by functionality (Chat, Excel, MCP, Workflow, etc.)
+- **🔍 Advanced Search**: Full-text search with filtering by category, type, status, and tags
+- **📈 Comprehensive Metadata**: Test complexity, status, dependencies, and more
+- **⚡ Real-time Monitoring**: Hot reload capability for development
+- **🚀 Performance Optimized**: Caching and intelligent discovery
+
+### Quick Start
+
+```typescript
+import { useTestDiscovery } from '../services/testDiscoveryService';
+
+function TestPanel() {
+  const testDiscovery = useTestDiscovery();
+  const [tests, setTests] = useState([]);
+  
+  useEffect(() => {
+    testDiscovery.discoverTestFiles().then(result => {
+      if (result.success) {
+        setTests(result.tests);
+      }
+    });
+  }, []);
+  
+  return (
+    <div>
+      {tests.map(test => (
+        <div key={test.id}>
+          {test.category.icon} {test.name} - {test.metadata.complexity}
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+### Search & Filtering
+
+```typescript
+// Advanced search with multiple filters
+const searchResults = await testDiscovery.searchTests({
+  query: 'excel processing',      // Full-text search
+  category: 'excel',              // Filter by category
+  type: 'html',                   // Filter by file type  
+  status: 'active',               // Filter by test status
+  tags: ['api', 'integration'],   // Filter by tags
+  sortBy: 'complexity',           // Sort by field
+  sortOrder: 'desc'              // Sort direction
+});
+```
+
+### Test Categories
+
+- **💬 Chat & Communication** - Chat API, messaging, communication tests
+- **📊 Excel Processing** - Excel file handling, data processing, exports  
+- **🔌 MCP Integration** - Model Context Protocol server integration
+- **⚡ Workflow Engine** - Workflow creation, execution, management
+- **📁 File Management** - File upload, persistence, processing
+- **💾 Data Persistence** - Storage, retrieval, state management
+- **🎨 User Interface** - UI components, interactions, user flows
+- **🔗 System Integration** - End-to-end integration tests
+- **🌐 API Testing** - API endpoints, requests, responses
+- **🔨 Smithery Integration** - Smithery server browser and installation
+
+### API Methods
+
+```typescript
+// Core discovery
+await testDiscoveryService.discoverTestFiles(forceRefresh?: boolean)
+await testDiscoveryService.listAllTests()
+await testDiscoveryService.getTestsByCategory(categoryId: string)
+
+// Search & filter  
+await testDiscoveryService.searchTests(options: TestSearchOptions)
+await testDiscoveryService.getTestDetails(testId: string)
+
+// Utilities
+testDiscoveryService.getCategories()
+testDiscoveryService.getStats()
+testDiscoveryService.enableHotReload()
+testDiscoveryService.refresh()
+```
+
+---
+
+## 🔄 Real-time Connection Services
 
 The real-time services consist of three main components:
 

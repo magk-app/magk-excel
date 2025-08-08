@@ -569,25 +569,7 @@ export const WorkflowBlockLibrary: React.FC<WorkflowBlockLibraryProps> = ({
     });
   }, [searchQuery, selectedCategory]);
 
-  // Group blocks by category
-  const groupedBlocks = useMemo(() => {
-    const groups: Record<BlockCategory, WorkflowBlock[]> = {
-      mcp: [],
-      api: [],
-      llm: [],
-      file: [],
-      data: [],
-      logic: [],
-      output: [],
-      all: []
-    };
 
-    filteredBlocks.forEach(block => {
-      groups[block.category].push(block);
-    });
-
-    return groups;
-  }, [filteredBlocks]);
 
   // Get category stats
   const categoryStats = useMemo(() => {
@@ -810,7 +792,7 @@ export const WorkflowBlockLibrary: React.FC<WorkflowBlockLibraryProps> = ({
       </div>
 
       {/* Category Tabs */}
-      <Tabs value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as BlockCategory)} className="flex-1 flex flex-col">
+      <Tabs value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as BlockCategory)} className="flex-1 flex flex-col overflow-hidden">
         <TabsList className="grid grid-cols-8 w-full rounded-none border-b h-auto p-0">
           {(['all', 'mcp', 'api', 'llm', 'file', 'data', 'logic', 'output'] as BlockCategory[]).map(category => (
             <TabsTrigger
@@ -829,9 +811,9 @@ export const WorkflowBlockLibrary: React.FC<WorkflowBlockLibraryProps> = ({
           ))}
         </TabsList>
 
-        <TabsContent value={selectedCategory} className="flex-1 mt-0">
-          <ScrollArea className="h-full">
-            <div className="p-4">
+        <TabsContent value={selectedCategory} className="flex-1 mt-0 overflow-hidden">
+          <ScrollArea className="h-full w-full">
+            <div className="p-4 min-h-0">
               {filteredBlocks.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />

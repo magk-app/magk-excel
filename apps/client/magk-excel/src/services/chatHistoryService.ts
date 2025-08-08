@@ -12,7 +12,22 @@ export interface ChatMessage {
   isStreaming?: boolean;
   isError?: boolean;
   isComplete?: boolean;
+  // Indicates the message content is a backend mock response (no live model)
+  isMock?: boolean;
   thoughts?: string[];
+  
+  // Extended thinking tokens support (Claude 4)
+  thinking?: {
+    content: string;
+    tokenCount?: number;
+    isStreaming?: boolean;
+    isComplete?: boolean;
+  };
+  thinkingHistory?: {
+    content: string;
+    tokenCount?: number;
+    timestamp: number;
+  }[];
   
   // File attachments
   attachments?: {

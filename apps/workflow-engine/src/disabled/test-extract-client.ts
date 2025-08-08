@@ -151,6 +151,7 @@ async function downloadExcelFile(request: ExtractRequest): Promise<void> {
 }
 
 // Helper function to demonstrate error handling
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function testErrorHandling() {
   console.log('\n🔧 Testing error handling...');
   
@@ -160,7 +161,7 @@ async function testErrorHandling() {
       date: 'invalid-date'
     });
   } catch (error) {
-    console.log('✅ Error handling working correctly:', error.message);
+    console.log('✅ Error handling working correctly:', error instanceof Error ? error.message : 'Unknown error');}
   }
 }
 
