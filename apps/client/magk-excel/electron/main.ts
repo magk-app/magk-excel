@@ -261,7 +261,7 @@ function createWindow() {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           "default-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-          "connect-src 'self' ws: wss: https: data:; " +
+          "connect-src 'self' ws: wss: https: data: http://localhost:*; " +
           "img-src 'self' data: https:; " +
           "media-src 'self' data:; " +
           "font-src 'self' data:;"
