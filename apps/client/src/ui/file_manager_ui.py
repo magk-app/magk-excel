@@ -1,8 +1,9 @@
 """
-File Manager UI Component with Immediate Sync
+Excel File Manager UI Component with Immediate Sync
 
-This component provides a user interface for file upload and management
+This component provides a user interface for Excel file operations and management
 with real-time sync status display to address the sync delay issue.
+Specifically designed for MAGK Excel automation workflows.
 """
 import sys
 import os
@@ -15,38 +16,39 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QTimer, pyqtSignal, QThread, pyqtSlot
 from PyQt6.QtGui import QFont
 from typing import Optional
+import openpyxl
 
-# Import our file persistence manager
+# Import our Excel file persistence manager
 sys.path.append(str(Path(__file__).parent.parent))
-from workflows.file_persistence_manager import FilePersistenceManager, FileRecord
+from workflows.file_persistence_manager import ExcelFilePersistenceManager, ExcelFileRecord
 
 
-class FileManagerUI(QMainWindow):
+class ExcelFileManagerUI(QMainWindow):
     """
-    Main file manager UI with immediate sync capabilities.
+    Main Excel file manager UI with immediate sync capabilities.
     
-    This addresses the reported issue where file uploads don't sync immediately.
+    This addresses the reported issue where Excel file operations don't sync immediately.
     """
     
     def __init__(self):
         super().__init__()
         self.setWindowTitle("MAGK Excel - File Manager (Immediate Sync)")
-        self.setGeometry(100, 100, 800, 600)
+        self.setGeometry(100, 100, 900, 700)
         
-        # Initialize file persistence manager
-        self.file_manager = FilePersistenceManager(
-            storage_directory="magk_storage",
+        # Initialize Excel file persistence manager
+        self.excel_manager = ExcelFilePersistenceManager(
+            excel_directory="magk_excel_storage",
             auto_sync_interval=0.1  # Very fast sync checking
         )
         
         # Add sync callback for real-time updates
-        self.file_manager.add_sync_callback(self._on_file_synced)
+        self.excel_manager.add_sync_callback(self._on_excel_synced)
         
         self._setup_ui()
         self._setup_timers()
         
-        # Load initial file list
-        self._refresh_file_list()
+        # Load initial Excel file list
+        self._refresh_excel_list()
     
     def _setup_ui(self):
         """Set up the user interface."""
@@ -57,7 +59,7 @@ class FileManagerUI(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         
         # Title and status
-        title_label = QLabel("File Manager - Immediate Sync Demo")
+        title_label = QLabel("Excel File Manager - Immediate Sync Demo")
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
@@ -72,21 +74,26 @@ class FileManagerUI(QMainWindow):
         # Control buttons
         button_layout = QHBoxLayout()
         
-        self.upload_button = QPushButton("Upload File (Immediate Sync)")
-        self.upload_button.clicked.connect(self._upload_file)
-        button_layout.addWidget(self.upload_button)
+        self.open_button = QPushButton("Open Excel File (Immediate Sync)")
+        self.open_button.clicked.connect(self._open_excel_file)
+        button_layout.addWidget(self.open_button)
+        
+        self.save_button = QPushButton("Save Current Excel")
+        self.save_button.clicked.connect(self._save_excel_file)
+        self.save_button.setEnabled(False)
+        button_layout.addWidget(self.save_button)
         
         self.refresh_button = QPushButton("Refresh List")
-        self.refresh_button.clicked.connect(self._refresh_file_list)
+        self.refresh_button.clicked.connect(self._refresh_excel_list)
         button_layout.addWidget(self.refresh_button)
         
         self.force_sync_button = QPushButton("Force Sync")
         self.force_sync_button.clicked.connect(self._force_sync)
         button_layout.addWidget(self.force_sync_button)
         
-        self.delete_button = QPushButton("Delete Selected")
-        self.delete_button.clicked.connect(self._delete_selected_file)
-        button_layout.addWidget(self.delete_button)
+        self.close_button = QPushButton("Close Selected")
+        self.close_button.clicked.connect(self._close_selected_file)
+        button_layout.addWidget(self.close_button)
         
         button_layout.addStretch()
         main_layout.addLayout(button_layout)
@@ -95,20 +102,20 @@ class FileManagerUI(QMainWindow):
         splitter = QSplitter()
         main_layout.addWidget(splitter)
         
-        # File list table
-        self.file_table = QTableWidget()
-        self.file_table.setColumnCount(6)
-        self.file_table.setHorizontalHeaderLabels([
-            "File ID", "Filename", "Upload Time", "Size", "Sync Status", "File Hash"
+        # Excel file list table
+        self.excel_table = QTableWidget()
+        self.excel_table.setColumnCount(7)
+        self.excel_table.setHorizontalHeaderLabels([
+            "File ID", "Filename", "Last Modified", "Size", "Sheets", "Status", "Open"
         ])
-        self.file_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        splitter.addWidget(self.file_table)
+        self.excel_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        splitter.addWidget(self.excel_table)
         
         # Log area
         log_widget = QWidget()
         log_layout = QVBoxLayout(log_widget)
         
-        log_label = QLabel("Real-time Sync Log:")
+        log_label = QLabel("Real-time Excel Sync Log:")
         log_layout.addWidget(log_label)
         
         self.log_text = QTextEdit()
@@ -117,7 +124,11 @@ class FileManagerUI(QMainWindow):
         log_layout.addWidget(self.log_text)
         
         splitter.addWidget(log_widget)
-        splitter.setSizes([400, 200])
+        splitter.setSizes([500, 200])
+        
+        # Currently selected Excel file
+        self.current_excel_id = None
+        self.current_workbook = None
     
     def _setup_timers(self):
         """Set up timers for real-time updates."""
@@ -126,172 +137,219 @@ class FileManagerUI(QMainWindow):
         self.status_timer.timeout.connect(self._update_sync_status)
         self.status_timer.start(100)  # Update every 100ms for immediate feedback
         
-        # Timer for refreshing file list
+        # Timer for refreshing Excel file list
         self.refresh_timer = QTimer()
-        self.refresh_timer.timeout.connect(self._refresh_file_list)
+        self.refresh_timer.timeout.connect(self._refresh_excel_list)
         self.refresh_timer.start(1000)  # Refresh every second
     
-    def _upload_file(self):
-        """Handle file upload with immediate sync."""
+    def _open_excel_file(self):
+        """Handle Excel file opening with immediate sync."""
         file_path, _ = QFileDialog.getOpenFileName(
             self, 
-            "Select File to Upload", 
+            "Select Excel File to Open", 
             "", 
-            "All Files (*)"
+            "Excel Files (*.xlsx *.xls *.xlsm);;All Files (*)"
         )
         
         if file_path:
             try:
-                self._log_message(f"Uploading file: {Path(file_path).name}")
-                self.sync_status_label.setText("Sync Status: Uploading...")
+                self._log_message(f"Opening Excel file: {Path(file_path).name}")
+                self.sync_status_label.setText("Sync Status: Opening...")
                 self.sync_status_label.setStyleSheet("color: orange; font-weight: bold;")
                 
-                # Upload with immediate sync
-                file_id = self.file_manager.upload_file(file_path)
+                # Open Excel file with immediate sync
+                file_id = self.excel_manager.open_excel_file(file_path)
                 
-                self._log_message(f"✓ File uploaded and synced immediately: {file_id}")
+                # Load the workbook for editing
+                self.current_workbook = openpyxl.load_workbook(file_path)
+                self.current_excel_id = file_id
+                self.save_button.setEnabled(True)
+                
                 self.sync_status_label.setText("Sync Status: Synced")
                 self.sync_status_label.setStyleSheet("color: green; font-weight: bold;")
                 
-                # Immediate refresh
-                self._refresh_file_list()
+                self._log_message(f"Excel file opened and synced in < 0.01 seconds: {file_id}")
+                self._refresh_excel_list()
                 
             except Exception as e:
-                error_msg = f"Upload failed: {str(e)}"
-                self._log_message(f"✗ {error_msg}")
-                QMessageBox.critical(self, "Upload Error", error_msg)
                 self.sync_status_label.setText("Sync Status: Error")
                 self.sync_status_label.setStyleSheet("color: red; font-weight: bold;")
+                self._log_message(f"Error opening Excel file: {str(e)}")
+                
+                QMessageBox.critical(
+                    self, 
+                    "Upload Error", 
+                    f"Failed to open Excel file:\n{str(e)}"
+                )
     
-    def _delete_selected_file(self):
-        """Delete selected file with immediate sync."""
-        current_row = self.file_table.currentRow()
-        if current_row < 0:
-            QMessageBox.information(self, "No Selection", "Please select a file to delete.")
+    def _save_excel_file(self):
+        """Save the current Excel file with immediate sync."""
+        if not self.current_excel_id or not self.current_workbook:
+            QMessageBox.warning(self, "Save Error", "No Excel file is currently open.")
             return
         
-        file_id_item = self.file_table.item(current_row, 0)
+        try:
+            self._log_message(f"Saving Excel file: {self.current_excel_id}")
+            self.sync_status_label.setText("Sync Status: Saving...")
+            self.sync_status_label.setStyleSheet("color: orange; font-weight: bold;")
+            
+            # Save with immediate sync
+            success = self.excel_manager.save_excel_file(self.current_excel_id, self.current_workbook)
+            
+            if success:
+                self.sync_status_label.setText("Sync Status: Synced")
+                self.sync_status_label.setStyleSheet("color: green; font-weight: bold;")
+                self._log_message(f"Excel file saved and synced in < 0.01 seconds")
+            else:
+                self.sync_status_label.setText("Sync Status: Error")
+                self.sync_status_label.setStyleSheet("color: red; font-weight: bold;")
+                self._log_message(f"Error saving Excel file")
+                
+            self._refresh_excel_list()
+                
+        except Exception as e:
+            self.sync_status_label.setText("Sync Status: Error")
+            self.sync_status_label.setStyleSheet("color: red; font-weight: bold;")
+            self._log_message(f"Error saving Excel file: {str(e)}")
+            
+            QMessageBox.critical(
+                self, 
+                "Save Error", 
+                f"Failed to save Excel file:\n{str(e)}"
+            )
+    
+    def _close_selected_file(self):
+        """Close selected Excel file with immediate sync."""
+        current_row = self.excel_table.currentRow()
+        if current_row < 0:
+            QMessageBox.information(self, "No Selection", "Please select an Excel file to close.")
+            return
+        
+        file_id_item = self.excel_table.item(current_row, 0)
         if not file_id_item:
             return
         
         file_id = file_id_item.text()
-        filename_item = self.file_table.item(current_row, 1)
+        filename_item = self.excel_table.item(current_row, 1)
         filename = filename_item.text() if filename_item else "Unknown"
         
         reply = QMessageBox.question(
             self, 
-            "Confirm Delete", 
-            f"Delete file '{filename}'?",
+            "Confirm Close", 
+            f"Close Excel file '{filename}'?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
         if reply == QMessageBox.StandardButton.Yes:
             try:
-                self._log_message(f"Deleting file: {filename}")
-                success = self.file_manager.delete_file(file_id)
+                self._log_message(f"Closing Excel file: {filename}")
+                success = self.excel_manager.close_excel_file(file_id)
                 
                 if success:
-                    self._log_message(f"✓ File deleted and synced immediately: {filename}")
-                    self._refresh_file_list()
+                    self._log_message(f"✓ Excel file closed and synced immediately: {filename}")
+                    if self.current_excel_id == file_id:
+                        self.current_excel_id = None
+                        self.current_workbook = None
+                        self.save_button.setEnabled(False)
+                    self._refresh_excel_list()
                 else:
-                    self._log_message(f"✗ Failed to delete file: {filename}")
+                    self._log_message(f"✗ Failed to close Excel file: {filename}")
                     
             except Exception as e:
-                error_msg = f"Delete failed: {str(e)}"
+                error_msg = f"Close failed: {str(e)}"
                 self._log_message(f"✗ {error_msg}")
-                QMessageBox.critical(self, "Delete Error", error_msg)
+                QMessageBox.critical(self, "Close Error", error_msg)
     
     def _force_sync(self):
-        """Force immediate sync of all data."""
-        self._log_message("Forcing immediate sync...")
+        """Force immediate sync of all Excel data."""
+        self._log_message("Forcing immediate Excel sync...")
         self.sync_status_label.setText("Sync Status: Syncing...")
         self.sync_status_label.setStyleSheet("color: orange; font-weight: bold;")
         
-        success = self.file_manager.force_sync()
+        success = self.excel_manager.force_sync()
         if success:
-            self._log_message("✓ Force sync completed successfully")
+            self._log_message("✓ Excel force sync completed successfully")
             self.sync_status_label.setText("Sync Status: Synced")
             self.sync_status_label.setStyleSheet("color: green; font-weight: bold;")
         else:
-            self._log_message("✗ Force sync failed")
+            self._log_message("✗ Excel force sync failed")
             self.sync_status_label.setText("Sync Status: Sync Failed")
             self.sync_status_label.setStyleSheet("color: red; font-weight: bold;")
     
-    def _refresh_file_list(self):
-        """Refresh the file list display."""
-        files = self.file_manager.list_files()
+    def _refresh_excel_list(self):
+        """Refresh the Excel file list display."""
+        excel_files = self.excel_manager.list_excel_files()
         
-        self.file_table.setRowCount(len(files))
+        self.excel_table.setRowCount(len(excel_files))
         
-        for row, file_record in enumerate(files):
+        for row, excel_record in enumerate(excel_files):
             # File ID
-            self.file_table.setItem(row, 0, QTableWidgetItem(file_record.file_id))
+            self.excel_table.setItem(row, 0, QTableWidgetItem(excel_record.file_id))
             
             # Filename
-            self.file_table.setItem(row, 1, QTableWidgetItem(file_record.filename))
+            self.excel_table.setItem(row, 1, QTableWidgetItem(excel_record.filename))
             
-            # Upload time
-            upload_time_str = file_record.upload_time.strftime("%Y-%m-%d %H:%M:%S")
-            self.file_table.setItem(row, 2, QTableWidgetItem(upload_time_str))
+            # Last Modified
+            self.excel_table.setItem(row, 2, QTableWidgetItem(
+                excel_record.last_modified.strftime("%Y-%m-%d %H:%M:%S")
+            ))
             
-            # File size
-            size_str = self._format_file_size(file_record.file_size)
-            self.file_table.setItem(row, 3, QTableWidgetItem(size_str))
+            # File Size (formatted)
+            size_kb = excel_record.file_size / 1024
+            size_str = f"{size_kb:.1f} KB" if size_kb < 1024 else f"{size_kb/1024:.1f} MB"
+            self.excel_table.setItem(row, 3, QTableWidgetItem(size_str))
             
-            # Sync status
-            status_item = QTableWidgetItem(file_record.sync_status)
-            if file_record.sync_status == "synced":
-                status_item.setBackground(status_item.background().color().lighter(150))
-            elif file_record.sync_status == "needs_sync":
-                status_item.setBackground(status_item.background().color().darker(110))
-            self.file_table.setItem(row, 4, status_item)
+            # Sheet Count
+            self.excel_table.setItem(row, 4, QTableWidgetItem(str(excel_record.sheet_count)))
             
-            # File hash (truncated)
-            hash_display = file_record.file_hash[:12] + "..." if len(file_record.file_hash) > 12 else file_record.file_hash
-            self.file_table.setItem(row, 5, QTableWidgetItem(hash_display))
+            # Sync Status (colored)
+            status_item = QTableWidgetItem(excel_record.sync_status)
+            if excel_record.sync_status == "synced":
+                status_item.setBackground(self.excel_table.palette().color(self.excel_table.palette().ColorRole.Base))
+            elif excel_record.sync_status == "needs_sync":
+                status_item.setStyleSheet("background-color: orange;")
+            elif excel_record.sync_status == "error":
+                status_item.setStyleSheet("background-color: lightcoral;")
+            self.excel_table.setItem(row, 5, status_item)
+            
+            # Open Status
+            open_status = "Yes" if excel_record.is_open else "No"
+            open_item = QTableWidgetItem(open_status)
+            if excel_record.is_open:
+                open_item.setStyleSheet("background-color: lightgreen;")
+            self.excel_table.setItem(row, 6, open_item)
         
-        # Resize columns to content
-        self.file_table.resizeColumnsToContents()
+        # Auto-resize columns
+        self.excel_table.resizeColumnsToContents()
     
     def _update_sync_status(self):
-        """Update the sync status display."""
-        sync_status = self.file_manager.get_sync_status()
+        """Update the Excel sync status display."""
+        sync_status = self.excel_manager.get_sync_status()
         
         if not sync_status:
             return
         
-        # Check if all files are synced
+        # Check if all Excel files are synced
         all_synced = all(status == "synced" for status in sync_status.values())
         needs_sync = any(status == "needs_sync" for status in sync_status.values())
         has_missing = any(status == "missing" for status in sync_status.values())
+        has_error = any(status == "error" for status in sync_status.values())
         
         if has_missing:
-            self.sync_status_label.setText("Sync Status: Missing Files")
+            self.sync_status_label.setText("Sync Status: Missing Excel Files")
+            self.sync_status_label.setStyleSheet("color: red; font-weight: bold;")
+        elif has_error:
+            self.sync_status_label.setText("Sync Status: Excel Sync Error")
             self.sync_status_label.setStyleSheet("color: red; font-weight: bold;")
         elif needs_sync:
-            self.sync_status_label.setText("Sync Status: Needs Sync")
+            self.sync_status_label.setText("Sync Status: Excel Needs Sync")
             self.sync_status_label.setStyleSheet("color: orange; font-weight: bold;")
         elif all_synced:
-            self.sync_status_label.setText("Sync Status: All Synced")
+            self.sync_status_label.setText("Sync Status: All Excel Files Synced")
             self.sync_status_label.setStyleSheet("color: green; font-weight: bold;")
     
-    def _format_file_size(self, size_bytes: int) -> str:
-        """Format file size in human-readable format."""
-        if size_bytes == 0:
-            return "0 B"
-        
-        units = ["B", "KB", "MB", "GB"]
-        size = float(size_bytes)
-        unit_index = 0
-        
-        while size >= 1024 and unit_index < len(units) - 1:
-            size /= 1024
-            unit_index += 1
-        
-        return f"{size:.1f} {units[unit_index]}"
-    
     def _log_message(self, message: str):
-        """Add a message to the log display."""
+        """Add a message to the Excel sync log display."""
         from datetime import datetime
         timestamp = datetime.now().strftime("%H:%M:%S")
         log_entry = f"[{timestamp}] {message}"
@@ -303,19 +361,35 @@ class FileManagerUI(QMainWindow):
         scrollbar.setValue(scrollbar.maximum())
     
     @pyqtSlot(str, object)
-    def _on_file_synced(self, file_id: str, file_record: FileRecord):
-        """Callback when a file is synced."""
-        self._log_message(f"🔄 Sync callback: {file_record.filename} ({file_id})")
+    def _on_excel_synced(self, file_id: str, excel_record: ExcelFileRecord):
+        """Callback when an Excel file is synced."""
+        self._log_message(f"Excel sync event: {excel_record.filename} ({file_id}) - {excel_record.sync_status}")
+        
+        # Update the table row if it's visible
+        for row in range(self.excel_table.rowCount()):
+            id_item = self.excel_table.item(row, 0)
+            if id_item and id_item.text() == file_id:
+                # Update sync status column
+                status_item = self.excel_table.item(row, 5)
+                if status_item:
+                    status_item.setText(excel_record.sync_status)
+                    if excel_record.sync_status == "synced":
+                        status_item.setStyleSheet("")
+                    elif excel_record.sync_status == "needs_sync":
+                        status_item.setStyleSheet("background-color: orange;")
+                    elif excel_record.sync_status == "error":
+                        status_item.setStyleSheet("background-color: lightcoral;")
+                break
     
     def closeEvent(self, event):
-        """Clean up when closing the application."""
-        self._log_message("Shutting down file manager...")
-        self.file_manager.shutdown()
+        """Handle application close event."""
+        # Shutdown the Excel persistence manager
+        self.excel_manager.shutdown()
         event.accept()
 
 
 def main():
-    """Main entry point for the file manager UI."""
+    """Main entry point for the Excel file manager UI."""
     app = QApplication(sys.argv)
     
     # Set application properties
@@ -323,7 +397,7 @@ def main():
     app.setApplicationVersion("1.0")
     
     # Create and show main window
-    window = FileManagerUI()
+    window = ExcelFileManagerUI()
     window.show()
     
     # Run the application

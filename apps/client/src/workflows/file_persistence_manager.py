@@ -1,8 +1,9 @@
 """
-File Persistence Manager with Immediate Sync
+Excel File Persistence Manager with Immediate Sync
 
-This module handles file upload and persistence with immediate syncing to ensure
-data consistency and real-time updates as reported in issue #4.
+This module handles Excel file operations and persistence with immediate syncing 
+to ensure data consistency and real-time updates as reported in issue #4.
+Specifically designed for MAGK Excel automation workflows.
 """
 import os
 import hashlib
@@ -13,45 +14,50 @@ from pathlib import Path
 from typing import Dict, List, Optional, Callable
 from dataclasses import dataclass, asdict
 from datetime import datetime
+import openpyxl
+from openpyxl import Workbook
 
 
 @dataclass
-class FileRecord:
-    """Represents a file in the persistence manager."""
+class ExcelFileRecord:
+    """Represents an Excel file in the persistence manager."""
     file_id: str
     filename: str
     file_path: str
     file_hash: str
-    upload_time: datetime
+    last_modified: datetime
     sync_status: str = "synced"
     file_size: int = 0
+    sheet_count: int = 0
+    is_open: bool = False
 
 
-class FilePersistenceManager:
+class ExcelFilePersistenceManager:
     """
-    Manages file persistence with immediate sync capabilities.
+    Manages Excel file persistence with immediate sync capabilities.
     
-    Addresses the sync issue where file uploads don't update immediately.
+    Addresses the sync issue where Excel file operations don't update immediately.
+    Specifically designed for MAGK Excel automation workflows.
     """
     
-    def __init__(self, storage_directory: str = "storage", auto_sync_interval: float = 0.1):
+    def __init__(self, excel_directory: str = "excel_files", auto_sync_interval: float = 0.1):
         """
-        Initialize the file persistence manager.
+        Initialize the Excel file persistence manager.
         
         Args:
-            storage_directory: Directory to store files
+            excel_directory: Directory to store Excel files
             auto_sync_interval: Interval for automatic sync checks (seconds)
         """
-        self.storage_directory = Path(storage_directory)
-        self.storage_directory.mkdir(exist_ok=True)
+        self.excel_directory = Path(excel_directory)
+        self.excel_directory.mkdir(exist_ok=True)
         
-        self.metadata_file = self.storage_directory / "file_metadata.json"
+        self.metadata_file = self.excel_directory / "excel_metadata.json"
         self.auto_sync_interval = auto_sync_interval
         
-        # File registry for tracking uploads and sync status
-        self._file_registry: Dict[str, FileRecord] = {}
+        # Excel file registry for tracking files and sync status
+        self._excel_registry: Dict[str, ExcelFileRecord] = {}
         self._sync_lock = threading.RLock()
-        self._sync_callbacks: List[Callable[[str, FileRecord], None]] = []
+        self._sync_callbacks: List[Callable[[str, ExcelFileRecord], None]] = []
         
         # Load existing metadata
         self._load_metadata()
@@ -61,38 +67,36 @@ class FilePersistenceManager:
         self._sync_thread = threading.Thread(target=self._sync_monitor, daemon=True)
         self._sync_thread.start()
     
-    def add_sync_callback(self, callback: Callable[[str, FileRecord], None]):
-        """Add a callback to be called when files are synced."""
+    def add_sync_callback(self, callback: Callable[[str, ExcelFileRecord], None]):
+        """Add a callback to be called when Excel files are synced."""
         self._sync_callbacks.append(callback)
     
-    def upload_file(self, file_path: str, filename: Optional[str] = None) -> str:
+    def open_excel_file(self, file_path: str) -> str:
         """
-        Upload a file with immediate sync.
+        Open an Excel file with immediate sync tracking.
         
         Args:
-            file_path: Path to the source file
-            filename: Optional custom filename
+            file_path: Path to the Excel file (.xlsx, .xls)
             
         Returns:
-            file_id: Unique identifier for the uploaded file
+            file_id: Unique identifier for the opened file
             
         Raises:
-            FileNotFoundError: If source file doesn't exist
+            FileNotFoundError: If Excel file doesn't exist
+            ValueError: If file is not a valid Excel format
             IOError: If file operations fail
         """
         source_path = Path(file_path)
         if not source_path.exists():
-            raise FileNotFoundError(f"Source file not found: {file_path}")
+            raise FileNotFoundError(f"Excel file not found: {file_path}")
+        
+        # Validate Excel file format
+        valid_extensions = {'.xlsx', '.xls', '.xlsm'}
+        if source_path.suffix.lower() not in valid_extensions:
+            raise ValueError(f"Invalid Excel file format. Expected: {valid_extensions}")
         
         # Generate unique file ID
         file_id = self._generate_file_id(file_path)
-        
-        # Use provided filename or extract from path
-        if filename is None:
-            filename = source_path.name
-        
-        # Calculate destination path
-        dest_path = self.storage_directory / f"{file_id}_{filename}"
         
         # Calculate file hash for integrity checking
         file_hash = self._calculate_file_hash(source_path)
@@ -100,23 +104,26 @@ class FilePersistenceManager:
         
         with self._sync_lock:
             try:
-                # Copy file to storage
-                import shutil
-                shutil.copy2(source_path, dest_path)
+                # Load Excel file to get metadata
+                workbook = openpyxl.load_workbook(source_path, read_only=True)
+                sheet_count = len(workbook.worksheets)
+                workbook.close()
                 
-                # Create file record
-                file_record = FileRecord(
+                # Create Excel file record
+                excel_record = ExcelFileRecord(
                     file_id=file_id,
-                    filename=filename,
-                    file_path=str(dest_path),
+                    filename=source_path.name,
+                    file_path=str(source_path),
                     file_hash=file_hash,
-                    upload_time=datetime.now(),
+                    last_modified=datetime.now(),
                     sync_status="synced",  # Immediate sync
-                    file_size=file_size
+                    file_size=file_size,
+                    sheet_count=sheet_count,
+                    is_open=True
                 )
                 
                 # Update registry
-                self._file_registry[file_id] = file_record
+                self._excel_registry[file_id] = excel_record
                 
                 # Immediate sync to persistent storage
                 self._sync_metadata_immediate()
@@ -124,78 +131,160 @@ class FilePersistenceManager:
                 # Notify sync callbacks immediately
                 for callback in self._sync_callbacks:
                     try:
-                        callback(file_id, file_record)
+                        callback(file_id, excel_record)
                     except Exception as e:
                         print(f"Sync callback error: {e}")
                 
-                print(f"File uploaded and synced immediately: {filename} ({file_id})")
+                print(f"Excel file opened and synced immediately: {source_path.name} ({file_id})")
                 return file_id
                 
             except Exception as e:
-                # Clean up on failure
-                if dest_path.exists():
-                    dest_path.unlink()
-                raise IOError(f"Failed to upload file: {e}")
+                raise IOError(f"Failed to open Excel file: {e}")
     
-    def get_file_info(self, file_id: str) -> Optional[FileRecord]:
-        """Get file information by ID."""
-        with self._sync_lock:
-            return self._file_registry.get(file_id)
-    
-    def list_files(self) -> List[FileRecord]:
-        """List all files in the registry."""
-        with self._sync_lock:
-            return list(self._file_registry.values())
-    
-    def delete_file(self, file_id: str) -> bool:
+    def save_excel_file(self, file_id: str, workbook: Workbook, save_path: Optional[str] = None) -> bool:
         """
-        Delete a file with immediate sync.
+        Save an Excel workbook with immediate sync.
         
         Args:
-            file_id: ID of the file to delete
+            file_id: ID of the Excel file
+            workbook: openpyxl Workbook object to save
+            save_path: Optional custom save path
             
         Returns:
-            True if file was deleted, False if not found
+            bool: True if save was successful
         """
         with self._sync_lock:
-            file_record = self._file_registry.get(file_id)
-            if not file_record:
+            excel_record = self._excel_registry.get(file_id)
+            if not excel_record:
+                raise ValueError(f"Excel file not found: {file_id}")
+            
+            # Determine save path
+            if save_path:
+                target_path = Path(save_path)
+            else:
+                target_path = Path(excel_record.file_path)
+            
+            try:
+                # Save the workbook immediately
+                workbook.save(target_path)
+                
+                # Update record with new metadata
+                excel_record.last_modified = datetime.now()
+                excel_record.file_hash = self._calculate_file_hash(target_path)
+                excel_record.file_size = target_path.stat().st_size
+                excel_record.sheet_count = len(workbook.worksheets)
+                excel_record.sync_status = "synced"
+                
+                # Immediate sync to persistent storage
+                self._sync_metadata_immediate()
+                
+                # Notify sync callbacks immediately
+                for callback in self._sync_callbacks:
+                    try:
+                        callback(file_id, excel_record)
+                    except Exception as e:
+                        print(f"Sync callback error: {e}")
+                
+                print(f"Excel file saved and synced immediately: {excel_record.filename}")
+                return True
+                
+            except Exception as e:
+                excel_record.sync_status = "error"
+                print(f"Failed to save Excel file: {e}")
+                return False
+    
+    def get_excel_info(self, file_id: str) -> Optional[ExcelFileRecord]:
+        """Get Excel file information by ID."""
+        with self._sync_lock:
+            return self._excel_registry.get(file_id)
+    
+    def list_excel_files(self) -> List[ExcelFileRecord]:
+        """List all Excel files in the registry."""
+        with self._sync_lock:
+            return list(self._excel_registry.values())
+    
+    def close_excel_file(self, file_id: str) -> bool:
+        """
+        Close an Excel file with immediate sync.
+        
+        Args:
+            file_id: ID of the Excel file to close
+            
+        Returns:
+            True if file was closed, False if not found
+        """
+        with self._sync_lock:
+            excel_record = self._excel_registry.get(file_id)
+            if not excel_record:
                 return False
             
             try:
-                # Remove physical file
-                file_path = Path(file_record.file_path)
-                if file_path.exists():
-                    file_path.unlink()
-                
-                # Remove from registry
-                del self._file_registry[file_id]
+                # Mark as closed
+                excel_record.is_open = False
+                excel_record.last_modified = datetime.now()
+                excel_record.sync_status = "synced"
                 
                 # Immediate sync
                 self._sync_metadata_immediate()
                 
-                print(f"File deleted and synced immediately: {file_record.filename} ({file_id})")
+                # Notify callbacks
+                for callback in self._sync_callbacks:
+                    try:
+                        callback(file_id, excel_record)
+                    except Exception as e:
+                        print(f"Sync callback error: {e}")
+                
+                print(f"Excel file closed and synced immediately: {excel_record.filename} ({file_id})")
                 return True
                 
             except Exception as e:
-                print(f"Failed to delete file: {e}")
+                print(f"Failed to close Excel file: {e}")
+                return False
+    
+    def remove_excel_file(self, file_id: str) -> bool:
+        """
+        Remove an Excel file from tracking (but don't delete the physical file).
+        
+        Args:
+            file_id: ID of the Excel file to remove from tracking
+            
+        Returns:
+            True if file was removed, False if not found
+        """
+        with self._sync_lock:
+            excel_record = self._excel_registry.get(file_id)
+            if not excel_record:
+                return False
+            
+            try:
+                # Remove from registry
+                del self._excel_registry[file_id]
+                
+                # Immediate sync
+                self._sync_metadata_immediate()
+                
+                print(f"Excel file removed from tracking and synced immediately: {excel_record.filename} ({file_id})")
+                return True
+                
+            except Exception as e:
+                print(f"Failed to remove Excel file: {e}")
                 return False
     
     def force_sync(self) -> bool:
-        """Force an immediate sync of all data."""
+        """Force an immediate sync of all Excel file data."""
         try:
             with self._sync_lock:
                 self._sync_metadata_immediate()
-                print("Forced sync completed successfully")
+                print("Excel files forced sync completed successfully")
                 return True
         except Exception as e:
-            print(f"Force sync failed: {e}")
+            print(f"Excel files force sync failed: {e}")
             return False
     
     def get_sync_status(self) -> Dict[str, str]:
-        """Get sync status for all files."""
+        """Get sync status for all Excel files."""
         with self._sync_lock:
-            return {file_id: record.sync_status for file_id, record in self._file_registry.items()}
+            return {file_id: record.sync_status for file_id, record in self._excel_registry.items()}
     
     def _generate_file_id(self, file_path: str) -> str:
         """Generate a unique file ID based on path and timestamp."""
@@ -212,7 +301,7 @@ class FilePersistenceManager:
         return hash_sha256.hexdigest()
     
     def _load_metadata(self):
-        """Load file metadata from persistent storage."""
+        """Load Excel file metadata from persistent storage."""
         if not self.metadata_file.exists():
             return
         
@@ -222,20 +311,20 @@ class FilePersistenceManager:
                 
             for file_id, record_data in data.items():
                 # Convert datetime string back to datetime object
-                record_data['upload_time'] = datetime.fromisoformat(record_data['upload_time'])
-                self._file_registry[file_id] = FileRecord(**record_data)
+                record_data['last_modified'] = datetime.fromisoformat(record_data['last_modified'])
+                self._excel_registry[file_id] = ExcelFileRecord(**record_data)
                 
         except Exception as e:
-            print(f"Failed to load metadata: {e}")
+            print(f"Failed to load Excel metadata: {e}")
     
     def _sync_metadata_immediate(self):
-        """Immediately sync metadata to persistent storage."""
+        """Immediately sync Excel metadata to persistent storage."""
         try:
             # Convert records to serializable format
             data = {}
-            for file_id, record in self._file_registry.items():
+            for file_id, record in self._excel_registry.items():
                 record_dict = asdict(record)
-                record_dict['upload_time'] = record.upload_time.isoformat()
+                record_dict['last_modified'] = record.last_modified.isoformat()
                 data[file_id] = record_dict
             
             # Write immediately with atomic operation
@@ -251,25 +340,26 @@ class FilePersistenceManager:
             raise
     
     def _sync_monitor(self):
-        """Background thread to monitor and ensure sync consistency."""
+        """Background thread to monitor and ensure Excel file sync consistency."""
         while self._sync_monitor_active:
             try:
                 time.sleep(self.auto_sync_interval)
                 
-                # Check for any files that might be out of sync
+                # Check for any Excel files that might be out of sync
                 with self._sync_lock:
                     needs_sync = False
-                    for file_id, record in self._file_registry.items():
+                    for file_id, record in self._excel_registry.items():
                         file_path = Path(record.file_path)
                         if file_path.exists():
                             # Verify file integrity
                             current_hash = self._calculate_file_hash(file_path)
                             if current_hash != record.file_hash:
-                                print(f"File integrity issue detected: {record.filename}")
+                                print(f"Excel file integrity issue detected: {record.filename}")
                                 record.sync_status = "needs_sync"
+                                record.last_modified = datetime.now()
                                 needs_sync = True
                         else:
-                            print(f"Missing file detected: {record.filename}")
+                            print(f"Missing Excel file detected: {record.filename}")
                             record.sync_status = "missing"
                             needs_sync = True
                     
@@ -277,10 +367,10 @@ class FilePersistenceManager:
                         self._sync_metadata_immediate()
                         
             except Exception as e:
-                print(f"Sync monitor error: {e}")
+                print(f"Excel sync monitor error: {e}")
     
     def shutdown(self):
-        """Shutdown the file persistence manager."""
+        """Shutdown the Excel file persistence manager."""
         self._sync_monitor_active = False
         if self._sync_thread.is_alive():
             self._sync_thread.join(timeout=1.0)
