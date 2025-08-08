@@ -11,27 +11,11 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
+// Note: Node ESM-compatible script
 
-// For Node.js compatibility with PDF.js
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// PDF.js setup for Node.js
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs';
-
-// Set up PDF.js worker
-GlobalWorkerOptions.workerSrc = path.join(__dirname, '../../../node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs');
-
-// Node.js polyfills for PDF.js
-if (typeof global !== 'undefined') {
-  // Polyfill DOMMatrix for Node.js
-  global.DOMMatrix = class DOMMatrix {
-    constructor() {
-      this.a = 1; this.b = 0; this.c = 0; this.d = 1; this.e = 0; this.f = 0;
-    }
-  };
-}
+import ExcelJS from 'exceljs';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 
 export interface FinancialTable {
   page: number;
@@ -79,6 +63,25 @@ export class LargePDFExtractor {
       // Load PDF
       const pdfBuffer = fs.readFileSync(pdfPath);
       const pdfData = new Uint8Array(pdfBuffer);
+      // Ensure DOMMatrix is available in Node (provided by canvas)
+      try {
+        const canvasMod = await import('canvas');
+        // @ts-ignore - assign at runtime
+        if (canvasMod && !('DOMMatrix' in globalThis)) {
+          // @ts-ignore
+          globalThis.DOMMatrix = (canvasMod as any).DOMMatrix;
+        }
+      } catch {
+        // If canvas is not available, continue; pdf.js legacy build may still work for text
+      }
+
+      // Use legacy build in Node to avoid DOMMatrix requirement
+      const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+      try {
+        const workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
+        // @ts-ignore - runtime assignment
+        GlobalWorkerOptions.workerSrc = workerPath;
+      } catch {}
       const loadingTask = getDocument({
         data: pdfData,
         useSystemFonts: true,
@@ -375,7 +378,7 @@ export class LargePDFExtractor {
     let currentCell = '';
     let lastEndX = -1;
     
-    items.forEach((item, index) => {
+    items.forEach((item) => {
       const gap = lastEndX === -1 ? 0 : item.x - lastEndX;
       const cellThreshold = 30; // Minimum gap to consider new cell
       
@@ -476,7 +479,7 @@ export class LargePDFExtractor {
       // Try to identify statement types and merge related tables
       const mergedFinancialData = this.mergeRelatedTables(financialTables);
       
-      mergedFinancialData.forEach((tableGroup, index) => {
+      mergedFinancialData.forEach((tableGroup) => {
         const statementType = this.identifyStatementType(tableGroup);
         markdown += `### ${statementType}\n\n`;
         markdown += this.tableGroupToMarkdown(tableGroup);
@@ -487,8 +490,8 @@ export class LargePDFExtractor {
     // Add other tables if any
     if (otherTables.length > 0) {
       markdown += `## Additional Data\n\n`;
-      otherTables.forEach((table, index) => {
-        markdown += `### Table ${index + 1} (Page ${table.page})\n\n`;
+      otherTables.forEach((table, i) => {
+        markdown += `### Table ${i + 1} (Page ${table.page})\n\n`;
         markdown += this.singleTableToMarkdown(table);
         markdown += `\n`;
       });
@@ -611,10 +614,107 @@ export class LargePDFExtractor {
       outputFile: path.basename(markdownFile),
       extractedAt: new Date().toISOString()
     }, null, 2));
+
+    // Save Excel workbook with extracted tables
+    const excelFile = path.join(this.outputDir, `${path.basename(result.fileName, path.extname(result.fileName))}_tables.xlsx`);
+    await this.saveExcel(result, excelFile);
     
     console.log(`\n📁 Results saved to: ${this.outputDir}`);
     console.log(`📄 Unified markdown: ${path.basename(markdownFile)}`);
     console.log(`📊 Summary: ${path.basename(summaryFile)}`);
+    console.log(`📈 Excel: ${path.basename(excelFile)}`);
+  }
+
+  private async saveExcel(result: PDFExtractionResult, excelFile: string): Promise<void> {
+    const workbook = new ExcelJS.Workbook();
+
+    // Summary sheet
+    const summary = workbook.addWorksheet('Summary');
+    summary.addRows([
+      ['File Name', result.fileName],
+      ['Total Pages', result.totalPages],
+      ['Tables Found', result.tables.length],
+      ['Financial Tables', result.tables.filter(t => t.tableType === 'financial').length],
+      ['Average Confidence', result.tables.length > 0 ? (result.tables.reduce((s, t) => s + t.confidence, 0) / result.tables.length).toFixed(3) : '0.000'],
+      ['Extraction Time (s)', (result.extractionTime / 1000).toFixed(2)],
+    ]);
+
+    const headerStyle = {
+      font: { bold: true },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCE6F1' } },
+      border: {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      },
+    } as const;
+
+    // If no tables, write text page dumps
+    if (result.tables.length === 0) {
+      const ws = workbook.addWorksheet('DocumentText');
+      ws.addRow(['Page', 'Text']);
+      ws.getRow(1).eachCell(c => Object.assign(c, { style: headerStyle }));
+      // Split by page markers
+      const pages = result.text.split(/\n=== PAGE (\d+) ===\n/).slice(1);
+      for (let i = 0; i < pages.length; i += 2) {
+        const pageNum = pages[i];
+        const text = pages[i + 1] ?? '';
+        ws.addRow([Number(pageNum), text]);
+      }
+      ws.views = [{ state: 'frozen', ySplit: 1 }];
+      ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 2 } };
+      // Auto width
+      ws.columns = (ws.columns || []).map((_, idx) => ({ key: String(idx), width: 30 }));
+    } else {
+      // One worksheet per detected table
+      result.tables.forEach((table, idx) => {
+        const maxCols = Math.max(table.headers.length, ...table.rows.map(r => r.length));
+        if (maxCols === 0) return;
+
+        const sheetNameBase = `Table_P${table.page}_${idx + 1}`;
+        const sheetName = sheetNameBase.substring(0, 31); // Excel sheet name limit
+        const ws = workbook.addWorksheet(sheetName);
+
+        // Build headers
+        const headers = table.headers.length > 0
+          ? table.headers.map(h => this.cleanText(h))
+          : Array.from({ length: maxCols }, (_, i) => `Column ${i + 1}`);
+        while (headers.length < maxCols) headers.push(`Column ${headers.length + 1}`);
+
+        ws.addRow(headers);
+        ws.getRow(1).eachCell(cell => {
+          cell.style = headerStyle as any;
+        });
+
+        // Data rows
+        for (const row of table.rows) {
+          const clean = row.map(c => this.cleanText(c));
+          while (clean.length < maxCols) clean.push('');
+          ws.addRow(clean.slice(0, maxCols));
+        }
+
+        // Freeze header and add autofilter
+        ws.views = [{ state: 'frozen', ySplit: 1 }];
+        ws.autoFilter = {
+          from: { row: 1, column: 1 },
+          to: { row: 1, column: maxCols },
+        };
+
+        // Column widths based on content
+        for (let c = 1; c <= maxCols; c++) {
+          let maxLen = headers[c - 1]?.length ?? 10;
+          for (let r = 2; r <= ws.rowCount; r++) {
+            const v = ws.getRow(r).getCell(c).value;
+            const len = typeof v === 'string' ? v.length : (v?.toString().length ?? 0);
+            if (len > maxLen) maxLen = Math.min(len, 60);
+          }
+          ws.getColumn(c).width = Math.max(10, Math.min(60, Math.ceil(maxLen * 1.1)));
+        }
+      });
+    }
+
+    await workbook.xlsx.writeFile(excelFile);
   }
 }
 
@@ -626,11 +726,11 @@ async function main() {
     console.log(`
 📄 Large PDF Financial Data Extractor
 
-Usage: npx tsx largePdfExtractor.ts <pdf_file> [output_dir] [--chunk-size N]
+Usage: npx tsx pdfExtractor.ts <pdf_file> [output_dir] [--chunk-size N]
 
 Examples:
-  npx tsx largePdfExtractor.ts ../../../pdf_misc/test-cases/Google.pdf
-  npx tsx largePdfExtractor.ts report.pdf ./output --chunk-size 50
+  npx tsx pdfExtractor.ts ../../../pdf_misc/test-cases/Google.pdf
+  npx tsx pdfExtractor.ts report.pdf ./output --chunk-size 50
 
 Options:
   --chunk-size N    Pages per chunk (default: 25)
