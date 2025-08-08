@@ -61,7 +61,7 @@ export class LargePDFExtractor {
   private chunkSize: number = 25;
   private outputDir: string;
   
-  constructor(chunkSize: number = 25, outputDir: string = path.join(__dirname, '../../output')) {
+  constructor(chunkSize: number = 25, outputDir: string = path.join(__dirname, 'output')) {
     this.chunkSize = chunkSize;
     this.outputDir = outputDir;
     
@@ -690,13 +690,13 @@ Examples:
 Options:
   --chunk-size N    Pages per chunk (default: 25)
   
-Default output directory: apps/workflow-engine/output/
+Default output directory: apps/workflow-engine/src/services/pdf/output/
     `);
     process.exit(1);
   }
   
   const pdfFile = args[0];
-  let outputDir = path.join(__dirname, '../../output');
+  let outputDir = path.join(__dirname, 'output');
   let chunkSize = 25;
   
   // Parse arguments

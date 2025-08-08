@@ -8,6 +8,7 @@ import WorkflowLibraryInterface from './components/workflow/WorkflowLibraryInter
 import TestWorkflowStore from './components/workflow/TestWorkflowStore'
 import WorkflowBlockLibrary from './components/workflow/WorkflowBlockLibrary'
 import ChatWorkflowIntegration from './components/ChatWorkflowIntegration'
+import { PDFExtractorPanel } from './components/PDFExtractorPanel'
 import { Button } from './components/ui/button'
 import { Badge } from './components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
@@ -25,12 +26,13 @@ import {
   Sparkles,
   Workflow,
   Eye,
-  EyeOff
+  EyeOff,
+  FileText
 } from 'lucide-react'
 import './App.css'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'chat' | 'chat-workflow' | 'editor' | 'library' | 'blocks' | 'demo' | 'mcp' | 'debug'>('chat')
+  const [activeTab, setActiveTab] = useState<'chat' | 'chat-workflow' | 'editor' | 'library' | 'blocks' | 'demo' | 'mcp' | 'debug' | 'pdf'>('chat')
   const [chatSessionId] = useState(`session-${Date.now()}`)
   const [showWorkflowInChat, setShowWorkflowInChat] = useState(true)
   const { initialize, tools, enabledServers } = useMCPStore()
@@ -186,6 +188,10 @@ function App() {
                 <Settings className="h-4 w-4" />
                 Debug Store
               </TabsTrigger>
+              <TabsTrigger value="pdf" className="gap-2">
+                <FileText className="h-4 w-4" />
+                PDF Extractor
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -324,6 +330,23 @@ function App() {
           {/* Debug Store */}
           <TabsContent value="debug" className="flex-1 mt-0 overflow-hidden">
             <TestWorkflowStore />
+          </TabsContent>
+
+          {/* PDF Extractor */}
+          <TabsContent value="pdf" className="flex-1 mt-0 overflow-hidden">
+            <div className="h-full p-6 overflow-auto">
+              <PDFExtractorPanel 
+                onExtractedContent={(content, result) => {
+                  console.log('PDF content extracted:', { content: content.substring(0, 100) + '...', result });
+                }}
+                onSendToChat={(content, result) => {
+                  console.log('Sending PDF content to chat:', { fileName: result.fileName, pages: result.totalPages, tables: result.tables.length });
+                  // Switch to chat tab so user can interact with extracted content
+                  setActiveTab('chat');
+                  // TODO: Pre-populate chat with extracted content
+                }}
+              />
+            </div>
           </TabsContent>
         </Tabs>
       </main>

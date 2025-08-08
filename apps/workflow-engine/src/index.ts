@@ -7,6 +7,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { chatRoute } from './routes/chat.js';
 import { chatV2Route } from './routes/chat-v2.js';
 import { extractRoute } from './routes/extract.js';
+import { pdfExtractRoute } from './routes/pdf-extract.js';
 import { demoRoute } from './routes/demo.js';
 
 const app = new Hono();
@@ -43,6 +44,7 @@ app.use('/downloads/*', serveStatic({
 app.route('/api', chatRoute);  // Legacy chat at /api/chat
 app.route('/api/v2', chatV2Route);  // New chat at /api/v2/chat
 app.route('', extractRoute);
+app.route('/api', pdfExtractRoute);  // PDF extraction at /api/pdf-extract
 app.route('', demoRoute);
 
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
