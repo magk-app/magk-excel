@@ -7,6 +7,37 @@
       "timeout": 30000,
       "retries": 3,
       "enabled": true,
+      "healthCheckInterval": 30000,
+      "defaultEnabled": true
+    },
+    "executor": {
+      "command": "node",
+      "args": ["./src/services/executor/executorServer.js"],
+      "capabilities": ["execute", "run", "command"],
+      "timeout": 30000,
+      "retries": 3,
+      "enabled": true,
+      "defaultEnabled": true,
+      "healthCheckInterval": 30000
+    },
+    "persistent": {
+      "command": "node",
+      "args": ["./src/services/persistence/persistentServer.js"],
+      "capabilities": ["storage", "persistence", "cache"],
+      "timeout": 30000,
+      "retries": 3,
+      "enabled": true,
+      "defaultEnabled": true,
+      "healthCheckInterval": 30000
+    },
+    "filesystem": {
+      "command": "node",
+      "args": ["./src/services/filesystem/filesystemServer.js"],
+      "capabilities": ["file", "directory", "filesystem"],
+      "timeout": 30000,
+      "retries": 3,
+      "enabled": true,
+      "defaultEnabled": true,
       "healthCheckInterval": 30000
     },
     "pdf": {
@@ -15,7 +46,8 @@
       "capabilities": ["pdf"],
       "timeout": 30000,
       "retries": 3,
-      "enabled": false
+      "enabled": false,
+      "defaultEnabled": false
     },
     "firecrawl": {
       "command": "echo",
@@ -23,7 +55,8 @@
       "capabilities": ["web", "scrape", "crawl"],
       "timeout": 60000,
       "retries": 2,
-      "enabled": false
+      "enabled": false,
+      "defaultEnabled": false
     },
     "puppeteer": {
       "command": "echo",
@@ -31,7 +64,8 @@
       "capabilities": ["browser", "screenshot", "render"],
       "timeout": 60000,
       "retries": 2,
-      "enabled": false
+      "enabled": false,
+      "defaultEnabled": false
     },
     "fetch": {
       "command": "echo",
@@ -39,7 +73,8 @@
       "capabilities": ["api", "request"],
       "timeout": 30000,
       "retries": 3,
-      "enabled": false
+      "enabled": false,
+      "defaultEnabled": false
     }
   },
   "global": {
