@@ -11,11 +11,16 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 // Note: Node ESM-compatible script
 
 import ExcelJS from 'exceljs';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export interface FinancialTable {
   page: number;
@@ -466,32 +471,7 @@ export class LargePDFExtractor {
     return markdown;
   }
   
-  /**
-   * Create page-structured text with clear page breaks and formatting
-   */
-  private createPageStructuredText(text: string): string {
-    // Split by the page markers that we add during extraction
-    const pages = text.split(/\n=== PAGE \d+ ===\n/);
-    
-    if (pages.length <= 1) {
-      // No page markers found, return cleaned text as-is
-      return this.cleanText(text);
-    }
-    
-    let structuredText = '';
-    
-    // Skip the first empty element and process each page
-    for (let i = 1; i < pages.length; i++) {
-      const pageContent = pages[i].trim();
-      if (pageContent) {
-        structuredText += `---\n\n## Page ${i}\n\n`;
-        structuredText += this.cleanText(pageContent);
-        structuredText += `\n\n`;
-      }
-    }
-    
-    return structuredText;
-  }
+
   
   /**
    * Create page-structured text with inline tables
@@ -528,7 +508,7 @@ export class LargePDFExtractor {
         if (pageTables && pageTables.length > 0) {
           structuredText += `\n\n### Structured Data from Page ${i}\n\n`;
           
-          pageTables.forEach((table, index) => {
+          pageTables.forEach((table) => {
             const tableType = this.getTableTypeDescription(table.tableType);
             structuredText += `#### ${tableType} (Confidence: ${(table.confidence * 100).toFixed(1)}%)\n\n`;
             structuredText += this.singleTableToMarkdown(table);
@@ -553,34 +533,8 @@ export class LargePDFExtractor {
       case 'unknown': return 'Table';
       default: return 'Table';
     }
-    // Add financial data section
-    if (financialTables.length > 0) {
-      markdown += `## Financial Data\n\n`;
-      
-      // Try to identify statement types and merge related tables
-      const mergedFinancialData = this.mergeRelatedTables(financialTables);
-      
-      mergedFinancialData.forEach((tableGroup) => {
-        const statementType = this.identifyStatementType(tableGroup);
-        markdown += `### ${statementType}\n\n`;
-        markdown += this.tableGroupToMarkdown(tableGroup);
-        markdown += `\n`;
-      });
-    }
-    
-    // Add other tables if any
-    if (otherTables.length > 0) {
-      markdown += `## Additional Data\n\n`;
-      otherTables.forEach((table, i) => {
-        markdown += `### Table ${i + 1} (Page ${table.page})\n\n`;
-        markdown += this.singleTableToMarkdown(table);
-        markdown += `\n`;
-      });
-    }
-    
-    return markdown;
   }
-  
+
   /**
    * Clean and normalize text content
    */
@@ -595,46 +549,7 @@ export class LargePDFExtractor {
       .replace(/\s+/g, ' ')
       .trim();
   }
-  
-  /**
-   * Merge related financial tables (e.g., multi-page income statements)
-   */
-  private mergeRelatedTables(tables: FinancialTable[]): FinancialTable[][] {
-    // For now, return each table as its own group
-    // TODO: Implement intelligent table merging based on headers and content
-    return tables.map(table => [table]);
-  }
-  
-  /**
-   * Identify the type of financial statement
-   */
-  private identifyStatementType(tableGroup: FinancialTable[]): string {
-    const firstTable = tableGroup[0];
-    const allText = [
-      ...firstTable.headers,
-      ...firstTable.rows.flat()
-    ].join(' ').toLowerCase();
-    
-    if (allText.includes('revenue') || allText.includes('income') || allText.includes('expense')) {
-      return 'Income Statement';
-    } else if (allText.includes('assets') || allText.includes('liabilities') || allText.includes('equity')) {
-      return 'Balance Sheet';
-    } else if (allText.includes('cash flow') || allText.includes('operating activities')) {
-      return 'Cash Flow Statement';
-    } else {
-      return `Financial Data (Page ${firstTable.page})`;
-    }
-  }
-  
-  /**
-   * Convert a group of related tables to markdown
-   */
-  private tableGroupToMarkdown(tableGroup: FinancialTable[]): string {
-    // For now, just render the first table
-    // TODO: Implement intelligent merging of related tables
-    return this.singleTableToMarkdown(tableGroup[0]);
-  }
-  
+
   /**
    * Convert a single table to clean markdown format
    */
@@ -808,13 +723,10 @@ async function main() {
 📄 Large PDF Financial Data Extractor
 
 Usage: npx tsx pdfExtractor.ts <pdf_file> [output_dir] [--chunk-size N]
-Usage: npx tsx pdfExtractor.ts <pdf_file> [output_dir] [--chunk-size N]
 
 Examples:
   npx tsx pdfExtractor.ts pdf_misc/test-cases/Google.pdf
   npx tsx pdfExtractor.ts report.pdf ../../../output --chunk-size 50
-  npx tsx pdfExtractor.ts ../../../pdf_misc/test-cases/Google.pdf
-  npx tsx pdfExtractor.ts report.pdf ./output --chunk-size 50
 
 Options:
   --chunk-size N    Pages per chunk (default: 25)
