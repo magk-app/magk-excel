@@ -209,13 +209,6 @@ computed:
   fields: []       # expressions over standardized columns; optional
 ```
 
-## 10. Non-Normative Examples (Optional Guidance)
-- Finance: A domain profile may introduce domain-specific columns (e.g., amounts, percentages), units, and synonyms. Tolerances for numeric comparison MAY be specified per-column.
-- Scientific: A profile may define units (SI prefixes), measurement timestamps, and quality scores.
-- Legal: A profile may define parties, clause identifiers, effective dates, and jurisdiction enums.
-
-These examples illustrate how to use the core standard via configuration; they are not part of the normative core.
-
 ## 11. QA & Acceptance (Normative)
 - QA Checklist:
   - [ ] Data_* sheets conform to the selected schema (labels, order, types, formats).
