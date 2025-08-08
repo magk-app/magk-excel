@@ -65,11 +65,7 @@ export function ChatSessionsSidebar({ isOpen, onToggle }: ChatSessionsSidebarPro
     }
   };
 
-  const handleClear = (sessionId: string) => {
-    if (confirm('Are you sure you want to clear all messages in this session?')) {
-      clearSession(sessionId);
-    }
-  };
+
 
   const handleExport = (sessionId: string) => {
     try {
@@ -138,8 +134,9 @@ export function ChatSessionsSidebar({ isOpen, onToggle }: ChatSessionsSidebarPro
             size="sm"
             onClick={onToggle}
             className="h-8 w-8 p-0"
+            title="Close sidebar"
           >
-            ✕
+            ◀
           </Button>
         </div>
         

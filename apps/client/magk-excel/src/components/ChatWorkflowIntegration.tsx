@@ -6,7 +6,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  MessageSquare,
   Workflow,
   GitBranch,
   Play,
@@ -259,18 +258,11 @@ export const ChatWorkflowIntegration: React.FC<ChatWorkflowIntegrationProps> = (
         <CardContent className="p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="gap-1">
-                <MessageSquare className="h-3 w-3" />
-                Chat Session
-              </Badge>
               {hasActiveWorkflow && (
-                <>
-                  <Link className="h-3 w-3 text-muted-foreground" />
-                  <Badge variant="default" className="gap-1">
-                    <GitBranch className="h-3 w-3" />
-                    Workflow
-                  </Badge>
-                </>
+                <Badge variant="default" className="gap-1">
+                  <GitBranch className="h-3 w-3" />
+                  Workflow Active
+                </Badge>
               )}
             </div>
             
@@ -505,13 +497,9 @@ export const ChatWorkflowIntegration: React.FC<ChatWorkflowIntegrationProps> = (
                           <GitBranch className="h-6 w-6 text-primary" />
                         </div>
                         <h3 className="text-lg font-semibold mb-2">No Workflow Yet</h3>
-                        <p className="text-sm text-muted-foreground mb-4">
+                        <p className="text-sm text-muted-foreground">
                           Start a conversation about data extraction or processing, and we'll help you create a workflow
                         </p>
-                        <Button onClick={() => setShowGenerateDialog(true)}>
-                          <Plus className="h-4 w-4 mr-1" />
-                          Create Workflow
-                        </Button>
                       </div>
                     </CardContent>
                   </Card>

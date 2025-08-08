@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { ChatInterface } from './components/ChatInterface'
 import { WorkflowDemo } from './components/workflow'
 import { MCPServerToggle } from './components/MCPServerToggle'
-import WorkflowEditor from './components/workflow/WorkflowEditor'
 import WorkflowStoreEditor from './components/workflow/WorkflowStoreEditor'
-import WorkflowLibraryInterface from './components/workflow/WorkflowLibraryInterface'
+
 import TestWorkflowStore from './components/workflow/TestWorkflowStore'
 import WorkflowBlockLibrary from './components/workflow/WorkflowBlockLibrary'
 import ChatWorkflowIntegration from './components/ChatWorkflowIntegration'
@@ -13,28 +12,22 @@ import { Button } from './components/ui/button'
 import { Badge } from './components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
+import { ScrollArea } from './components/ui/scroll-area'
+import { cn } from './lib/utils'
 import { useMCPStore } from './services/mcpService'
 import { useWorkflowStore, WorkflowType } from './stores/workflowStore'
 import { 
   MessageSquare, 
-  GitBranch, 
-  Library, 
-  Blocks, 
   Settings, 
   Plus,
   FolderOpen,
-  Sparkles,
   Workflow,
-  Eye,
-  EyeOff,
   FileText
 } from 'lucide-react'
 import './App.css'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'chat' | 'chat-workflow' | 'editor' | 'library' | 'blocks' | 'demo' | 'mcp' | 'debug' | 'pdf'>('chat')
-  const [chatSessionId] = useState(`session-${Date.now()}`)
-  const [showWorkflowInChat, setShowWorkflowInChat] = useState(true)
+  const [activeTab, setActiveTab] = useState<'chat' | 'workflow' | 'demo' | 'mcp' | 'debug' | 'pdf'>('chat')
   const { initialize, tools, enabledServers } = useMCPStore()
   const { 
     createWorkflow, 
@@ -43,6 +36,15 @@ function App() {
     permanentWorkflows,
     loadWorkflow
   } = useWorkflowStore()
+  
+  // Debug: Log store state changes
+  React.useEffect(() => {
+    console.log('🔍 Store state changed:', {
+      temporaryWorkflows: temporaryWorkflows.size,
+      permanentWorkflows: permanentWorkflows.size,
+      activeWorkflow: activeWorkflow?.name
+    });
+  }, [temporaryWorkflows, permanentWorkflows, activeWorkflow])
   
   // Initialize MCP on app startup - ONLY ONCE
   useEffect(() => {
@@ -67,49 +69,60 @@ function App() {
     })
   }, []) // Empty dependency array - run only once on mount
 
-  // Handle creating a new workflow
+  // Handle creating a new workflow with dedicated chat session (1:1 relationship)
   const handleCreateWorkflow = () => {
     console.log('🚀 handleCreateWorkflow called');
-    console.log('Current state before creation:', {
-      temporaryWorkflows: temporaryWorkflows.size,
-      permanentWorkflows: permanentWorkflows.size,
-      activeWorkflow: activeWorkflow?.name,
-      activeTab: activeTab
+    console.log('Store functions available:', {
+      createWorkflow: typeof createWorkflow,
+      loadWorkflow: typeof loadWorkflow,
+      temporaryWorkflows: temporaryWorkflows?.size,
+      permanentWorkflows: permanentWorkflows?.size
     });
     
-    const workflowId = createWorkflow(
-      `New Workflow ${new Date().toLocaleTimeString()}`,
-      WorkflowType.TEMPORARY,
-      chatSessionId
-    )
-    
-    console.log('📝 Created workflow ID:', workflowId);
-    
-    if (workflowId) {
-      console.log('🔄 Loading workflow...');
-      loadWorkflow(workflowId);
+    try {
+      // Each workflow gets its own unique chat session ID for 1:1 relationship
+      const uniqueChatSessionId = `workflow-chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      const workflowName = `Workflow ${new Date().toLocaleTimeString()}`
       
-      // Add a small delay to ensure state updates propagate
-      setTimeout(() => {
-        console.log('📍 Switching to editor tab');
-        setActiveTab('editor');
-        console.log('State after tab switch:', {
-          activeTab: 'editor',
-          activeWorkflow: useWorkflowStore.getState().activeWorkflow?.name,
-          temporaryWorkflows: useWorkflowStore.getState().temporaryWorkflows.size
+      console.log('🔧 About to create workflow:', {
+        name: workflowName,
+        type: WorkflowType.TEMPORARY,
+        chatSessionId: uniqueChatSessionId
+      });
+      
+      const workflowId = createWorkflow(
+        workflowName,
+        WorkflowType.TEMPORARY,
+        uniqueChatSessionId
+      )
+      
+      console.log('📝 Created workflow ID:', workflowId);
+      
+      if (workflowId) {
+        console.log('🔄 Loading workflow...');
+        loadWorkflow(workflowId);
+        
+        // Force a state check immediately
+        const currentState = useWorkflowStore.getState();
+        console.log('📊 Current store state:', {
+          activeWorkflow: currentState.activeWorkflow?.name,
+          temporaryWorkflows: currentState.temporaryWorkflows.size,
+          permanentWorkflows: currentState.permanentWorkflows.size
         });
-      }, 100);
-      
-      console.log('✅ Workflow creation initiated');
-    } else {
-      console.error('❌ Failed to create workflow - no ID returned');
+        
+        console.log('✅ Workflow creation completed successfully');
+      } else {
+        console.error('❌ Failed to create workflow - no ID returned');
+      }
+    } catch (error) {
+      console.error('💥 Error in handleCreateWorkflow:', error);
     }
   }
 
   // Handle selecting a workflow from library
   const handleWorkflowSelect = (workflow: any) => {
     loadWorkflow(workflow.id)
-    setActiveTab('editor')
+    setActiveTab('workflow')
   }
 
   // Get workflow counts
@@ -148,6 +161,17 @@ function App() {
         <div className="flex items-center gap-2">
           <Button
             size="sm"
+            onClick={() => {
+              console.log('🧪 Test button clicked');
+              alert('Test button works!');
+            }}
+            variant="outline"
+            className="gap-1"
+          >
+            Test
+          </Button>
+          <Button
+            size="sm"
             onClick={handleCreateWorkflow}
             className="gap-1"
           >
@@ -166,22 +190,11 @@ function App() {
                 <MessageSquare className="h-4 w-4" />
                 Chat
               </TabsTrigger>
-              <TabsTrigger value="chat-workflow" className="gap-2">
-                <Sparkles className="h-4 w-4" />
-                Chat + Workflow
+              <TabsTrigger value="workflow" className="gap-2">
+                <Workflow className="h-4 w-4" />
+                Workflow
               </TabsTrigger>
-              <TabsTrigger value="editor" className="gap-2">
-                <GitBranch className="h-4 w-4" />
-                Workflow Editor
-              </TabsTrigger>
-              <TabsTrigger value="library" className="gap-2">
-                <Library className="h-4 w-4" />
-                Workflow Library
-              </TabsTrigger>
-              <TabsTrigger value="blocks" className="gap-2">
-                <Blocks className="h-4 w-4" />
-                Block Library
-              </TabsTrigger>
+              
               <TabsTrigger value="demo" className="gap-2">
                 <FolderOpen className="h-4 w-4" />
                 Demo
@@ -201,125 +214,217 @@ function App() {
             </TabsList>
           </div>
 
-          {/* Standalone Chat (NEW!) */}
+          {/* Quick Chat */}
           <TabsContent value="chat" className="flex-1 mt-0 overflow-hidden">
-            <ChatInterface />
-          </TabsContent>
-
-          {/* Chat + Workflow Integration */}
-          <TabsContent value="chat-workflow" className="flex-1 mt-0 overflow-hidden">
             <div className="h-full flex flex-col">
-              {/* Toggle Bar */}
-              <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30">
-                <span className="text-sm font-medium">Chat with Workflow Integration</span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setShowWorkflowInChat(!showWorkflowInChat)}
-                  className="gap-2"
-                >
-                  {showWorkflowInChat ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  {showWorkflowInChat ? 'Hide' : 'Show'} Workflow
-                </Button>
+              {/* Header */}
+              <div className="px-4 py-2 border-b bg-muted/30 flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Quick Chat</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      // Create workflow with dedicated chat session (1:1 relationship)
+                      const uniqueChatSessionId = `workflow-chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+                      const workflowId = createWorkflow(
+                        `Workflow ${new Date().toLocaleTimeString()}`,
+                        WorkflowType.TEMPORARY,
+                        uniqueChatSessionId
+                      )
+                      if (workflowId) {
+                        loadWorkflow(workflowId)
+                        setActiveTab('workflow')
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    <Workflow className="h-4 w-4" />
+                    Create Workflow
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  For complex tasks, create a workflow to organize your work
+                </p>
               </div>
               
-              <div className="flex-1 flex overflow-hidden">
-                {/* Chat Interface */}
-                <div className={showWorkflowInChat ? "w-1/2 border-r" : "w-full"}>
-                  <ChatInterface />
+              {/* Simple Chat Interface */}
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <ChatInterface />
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Unified Workflow Tab */}
+          <TabsContent value="workflow" className="flex-1 mt-0 overflow-hidden">
+            <div className="h-full flex">
+              {/* Simplified Workflow Library Sidebar */}
+              <div className="w-80 border-r bg-muted/30 flex flex-col">
+                {/* Header */}
+                <div className="p-4 border-b bg-background/50">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="font-semibold text-lg">Workflows</h2>
+                    <Button 
+                      onClick={(e) => {
+                        console.log('🎯 Button clicked!', e);
+                        handleCreateWorkflow();
+                      }} 
+                      size="sm"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      New ({temporaryWorkflows.size + permanentWorkflows.size})
+                    </Button>
+                  </div>
                 </div>
                 
-                {/* Workflow Integration */}
-                {showWorkflowInChat && (
-                  <div className="w-1/2">
-                    <ChatWorkflowIntegration
-                      chatSessionId={chatSessionId}
-                      onWorkflowGenerate={(prompt) => {
-                        console.log('Generating workflow from:', prompt)
-                        // Create a new workflow based on prompt
-                        const workflowId = createWorkflow(
-                          `Generated: ${prompt.substring(0, 50)}...`,
-                          WorkflowType.TEMPORARY,
-                          chatSessionId
-                        )
-                        if (workflowId) {
-                          loadWorkflow(workflowId)
-                        }
-                      }}
-                      onWorkflowExecute={(workflowId) => {
-                        console.log('Executing workflow:', workflowId)
-                      }}
-                      className="h-full"
-                    />
+                {/* Workflow List */}
+                <ScrollArea className="flex-1">
+                  <div className="p-2 space-y-2">
+                    {Array.from(temporaryWorkflows.values()).concat(Array.from(permanentWorkflows.values())).map((workflow) => (
+                      <Card
+                        key={workflow.id}
+                        className={cn(
+                          'cursor-pointer transition-all hover:shadow-md',
+                          activeWorkflow?.id === workflow.id 
+                            ? 'ring-2 ring-primary bg-primary/5' 
+                            : 'hover:bg-muted/50'
+                        )}
+                        onClick={() => handleWorkflowSelect(workflow)}
+                      >
+                        <CardHeader className="pb-2">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-medium text-sm truncate" title={workflow.name}>
+                                {workflow.name}
+                              </h3>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(workflow.metadata.modified).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <Badge variant={workflow.type === WorkflowType.TEMPORARY ? 'secondary' : 'default'} className="text-xs">
+                              {workflow.type === WorkflowType.TEMPORARY ? 'Live Chat' : 'Saved'}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Badge variant="outline" className="text-xs">
+                              {workflow.nodes.length} blocks
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {workflow.status}
+                            </Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                    
+                    {temporaryWorkflows.size === 0 && permanentWorkflows.size === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <div className="text-4xl mb-2">🔧</div>
+                        <p className="text-sm">No workflows yet</p>
+                        <p className="text-xs">Create one to get started</p>
+                        <div className="mt-4 text-xs">
+                          <p>Debug: T:{temporaryWorkflows.size} P:{permanentWorkflows.size}</p>
+                          <p>Active: {activeWorkflow?.name || 'none'}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+              
+              {/* Main Workflow Area */}
+              <div className="flex-1 flex flex-col">
+                {activeWorkflow ? (
+                  <div className="h-full flex">
+                    {/* Workflow Editor */}
+                    <div className="flex-1 min-w-0">
+                      <WorkflowStoreEditor />
+                    </div>
+                    
+                    {/* Integrated Block Library */}
+                    <div className="w-80 border-l bg-muted/30 flex flex-col">
+                      <div className="p-4 border-b bg-background/50">
+                        <h3 className="font-semibold text-sm">Block Library</h3>
+                        <p className="text-xs text-muted-foreground">
+                          Drag blocks to build your workflow
+                        </p>
+                      </div>
+                      <div className="flex-1 overflow-hidden">
+                        <WorkflowBlockLibrary
+                          isOpen={true}
+                          onToggle={() => {}} // Always open when integrated
+                          onBlockSelect={(block) => {
+                            console.log('Block selected:', block)
+                          }}
+                          onBlockAdd={(block) => {
+                            console.log('Adding block to workflow:', block)
+                            // Add block to current active workflow
+                          }}
+                          viewMode="grid"
+                          className="h-full border-none bg-transparent [&>div:first-child]:hidden" // Hide the header
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Workflow Chat - Bottom Panel */}
+                    <div className="absolute bottom-4 right-4 w-96 h-64 bg-background border border-border rounded-lg shadow-lg z-10 flex flex-col">
+                      <div className="p-3 border-b bg-background/50 flex items-center justify-between">
+                        <div>
+                          <h3 className="font-semibold text-xs">Workflow Chat</h3>
+                          <p className="text-xs text-muted-foreground">
+                            Discuss and refine this workflow
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => {
+                            // Toggle chat panel
+                          }}
+                        >
+                          ×
+                        </Button>
+                      </div>
+                      <div className="flex-1 min-h-0 p-2">
+                        <ChatWorkflowIntegration
+                          chatSessionId={activeWorkflow.chatSessionId!}
+                          onWorkflowGenerate={(prompt) => {
+                            console.log('Updating workflow from chat:', prompt)
+                          }}
+                          onWorkflowExecute={(workflowId) => {
+                            console.log('Executing workflow from chat:', workflowId)
+                          }}
+                          className="h-full"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <Card className="max-w-md">
+                      <CardHeader className="text-center">
+                        <CardTitle>Welcome to Workflows</CardTitle>
+                        <CardDescription>
+                          Build workflows using blocks from the integrated library
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex gap-2 justify-center">
+                        <Button onClick={handleCreateWorkflow}>
+                          <Plus className="h-4 w-4 mr-1" />
+                          Create Your First Workflow
+                        </Button>
+                      </CardContent>
+                    </Card>
                   </div>
                 )}
               </div>
             </div>
           </TabsContent>
 
-          {/* Workflow Editor - Store-integrated version */}
-          <TabsContent value="editor" className="flex-1 mt-0 overflow-hidden">
-            {activeWorkflow ? (
-              <WorkflowStoreEditor />
-            ) : (
-              <div className="h-full flex items-center justify-center">
-                <Card className="max-w-md">
-                  <CardHeader className="text-center">
-                    <CardTitle>No Active Workflow</CardTitle>
-                    <CardDescription>
-                      Create a new workflow or select one from the library to get started
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex gap-2 justify-center">
-                    <Button onClick={handleCreateWorkflow}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      Create New
-                    </Button>
-                    <Button variant="outline" onClick={() => setActiveTab('library')}>
-                      <Library className="h-4 w-4 mr-1" />
-                      Browse Library
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-          </TabsContent>
 
-          {/* Workflow Library */}
-          <TabsContent value="library" className="flex-1 mt-0 overflow-hidden">
-            <WorkflowLibraryInterface
-              onWorkflowSelect={handleWorkflowSelect}
-              onWorkflowCreate={handleCreateWorkflow}
-              onWorkflowExecute={(workflowId) => {
-                console.log('Executing workflow:', workflowId)
-              }}
-              selectedWorkflowId={activeWorkflow?.id}
-              className="h-full"
-            />
-          </TabsContent>
-
-          {/* Block Library */}
-          <TabsContent value="blocks" className="flex-1 mt-0 overflow-hidden">
-            <div className="h-full flex flex-col">
-              <WorkflowBlockLibrary
-                onBlockSelect={(block) => {
-                  console.log('Block selected:', block)
-                }}
-                onBlockAdd={(block) => {
-                  console.log('Adding block to workflow:', block)
-                  // If there's an active workflow, switch to editor
-                  if (activeWorkflow) {
-                    setActiveTab('editor')
-                  } else {
-                    // Create a new workflow first
-                    handleCreateWorkflow()
-                  }
-                }}
-                viewMode="grid"
-                className="h-full"
-              />
-            </div>
-          </TabsContent>
 
           {/* Original Demo */}
           <TabsContent value="demo" className="flex-1 mt-0 overflow-hidden">

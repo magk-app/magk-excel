@@ -75,6 +75,26 @@ export function useChatAdapter({
       return;
     }
 
+    // Get API key from localStorage early
+    const savedKeys = localStorage.getItem('magk_api_keys');
+    let apiKey = '';
+    if (savedKeys) {
+      try {
+        const parsedKeys = JSON.parse(savedKeys);
+        if (modelConfig.provider === 'anthropic') {
+          apiKey = parsedKeys.anthropic || '';
+        } else if (modelConfig.provider === 'openai') {
+          apiKey = parsedKeys.openai || '';
+        }
+      } catch (e) {
+        console.error('Failed to parse API keys from localStorage');
+      }
+    }
+
+    // Check if message contains PDF URLs
+    const pdfUrlRegex = /https?:\/\/[^\s]+\.pdf/gi;
+    const pdfUrls = message.match(pdfUrlRegex);
+
     // IMMEDIATELY add user message
     console.log('📝 Adding user message to session:', activeSessionId);
     addMessage(activeSessionId, {
@@ -97,6 +117,102 @@ export function useChatAdapter({
       isStreaming: true,
       isThinking: modelConfig.enableThinking
     });
+
+    // Handle PDF URL extraction if found
+    if (pdfUrls && pdfUrls.length > 0) {
+      console.log('📄 Detected PDF URLs:', pdfUrls);
+      
+      try {
+        // Update message to show we're processing PDF
+        updateMessage(activeSessionId, assistantMessageId, {
+          role: 'assistant',
+          content: `🔄 Processing PDF from URL: ${pdfUrls[0]}\n\nExtracting content...`,
+          isStreaming: true
+        });
+
+        // Extract PDF content using the demo API
+        const pdfResponse = await fetch('http://localhost:3001/demo/pdf-extraction/extract', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            pdf_source: pdfUrls[0],
+            extract_all: true
+          })
+        });
+
+        if (pdfResponse.ok) {
+          const pdfData = await pdfResponse.json();
+          console.log('✅ PDF extraction successful:', pdfData);
+          
+          // Format the extracted data
+          let extractedContent = `📄 **PDF Extraction Results**\n\n`;
+          extractedContent += `**Source:** ${pdfUrls[0]}\n`;
+          extractedContent += `**Status:** ${pdfData.status}\n`;
+          extractedContent += `**Processing Time:** ${pdfData.processingTime}s\n\n`;
+          
+          if (pdfData.extracted_data && pdfData.extracted_data.tables) {
+            extractedContent += `**Tables Found:** ${pdfData.extracted_data.tables.length}\n\n`;
+            
+            // Show first few tables as preview
+            pdfData.extracted_data.tables.slice(0, 3).forEach((table: any, index: number) => {
+              extractedContent += `**Table ${index + 1}:** ${table.title || `Table ${index + 1}`}\n`;
+              if (table.data && table.data.length > 0) {
+                // Show first few rows
+                const headers = Object.keys(table.data[0]).join(' | ');
+                extractedContent += `${headers}\n`;
+                extractedContent += `${'---|'.repeat(Object.keys(table.data[0]).length)}\n`;
+                
+                table.data.slice(0, 5).forEach((row: any) => {
+                  const values = Object.values(row).join(' | ');
+                  extractedContent += `${values}\n`;
+                });
+                
+                if (table.data.length > 5) {
+                  extractedContent += `... and ${table.data.length - 5} more rows\n`;
+                }
+              }
+              extractedContent += '\n';
+            });
+            
+            if (pdfData.extracted_data.tables.length > 3) {
+              extractedContent += `... and ${pdfData.extracted_data.tables.length - 3} more tables\n\n`;
+            }
+          }
+          
+          extractedContent += `\n💡 **What would you like me to do with this data?**\n`;
+          extractedContent += `- Analyze specific tables\n`;
+          extractedContent += `- Export to Excel\n`;
+          extractedContent += `- Create visualizations\n`;
+          extractedContent += `- Answer questions about the data\n`;
+          
+          updateMessage(activeSessionId, assistantMessageId, {
+            role: 'assistant',
+            content: extractedContent,
+            isComplete: true,
+            isStreaming: false
+          });
+          
+          // Clear attachments and return early since we handled the PDF
+          clearAttachments();
+          return;
+          
+        } else {
+          throw new Error(`PDF extraction failed: ${pdfResponse.status}`);
+        }
+        
+      } catch (error) {
+        console.error('❌ PDF extraction error:', error);
+        updateMessage(activeSessionId, assistantMessageId, {
+          role: 'assistant',
+          content: `❌ Failed to extract PDF content from ${pdfUrls[0]}\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try uploading the PDF file directly or use the PDF extraction panel.`,
+          isComplete: true,
+          isStreaming: false
+        });
+        return;
+      }
+    }
 
     // Get persistent files context
     let fileContext = '';
@@ -143,21 +259,7 @@ export function useChatAdapter({
       // Add file context to the message if available
       const enhancedMessage = fileContext ? message + fileContext : message;
       
-      // Get API key from localStorage
-      const savedKeys = localStorage.getItem('magk_api_keys');
-      let apiKey = '';
-      if (savedKeys) {
-        try {
-          const parsedKeys = JSON.parse(savedKeys);
-          if (modelConfig.provider === 'anthropic') {
-            apiKey = parsedKeys.anthropic || '';
-          } else if (modelConfig.provider === 'openai') {
-            apiKey = parsedKeys.openai || '';
-          }
-        } catch (e) {
-          console.error('Failed to parse API keys from localStorage');
-        }
-      }
+      // API key already retrieved at the beginning of the function
 
       console.log('🔑 Using API key for provider:', modelConfig.provider, apiKey ? 'Found' : 'Missing');
 

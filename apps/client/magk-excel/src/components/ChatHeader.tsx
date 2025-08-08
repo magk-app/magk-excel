@@ -1,13 +1,11 @@
 import React, { memo, useState } from 'react';
-import { MessageSquare, Menu, Settings, Server, Download, Cog, FileIcon } from 'lucide-react';
+import { MessageSquare, Settings, Server, Download, Cog, FileIcon } from 'lucide-react';
 import { Button } from './ui/button';
 import { ModelSelector, ModelConfig } from './ModelSelector';
 import { MCPServerToggle } from './MCPServerToggle';
 import { Dialog, DialogContent, DialogTrigger } from './ui/dialog';
 
 interface ChatHeaderProps {
-  sidebarOpen: boolean;
-  onToggleSidebar: () => void;
   sessionTitle: string;
   messageCount: number;
   enabledServersCount: number;
@@ -25,8 +23,6 @@ interface ChatHeaderProps {
 }
 
 export const ChatHeader = memo(function ChatHeader({
-  sidebarOpen,
-  onToggleSidebar,
   sessionTitle,
   messageCount,
   enabledServersCount,
@@ -46,55 +42,51 @@ export const ChatHeader = memo(function ChatHeader({
 
   return (
     <>
-      <div className="h-14 border-b bg-background flex items-center justify-between px-4">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onToggleSidebar}
-            aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          <MessageSquare className="h-5 w-5" />
-          <div>
-            <h1 className="text-lg font-semibold">{sessionTitle}</h1>
+      <div className="h-14 border-b bg-background flex items-center justify-between px-4 overflow-hidden">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <MessageSquare className="h-5 w-5 flex-shrink-0" />
+          <div className="min-w-0">
+            <h1 className="text-lg font-semibold truncate">{sessionTitle}</h1>
             {messageCount > 0 && (
               <p className="text-xs text-muted-foreground">{messageCount} messages</p>
             )}
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {/* Demo Controls */}
           {children}
           
-          {/* Action Buttons */}
-          {hasExcelFiles && (
-            <Button size="sm" variant="outline" onClick={onExportToExcel}>
-              <Download className="h-4 w-4 mr-1" />
-              Export
+          {/* Action Buttons - Responsive layout */}
+          <div className="hidden sm:flex items-center gap-2">
+            {hasExcelFiles && (
+              <Button size="sm" variant="outline" onClick={onExportToExcel}>
+                <Download className="h-4 w-4 mr-1" />
+                <span className="hidden md:inline">Export</span>
+              </Button>
+            )}
+            
+            <Button size="sm" variant="outline" onClick={onTogglePDFPanel}>
+              <span className="hidden md:inline">PDF Extract</span>
+              <span className="md:hidden">PDF</span>
             </Button>
-          )}
+            
+            {/* File Persistence Button */}
+            {onOpenFilePersistence && (
+              <Button size="sm" variant="outline" onClick={onOpenFilePersistence}>
+                <FileIcon className="h-4 w-4 mr-1" />
+                <span className="hidden lg:inline">Files</span>
+              </Button>
+            )}
+          </div>
           
-          <Button size="sm" variant="outline" onClick={onTogglePDFPanel}>
-            PDF Extract
-          </Button>
-          
-          {/* File Persistence Button */}
-          {onOpenFilePersistence && (
-            <Button size="sm" variant="outline" onClick={onOpenFilePersistence}>
-              <FileIcon className="h-4 w-4 mr-1" />
-              Files
-            </Button>
-          )}
-          
-          {/* MCP Servers Status */}
+          {/* MCP Servers Status - Always visible but compact on mobile */}
           <Dialog open={showMCPDialog} onOpenChange={setShowMCPDialog}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline" className="relative">
-                <Server className="h-4 w-4 mr-1" />
-                Servers ({enabledServersCount})
+                <Server className="h-4 w-4" />
+                <span className="ml-1 hidden sm:inline">Servers</span>
+                <span className="ml-1">({enabledServersCount})</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">

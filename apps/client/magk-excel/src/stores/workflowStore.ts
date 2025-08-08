@@ -132,82 +132,140 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
 
     // Workflow Management
     createWorkflow: (name, type, chatSessionId) => {
-      console.log('🔧 Creating workflow:', { name, type, chatSessionId });
-      const id = `workflow-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const workflow: ExtendedWorkflow = {
-        id,
-        name,
-        type,
-        chatSessionId,
-        nodes: [],
-        edges: [],
-        status: 'draft',
-        metadata: {
-          created: new Date(),
-          modified: new Date(),
-          tags: [],
-          category: 'general'
-        },
-        version: 1
-      };
-
-      set((state) => {
-        if (type === WorkflowType.TEMPORARY) {
-          // Create new Map to ensure immutability
-          const newMap = new Map(state.temporaryWorkflows);
-          newMap.set(id, workflow);
-          state.temporaryWorkflows = newMap;
-          console.log('✅ Added to temporary workflows:', id, 'Total:', newMap.size);
-        } else {
-          const newMap = new Map(state.permanentWorkflows);
-          newMap.set(id, workflow);
-          state.permanentWorkflows = newMap;
-          console.log('✅ Added to permanent workflows:', id, 'Total:', newMap.size);
+      try {
+        console.log('🔧 Creating workflow:', { name, type, chatSessionId });
+        
+        // Validate input
+        if (!name?.trim()) {
+          throw new Error('Workflow name is required');
         }
-      });
+        if (!Object.values(WorkflowType).includes(type)) {
+          throw new Error('Invalid workflow type');
+        }
+        
+        const id = `workflow-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Enforce 1:1 relationship: temporary workflows MUST have a chat session
+        const finalChatSessionId = type === WorkflowType.TEMPORARY 
+          ? (chatSessionId || `workflow-chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`)
+          : undefined;
+        
+        const workflow: ExtendedWorkflow = {
+          id,
+          name: name.trim(),
+          type,
+          chatSessionId: finalChatSessionId,
+          nodes: [],
+          edges: [],
+          status: 'draft',
+          metadata: {
+            created: new Date(),
+            modified: new Date(),
+            tags: [],
+            category: 'general'
+          },
+          version: 1
+        };
 
-      return id;
+        set((state) => {
+          try {
+            if (type === WorkflowType.TEMPORARY) {
+              // Create new Map to ensure immutability
+              const newMap = new Map(state.temporaryWorkflows);
+              newMap.set(id, workflow);
+              state.temporaryWorkflows = newMap;
+              console.log('✅ Added to temporary workflows:', id, 'Total:', newMap.size);
+            } else {
+              const newMap = new Map(state.permanentWorkflows);
+              newMap.set(id, workflow);
+              state.permanentWorkflows = newMap;
+              console.log('✅ Added to permanent workflows:', id, 'Total:', newMap.size);
+            }
+          } catch (error) {
+            console.error('❌ Failed to store workflow:', error);
+            throw new Error('Failed to store workflow in state');
+          }
+        });
+
+        return id;
+      } catch (error) {
+        console.error('❌ Workflow creation failed:', error);
+        throw error;
+      }
     },
 
     loadWorkflow: (id) => {
-      console.log('📂 Loading workflow:', id);
-      set((state) => {
-        // Get workflow directly from the maps within the set function to ensure we have the current state
-        const workflow = state.temporaryWorkflows.get(id) ||
-                        state.permanentWorkflows.get(id) ||
-                        state.templates.get(id);
-        
-        if (workflow) {
-          console.log('✅ Found workflow:', workflow.name);
-          state.activeWorkflowId = id;
-          // Create a shallow copy to ensure reactivity but maintain reference to arrays
-          state.activeWorkflow = { ...workflow };
-          state.isEditing = false;
-          state.isDirty = false;
-        } else {
-          console.warn('⚠️ Workflow not found:', id);
+      try {
+        console.log('📂 Loading workflow:', id);
+        if (!id?.trim()) {
+          throw new Error('Workflow ID is required');
         }
-      });
+        
+        set((state) => {
+          // Get workflow directly from the maps within the set function to ensure we have the current state
+          const workflow = state.temporaryWorkflows.get(id) ||
+                          state.permanentWorkflows.get(id) ||
+                          state.templates.get(id);
+          
+          if (workflow) {
+            console.log('✅ Found workflow:', workflow.name);
+            state.activeWorkflowId = id;
+            // Create a deep copy to ensure proper state isolation
+            state.activeWorkflow = {
+              ...workflow,
+              nodes: [...workflow.nodes],
+              edges: [...workflow.edges],
+              metadata: { ...workflow.metadata }
+            };
+            state.isEditing = false;
+            state.isDirty = false;
+          } else {
+            console.warn('⚠️ Workflow not found:', id);
+            throw new Error(`Workflow with ID '${id}' not found`);
+          }
+        });
+      } catch (error) {
+        console.error('❌ Failed to load workflow:', error);
+        throw error;
+      }
     },
 
     saveWorkflow: (id) => {
-      const state = get();
-      if (state.activeWorkflow && state.activeWorkflowId === id) {
-        const workflow = { ...state.activeWorkflow };
-        workflow.metadata.modified = new Date();
+      try {
+        const state = get();
+        if (!state.activeWorkflow || state.activeWorkflowId !== id) {
+          throw new Error('No active workflow matches the provided ID');
+        }
+        
+        const workflow = { 
+          ...state.activeWorkflow,
+          metadata: {
+            ...state.activeWorkflow.metadata,
+            modified: new Date()
+          }
+        };
         
         set((draft) => {
-          if (workflow.type === WorkflowType.TEMPORARY) {
-            const newMap = new Map(draft.temporaryWorkflows);
-            newMap.set(id, workflow);
-            draft.temporaryWorkflows = newMap;
-          } else {
-            const newMap = new Map(draft.permanentWorkflows);
-            newMap.set(id, workflow);
-            draft.permanentWorkflows = newMap;
+          try {
+            if (workflow.type === WorkflowType.TEMPORARY) {
+              const newMap = new Map(draft.temporaryWorkflows);
+              newMap.set(id, workflow);
+              draft.temporaryWorkflows = newMap;
+            } else {
+              const newMap = new Map(draft.permanentWorkflows);
+              newMap.set(id, workflow);
+              draft.permanentWorkflows = newMap;
+            }
+            draft.isDirty = false;
+            console.log('✅ Workflow saved successfully:', id);
+          } catch (error) {
+            console.error('❌ Failed to save workflow:', error);
+            throw new Error('Failed to save workflow to store');
           }
-          draft.isDirty = false;
         });
+      } catch (error) {
+        console.error('❌ Save workflow failed:', error);
+        throw error;
       }
     },
 
@@ -272,7 +330,7 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
         ...workflow,
         id: newId,
         type: WorkflowType.PERMANENT,
-        chatSessionId: undefined,
+        chatSessionId: undefined, // Permanent workflows don't have active chat sessions
         metadata: {
           ...workflow.metadata,
           modified: new Date()
@@ -333,26 +391,31 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
     // Node Management
     addNode: (node) => {
       set((state) => {
-        if (state.activeWorkflow) {
-          // Ensure nodes array exists
-          if (!state.activeWorkflow.nodes) {
-            state.activeWorkflow.nodes = [];
-          }
-          state.activeWorkflow.nodes.push(node);
+        if (state.activeWorkflow && state.activeWorkflowId) {
+          // Create a new workflow object with the added node
+          const updatedWorkflow: ExtendedWorkflow = {
+            ...state.activeWorkflow,
+            nodes: [...(state.activeWorkflow.nodes || []), node],
+            metadata: {
+              ...state.activeWorkflow.metadata,
+              modified: new Date()
+            }
+          };
+          
+          // Update the active workflow
+          state.activeWorkflow = updatedWorkflow;
           state.isDirty = true;
           
-          // Also update the workflow in the appropriate map
+          // Update the workflow in the appropriate map
           const workflowId = state.activeWorkflowId;
-          if (workflowId) {
-            if (state.activeWorkflow.type === WorkflowType.TEMPORARY) {
-              const newMap = new Map(state.temporaryWorkflows);
-              newMap.set(workflowId, state.activeWorkflow);
-              state.temporaryWorkflows = newMap;
-            } else {
-              const newMap = new Map(state.permanentWorkflows);
-              newMap.set(workflowId, state.activeWorkflow);
-              state.permanentWorkflows = newMap;
-            }
+          if (updatedWorkflow.type === WorkflowType.TEMPORARY) {
+            const newMap = new Map(state.temporaryWorkflows);
+            newMap.set(workflowId, updatedWorkflow);
+            state.temporaryWorkflows = newMap;
+          } else {
+            const newMap = new Map(state.permanentWorkflows);
+            newMap.set(workflowId, updatedWorkflow);
+            state.permanentWorkflows = newMap;
           }
         }
       });
@@ -360,14 +423,40 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
 
     updateNode: (nodeId, updates) => {
       set((state) => {
-        if (state.activeWorkflow) {
+        if (state.activeWorkflow && state.activeWorkflowId) {
           const nodeIndex = state.activeWorkflow.nodes.findIndex(n => n.id === nodeId);
           if (nodeIndex !== -1) {
-            state.activeWorkflow.nodes[nodeIndex] = {
-              ...state.activeWorkflow.nodes[nodeIndex],
+            // Create a new nodes array with the updated node
+            const updatedNodes = [...state.activeWorkflow.nodes];
+            updatedNodes[nodeIndex] = {
+              ...updatedNodes[nodeIndex],
               ...updates
             };
+            
+            // Create a new workflow object
+            const updatedWorkflow: ExtendedWorkflow = {
+              ...state.activeWorkflow,
+              nodes: updatedNodes,
+              metadata: {
+                ...state.activeWorkflow.metadata,
+                modified: new Date()
+              }
+            };
+            
+            // Update both active workflow and the map
+            state.activeWorkflow = updatedWorkflow;
             state.isDirty = true;
+            
+            const workflowId = state.activeWorkflowId;
+            if (updatedWorkflow.type === WorkflowType.TEMPORARY) {
+              const newMap = new Map(state.temporaryWorkflows);
+              newMap.set(workflowId, updatedWorkflow);
+              state.temporaryWorkflows = newMap;
+            } else {
+              const newMap = new Map(state.permanentWorkflows);
+              newMap.set(workflowId, updatedWorkflow);
+              state.permanentWorkflows = newMap;
+            }
           }
         }
       });
@@ -375,64 +464,129 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
 
     deleteNode: (nodeId) => {
       set((state) => {
-        if (state.activeWorkflow) {
-          state.activeWorkflow.nodes = state.activeWorkflow.nodes.filter(n => n.id !== nodeId);
-          state.activeWorkflow.edges = state.activeWorkflow.edges.filter(
-            e => e.source !== nodeId && e.target !== nodeId
-          );
-          state.isDirty = true;
+        if (state.activeWorkflow && state.activeWorkflowId) {
+          try {
+            // Create a new workflow object with filtered nodes and edges
+            const updatedWorkflow: ExtendedWorkflow = {
+              ...state.activeWorkflow,
+              nodes: state.activeWorkflow.nodes.filter(n => n.id !== nodeId),
+              edges: state.activeWorkflow.edges.filter(
+                e => e.source !== nodeId && e.target !== nodeId
+              ),
+              metadata: {
+                ...state.activeWorkflow.metadata,
+                modified: new Date()
+              }
+            };
+            
+            // Update both active workflow and the map
+            state.activeWorkflow = updatedWorkflow;
+            state.isDirty = true;
+            
+            const workflowId = state.activeWorkflowId;
+            if (updatedWorkflow.type === WorkflowType.TEMPORARY) {
+              const newMap = new Map(state.temporaryWorkflows);
+              newMap.set(workflowId, updatedWorkflow);
+              state.temporaryWorkflows = newMap;
+            } else {
+              const newMap = new Map(state.permanentWorkflows);
+              newMap.set(workflowId, updatedWorkflow);
+              state.permanentWorkflows = newMap;
+            }
+          } catch (error) {
+            console.error('❌ Failed to delete node:', error);
+            throw new Error('Failed to delete node from workflow');
+          }
         }
       });
     },
 
     duplicateNode: (nodeId) => {
-      const state = get();
-      if (!state.activeWorkflow) return '';
-
-      const node = state.activeWorkflow.nodes.find(n => n.id === nodeId);
-      if (!node) return '';
-
-      const newId = `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const duplicated: WorkflowNode = {
-        ...node,
-        id: newId,
-        position: {
-          x: node.position.x + 50,
-          y: node.position.y + 50
+      try {
+        const state = get();
+        if (!state.activeWorkflow || !state.activeWorkflowId) {
+          throw new Error('No active workflow available');
         }
-      };
 
-      set((state) => {
-        if (state.activeWorkflow) {
-          state.activeWorkflow.nodes.push(duplicated);
-          state.isDirty = true;
+        const node = state.activeWorkflow.nodes.find(n => n.id === nodeId);
+        if (!node) {
+          throw new Error('Node not found');
         }
-      });
 
-      return newId;
+        const newId = `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const duplicated: WorkflowNode = {
+          ...node,
+          id: newId,
+          position: {
+            x: node.position.x + 50,
+            y: node.position.y + 50
+          }
+        };
+
+        set((state) => {
+          if (state.activeWorkflow && state.activeWorkflowId) {
+            // Create a new workflow object with the duplicated node
+            const updatedWorkflow: ExtendedWorkflow = {
+              ...state.activeWorkflow,
+              nodes: [...state.activeWorkflow.nodes, duplicated],
+              metadata: {
+                ...state.activeWorkflow.metadata,
+                modified: new Date()
+              }
+            };
+            
+            // Update both active workflow and the map
+            state.activeWorkflow = updatedWorkflow;
+            state.isDirty = true;
+            
+            const workflowId = state.activeWorkflowId;
+            if (updatedWorkflow.type === WorkflowType.TEMPORARY) {
+              const newMap = new Map(state.temporaryWorkflows);
+              newMap.set(workflowId, updatedWorkflow);
+              state.temporaryWorkflows = newMap;
+            } else {
+              const newMap = new Map(state.permanentWorkflows);
+              newMap.set(workflowId, updatedWorkflow);
+              state.permanentWorkflows = newMap;
+            }
+          }
+        });
+
+        return newId;
+      } catch (error) {
+        console.error('❌ Failed to duplicate node:', error);
+        throw error;
+      }
     },
 
     // Edge Management
     addEdge: (edge) => {
       set((state) => {
-        if (state.activeWorkflow) {
-          // Ensure edges array exists
-          if (!state.activeWorkflow.edges) {
-            state.activeWorkflow.edges = [];
-          }
-          state.activeWorkflow.edges.push(edge);
+        if (state.activeWorkflow && state.activeWorkflowId) {
+          // Create a new workflow object with the added edge
+          const updatedWorkflow: ExtendedWorkflow = {
+            ...state.activeWorkflow,
+            edges: [...(state.activeWorkflow.edges || []), edge],
+            metadata: {
+              ...state.activeWorkflow.metadata,
+              modified: new Date()
+            }
+          };
+          
+          // Update the active workflow
+          state.activeWorkflow = updatedWorkflow;
           state.isDirty = true;
           
           // Also update the workflow in the appropriate map
           const workflowId = state.activeWorkflowId;
           if (workflowId) {
-            if (state.activeWorkflow.type === WorkflowType.TEMPORARY) {
+            if (updatedWorkflow.type === WorkflowType.TEMPORARY) {
               const newMap = new Map(state.temporaryWorkflows);
-              newMap.set(workflowId, state.activeWorkflow);
+              newMap.set(workflowId, updatedWorkflow);
               state.temporaryWorkflows = newMap;
             } else {
               const newMap = new Map(state.permanentWorkflows);
-              newMap.set(workflowId, state.activeWorkflow);
+              newMap.set(workflowId, updatedWorkflow);
               state.permanentWorkflows = newMap;
             }
           }
@@ -442,14 +596,45 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
 
     updateEdge: (edgeId, updates) => {
       set((state) => {
-        if (state.activeWorkflow) {
+        if (state.activeWorkflow && state.activeWorkflowId) {
           const edgeIndex = state.activeWorkflow.edges.findIndex(e => e.id === edgeId);
           if (edgeIndex !== -1) {
-            state.activeWorkflow.edges[edgeIndex] = {
-              ...state.activeWorkflow.edges[edgeIndex],
-              ...updates
-            };
-            state.isDirty = true;
+            try {
+              // Create a new edges array with the updated edge
+              const updatedEdges = [...state.activeWorkflow.edges];
+              updatedEdges[edgeIndex] = {
+                ...updatedEdges[edgeIndex],
+                ...updates
+              };
+              
+              // Create a new workflow object
+              const updatedWorkflow: ExtendedWorkflow = {
+                ...state.activeWorkflow,
+                edges: updatedEdges,
+                metadata: {
+                  ...state.activeWorkflow.metadata,
+                  modified: new Date()
+                }
+              };
+              
+              // Update both active workflow and the map
+              state.activeWorkflow = updatedWorkflow;
+              state.isDirty = true;
+              
+              const workflowId = state.activeWorkflowId;
+              if (updatedWorkflow.type === WorkflowType.TEMPORARY) {
+                const newMap = new Map(state.temporaryWorkflows);
+                newMap.set(workflowId, updatedWorkflow);
+                state.temporaryWorkflows = newMap;
+              } else {
+                const newMap = new Map(state.permanentWorkflows);
+                newMap.set(workflowId, updatedWorkflow);
+                state.permanentWorkflows = newMap;
+              }
+            } catch (error) {
+              console.error('❌ Failed to update edge:', error);
+              throw new Error('Failed to update edge in workflow');
+            }
           }
         }
       });
@@ -457,9 +642,36 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
 
     deleteEdge: (edgeId) => {
       set((state) => {
-        if (state.activeWorkflow) {
-          state.activeWorkflow.edges = state.activeWorkflow.edges.filter(e => e.id !== edgeId);
-          state.isDirty = true;
+        if (state.activeWorkflow && state.activeWorkflowId) {
+          try {
+            // Create a new workflow object with filtered edges
+            const updatedWorkflow: ExtendedWorkflow = {
+              ...state.activeWorkflow,
+              edges: state.activeWorkflow.edges.filter(e => e.id !== edgeId),
+              metadata: {
+                ...state.activeWorkflow.metadata,
+                modified: new Date()
+              }
+            };
+            
+            // Update both active workflow and the map
+            state.activeWorkflow = updatedWorkflow;
+            state.isDirty = true;
+            
+            const workflowId = state.activeWorkflowId;
+            if (updatedWorkflow.type === WorkflowType.TEMPORARY) {
+              const newMap = new Map(state.temporaryWorkflows);
+              newMap.set(workflowId, updatedWorkflow);
+              state.temporaryWorkflows = newMap;
+            } else {
+              const newMap = new Map(state.permanentWorkflows);
+              newMap.set(workflowId, updatedWorkflow);
+              state.permanentWorkflows = newMap;
+            }
+          } catch (error) {
+            console.error('❌ Failed to delete edge:', error);
+            throw new Error('Failed to delete edge from workflow');
+          }
         }
       });
     },
@@ -506,15 +718,62 @@ export const useWorkflowStore = create<WorkflowStoreState>()(
     },
 
     updateNodeStatus: (workflowId, nodeId, status) => {
-      const workflow = get().getWorkflowById(workflowId);
-      if (workflow) {
-        const node = workflow.nodes.find(n => n.id === nodeId);
-        if (node && node.data) {
-          set((state) => {
-            node.data.status = status;
-            state.isDirty = true;
-          });
+      try {
+        const workflow = get().getWorkflowById(workflowId);
+        if (!workflow) {
+          throw new Error(`Workflow '${workflowId}' not found`);
         }
+        
+        const nodeIndex = workflow.nodes.findIndex(n => n.id === nodeId);
+        if (nodeIndex === -1) {
+          throw new Error(`Node '${nodeId}' not found in workflow`);
+        }
+        
+        const node = workflow.nodes[nodeIndex];
+        if (!node.data) {
+          throw new Error(`Node '${nodeId}' has no data object`);
+        }
+
+        set((state) => {
+          // Update the workflow in the appropriate map
+          const updatedNodes = [...workflow.nodes];
+          updatedNodes[nodeIndex] = {
+            ...node,
+            data: {
+              ...node.data,
+              status
+            }
+          };
+          
+          const updatedWorkflow: ExtendedWorkflow = {
+            ...workflow,
+            nodes: updatedNodes,
+            metadata: {
+              ...workflow.metadata,
+              modified: new Date()
+            }
+          };
+          
+          // Update in the appropriate map
+          if (workflow.type === WorkflowType.TEMPORARY) {
+            const newMap = new Map(state.temporaryWorkflows);
+            newMap.set(workflowId, updatedWorkflow);
+            state.temporaryWorkflows = newMap;
+          } else {
+            const newMap = new Map(state.permanentWorkflows);
+            newMap.set(workflowId, updatedWorkflow);
+            state.permanentWorkflows = newMap;
+          }
+          
+          // Update active workflow if it's the same
+          if (state.activeWorkflowId === workflowId) {
+            state.activeWorkflow = updatedWorkflow;
+            state.isDirty = true;
+          }
+        });
+      } catch (error) {
+        console.error('❌ Failed to update node status:', error);
+        throw error;
       }
     },
 

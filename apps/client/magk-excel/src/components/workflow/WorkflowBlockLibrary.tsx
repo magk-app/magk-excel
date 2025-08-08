@@ -42,7 +42,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -536,6 +536,8 @@ const WORKFLOW_BLOCKS: WorkflowBlock[] = [
 ];
 
 interface WorkflowBlockLibraryProps {
+  isOpen: boolean;
+  onToggle: () => void;
   onBlockSelect?: (block: WorkflowBlock) => void;
   onBlockAdd?: (block: WorkflowBlock) => void;
   selectedCategory?: BlockCategory;
@@ -544,6 +546,8 @@ interface WorkflowBlockLibraryProps {
 }
 
 export const WorkflowBlockLibrary: React.FC<WorkflowBlockLibraryProps> = ({
+  isOpen,
+  onToggle,
   onBlockSelect,
   onBlockAdd,
   selectedCategory: initialCategory = 'all',
@@ -677,11 +681,11 @@ export const WorkflowBlockLibrary: React.FC<WorkflowBlockLibraryProps> = ({
                 <TooltipTrigger asChild>
                   <Button
                     size="sm"
-                    variant="ghost"
-                    className="h-7 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    variant="outline"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={(e) => handleAddBlock(block, e)}
                   >
-                    <Plus className="h-3 w-3" />
+                    <Plus className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Add to workflow</TooltipContent>
@@ -738,8 +742,8 @@ export const WorkflowBlockLibrary: React.FC<WorkflowBlockLibraryProps> = ({
               <TooltipTrigger asChild>
                 <Button
                   size="sm"
-                  variant="ghost"
-                  className="h-8 px-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                  variant="outline"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={(e) => handleAddBlock(block, e)}
                 >
                   <Plus className="h-4 w-4" />
@@ -753,30 +757,71 @@ export const WorkflowBlockLibrary: React.FC<WorkflowBlockLibraryProps> = ({
     </motion.div>
   );
 
+  if (!isOpen) {
+    return (
+      <div className="w-12 border-r bg-muted/30 flex flex-col items-center py-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onToggle}
+          className="h-8 w-8 p-0"
+          title="Open block library"
+        >
+          🧩
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            // Quick add most popular block
+            const popularBlock = filteredBlocks.sort((a, b) => (b.usage || 0) - (a.usage || 0))[0];
+            if (popularBlock) onBlockAdd?.(popularBlock);
+          }}
+          className="h-8 w-8 p-0 mt-2"
+          title="Add popular block"
+        >
+          ➕
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div className={cn('flex flex-col h-full', className)}>
+    <div className={cn('w-80 border-r bg-muted/30 flex flex-col h-full', className)}>
       {/* Header */}
-      <div className="p-4 border-b">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Workflow Block Library</h2>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant={viewMode === 'grid' ? 'default' : 'outline'}
-              onClick={() => setViewMode('grid')}
-              className="h-8 px-2"
-            >
-              <Grid className="h-4 w-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant={viewMode === 'list' ? 'default' : 'outline'}
-              onClick={() => setViewMode('list')}
-              className="h-8 px-2"
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
+      <div className="p-4 border-b bg-background/50">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">Block Library</h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggle}
+            className="h-8 w-8 p-0"
+            title="Close sidebar"
+          >
+            ◀
+          </Button>
+        </div>
+        
+        <div className="flex gap-2 mb-3">
+          <Button
+            size="sm"
+            variant={viewMode === 'grid' ? 'default' : 'outline'}
+            onClick={() => setViewMode('grid')}
+            className="flex-1"
+          >
+            <Grid className="h-4 w-4 mr-1" />
+            Grid
+          </Button>
+          <Button
+            size="sm"
+            variant={viewMode === 'list' ? 'default' : 'outline'}
+            onClick={() => setViewMode('list')}
+            className="flex-1"
+          >
+            <List className="h-4 w-4 mr-1" />
+            List
+          </Button>
         </div>
         
         {/* Search */}
@@ -791,50 +836,50 @@ export const WorkflowBlockLibrary: React.FC<WorkflowBlockLibraryProps> = ({
         </div>
       </div>
 
-      {/* Category Tabs */}
-      <Tabs value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as BlockCategory)} className="flex-1 flex flex-col overflow-hidden">
-        <TabsList className="grid grid-cols-8 w-full rounded-none border-b h-auto p-0">
+      {/* Category Buttons */}
+      <div className="border-b">
+        <div className="flex items-center gap-2 p-4 overflow-x-auto">
           {(['all', 'mcp', 'api', 'llm', 'file', 'data', 'logic', 'output'] as BlockCategory[]).map(category => (
-            <TabsTrigger
+            <Button
               key={category}
-              value={category}
-              className="rounded-none border-r last:border-r-0 data-[state=active]:bg-accent flex flex-col gap-1 py-3"
+              size="sm"
+              variant={selectedCategory === category ? 'default' : 'outline'}
+              onClick={() => setSelectedCategory(category)}
+              className="flex items-center gap-1 whitespace-nowrap"
             >
-              <div className={cn('flex items-center gap-1', getCategoryColor(category))}>
+              <div className={cn('flex items-center gap-1', selectedCategory === category ? 'text-primary-foreground' : getCategoryColor(category))}>
                 {getCategoryIcon(category)}
                 <span className="text-xs font-medium capitalize">{category === 'all' ? 'All' : category.toUpperCase()}</span>
+                <span className="text-xs font-medium ml-1">{categoryStats[category]}</span>
               </div>
-              <Badge variant="outline" className="text-xs h-5">
-                {categoryStats[category]}
-              </Badge>
-            </TabsTrigger>
+            </Button>
           ))}
-        </TabsList>
+        </div>
+      </div>
 
-        <TabsContent value={selectedCategory} className="flex-1 mt-0 overflow-hidden">
-          <ScrollArea className="h-full w-full">
-            <div className="p-4 min-h-0">
-              {filteredBlocks.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-sm">No blocks found</p>
-                  <p className="text-xs mt-1">Try adjusting your search or category filter</p>
-                </div>
-              ) : (
-                <div className={cn(
-                  viewMode === 'grid' 
-                    ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
-                    : 'space-y-2'
-                )}>
-                  {filteredBlocks.map(block => 
-                    viewMode === 'grid' ? renderBlockCard(block) : renderBlockList(block)
-                  )}
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-        </TabsContent>
-      </Tabs>
+      <div className="flex-1 overflow-hidden">
+        <ScrollArea className="h-full w-full">
+          <div className="p-4 min-h-0">
+            {filteredBlocks.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="text-sm">No blocks found</p>
+                <p className="text-xs mt-1">Try adjusting your search or category filter</p>
+              </div>
+            ) : (
+              <div className={cn(
+                viewMode === 'grid' 
+                  ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
+                  : 'space-y-2'
+              )}>
+                {filteredBlocks.map(block => 
+                  viewMode === 'grid' ? renderBlockCard(block) : renderBlockList(block)
+                )}
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
 
       {/* Selected Block Details */}
       <AnimatePresence>
@@ -850,6 +895,7 @@ export const WorkflowBlockLibrary: React.FC<WorkflowBlockLibraryProps> = ({
                 <h3 className="font-medium text-sm">{selectedBlock.name}</h3>
                 <Button
                   size="sm"
+                  variant="outline"
                   onClick={() => onBlockAdd?.(selectedBlock)}
                 >
                   <Plus className="h-4 w-4 mr-1" />

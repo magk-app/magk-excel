@@ -285,8 +285,6 @@ export function ChatInterface() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Chat Header with Demo Controls */}
         <ChatHeader
-          sidebarOpen={sidebarOpen}
-          onToggleSidebar={handleSidebarToggle}
           sessionTitle={sessionTitle}
           messageCount={messageCount}
           enabledServersCount={serverStatus.enabledCount}
