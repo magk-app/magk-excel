@@ -5,6 +5,7 @@ import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import 'highlight.js/styles/github-dark.css';
 import { ToolCallDisplay } from './ToolCallDisplay';
+import { ThinkingTokensDisplay } from './ThinkingTokensDisplay';
 
 interface MessageRendererProps {
   content: string;
@@ -20,6 +21,19 @@ interface MessageRendererProps {
     status?: 'pending' | 'running' | 'completed' | 'error';
     duration?: number;
   }>;
+  thinking?: {
+    content: string;
+    tokenCount?: number;
+    isStreaming?: boolean;
+    isComplete?: boolean;
+  };
+  thinkingHistory?: {
+    content: string;
+    tokenCount?: number;
+    timestamp: number;
+  }[];
+  // Optional mock indicator
+  isMock?: boolean;
 }
 
 interface ThinkingIndicatorProps {
@@ -120,9 +134,9 @@ const ToolCallIndicator = memo(({ toolName }: { toolName: string }) => (
   </div>
 ));
 
-const MessageRenderer = memo(({ content, isThinking, isStreaming, isError, role, mcpToolCalls }: MessageRendererProps) => {
-  // Show thinking indicator for assistant messages
-  if (isThinking && role === 'assistant') {
+const MessageRenderer = memo(({ content, isThinking, isStreaming, isError, role, mcpToolCalls, thinking, thinkingHistory, isMock }: MessageRendererProps) => {
+  // Show thinking indicator for assistant messages (legacy)
+  if (isThinking && role === 'assistant' && !thinking) {
     return <ThinkingIndicator isVisible={true} />;
   }
 
@@ -155,6 +169,25 @@ const MessageRenderer = memo(({ content, isThinking, isStreaming, isError, role,
 
   return (
     <div className={`message-content ${role === 'user' ? 'user-message' : 'assistant-message'}`}>
+      {/* Mock response badge */}
+      {role === 'assistant' && isMock && (
+        <div className="mb-2 inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H9l-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Mock response (no live model)
+        </div>
+      )}
+      {/* Display thinking tokens if present */}
+      {role === 'assistant' && (thinking || thinkingHistory?.length) && (
+        <ThinkingTokensDisplay
+          thinking={thinking}
+          thinkingHistory={thinkingHistory}
+          isVisible={true}
+          allowToggle={true}
+        />
+      )}
+      
       {/* Display tool calls if present */}
       {mcpToolCalls && mcpToolCalls.length > 0 && (
         <div className="mb-3">

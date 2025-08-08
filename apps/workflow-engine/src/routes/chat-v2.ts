@@ -20,6 +20,7 @@ const chatRequestSchema = z.object({
     maxTokens: z.number().optional(),
     apiKey: z.string().optional()
   }),
+  forceExecutor: z.boolean().optional().default(false),
   history: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string()
@@ -46,7 +47,7 @@ const chatRequestSchema = z.object({
 const llmService = new LLMService();
 
 // Helper function for AI-based MCP tool selection
-async function selectMCPToolsWithAI(message: string, mcpTools: any[], attachments: any[] = []): Promise<any[]> {
+async function selectMCPToolsWithAI(message: string, mcpTools: any[], attachments: any[] = [], forceExecutor: boolean = false): Promise<any[]> {
   // Create a concise tool catalog for the LLM
   const toolCatalog = mcpTools.map(tool => ({
     server: tool.server,
@@ -74,6 +75,11 @@ For Excel data extraction/processing, use:
 - excel/excel_write_to_sheet (save to: ${outputPath})
 - excel/excel_read_sheet (read existing files)
 - excel/excel_describe_sheets (get sheet info)
+
+For dynamic code execution with ExcelJS, use:
+- executor/run_ts (provide a module exporting async function main(ctx) and return JSON)
+
+${forceExecutor ? 'REQUIREMENT: Return exactly one selection using executor/run_ts with args including a code string (exports async function main(ctx)), and include any absolute temp paths in args.readPaths if needed.' : ''}
 
 For web scraping, use: fetch/fetch or puppeteer/navigate
 For HTTP requests, use: fetch/fetch
@@ -131,14 +137,18 @@ Return JSON array with tool selections including appropriate file paths:`;
 // Helper function to save uploaded files to temp directory
 function saveUploadedFile(attachment: any): string | null {
   try {
-    // Generate temp file path
-    const tempPath = join(tmpdir(), attachment.name);
+    // Create a unique filename to avoid conflicts
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(7);
+    const fileExtension = attachment.name.split('.').pop() || '';
+    const uniqueName = `upload_${timestamp}_${randomSuffix}.${fileExtension}`;
+    const tempPath = join(tmpdir(), uniqueName);
     
     // Decode base64 content if present
     if (attachment.content) {
       const buffer = Buffer.from(attachment.content, 'base64');
       writeFileSync(tempPath, buffer);
-      console.log('📁 Saved uploaded file to:', tempPath);
+      console.log(`📁 Saved uploaded file: ${attachment.name} -> ${tempPath}`);
       return tempPath;
     }
     
@@ -206,55 +216,53 @@ chatV2Route.post('/chat/stream', async (c) => {
         let mcpToolCalls: any[] = [];
         let savedFilePaths: Record<string, string> = {};
         
+        // First, save all uploaded files to temp storage to create file mappings
+        if (request.attachments && request.attachments.length > 0) {
+          console.log('💾 Saving uploaded files to temp storage...');
+          for (const attachment of request.attachments) {
+            const tempPath = saveUploadedFile(attachment);
+            if (tempPath) {
+              savedFilePaths[attachment.name] = tempPath;
+              console.log(`📋 File mapping: "${attachment.name}" -> "${tempPath}"`);
+            }
+          }
+        }
+        
         if (request.mcpTools && request.mcpTools.length > 0) {
           console.log('🤖 Using AI to select appropriate MCP tools...');
-          mcpToolCalls = await selectMCPToolsWithAI(request.message, request.mcpTools, request.attachments);
+          mcpToolCalls = await selectMCPToolsWithAI(request.message, request.mcpTools, request.attachments, request.forceExecutor);
           
           // Fallback: Check for uploaded files that need processing
           if (mcpToolCalls.length === 0 && request.attachments.length > 0) {
-            console.log('🔧 Fallback: Processing uploaded files with MCP tools');
+            console.log('🔧 Fallback: Adding default processing tools for uploaded files');
             
             const excelFiles = request.attachments.filter(a => 
               a.type.includes('excel') || a.type.includes('spreadsheet') || 
               a.name.endsWith('.xlsx') || a.name.endsWith('.xls')
             );
             
-            const pdfFiles = request.attachments.filter(a => 
-              a.type === 'application/pdf' || a.name.endsWith('.pdf')
-            );
+            // const pdfFiles = request.attachments.filter(a => 
+            //   a.type === 'application/pdf' || a.name.endsWith('.pdf')
+            // );
             
-            // Save files to temp directory for MCP tool access
-            for (const attachment of [...excelFiles, ...pdfFiles]) {
-              const tempPath = saveUploadedFile(attachment);
+            // Add appropriate tool calls for uploaded files
+            for (const attachment of excelFiles) {
+              const tempPath = savedFilePaths[attachment.name];
               if (tempPath) {
-                savedFilePaths[attachment.name] = tempPath;
+                // Add Excel tool calls
+                const describeTool = request.mcpTools.find(t => t.server === 'excel' && t.name === 'excel_describe_sheets');
+                const readTool = request.mcpTools.find(t => t.server === 'excel' && t.name === 'excel_read_sheet');
                 
-                // Add appropriate tool calls
-                if (excelFiles.includes(attachment)) {
-                  // Add Excel tool calls
-                  const describeTool = request.mcpTools.find(t => t.server === 'excel' && t.name === 'excel_describe_sheets');
-                  const readTool = request.mcpTools.find(t => t.server === 'excel' && t.name === 'excel_read_sheet');
-                  
-                  if (describeTool) {
-                    mcpToolCalls.push({
-                      server: 'excel',
-                      tool: 'excel_describe_sheets',
-                      args: { file_path: tempPath }
-                    });
-                  }
-                  
-                  if (readTool) {
-                    mcpToolCalls.push({
-                      server: 'excel',
-                      tool: 'excel_read_sheet',
-                      args: { file_path: tempPath, sheet_name: 'Sheet1', limit: 100 }
-                    });
-                  }
+                if (describeTool) {
+                  mcpToolCalls.push({
+                    server: 'excel',
+                    tool: 'excel_describe_sheets',
+                    args: { file_path: tempPath }
+                  });
                 }
                 
-                // Add PDF tool calls
+                // Add PDF tool calls for PDF files
                 if (pdfFiles.includes(attachment)) {
-                  // Add PDF tool calls
                   const pdfExtractTool = request.mcpTools.find(t => t.server === 'pdf' && t.name === 'pdf_extract_tables');
                   const pdfTextTool = request.mcpTools.find(t => t.server === 'pdf' && t.name === 'pdf_extract_text');
                   
@@ -273,9 +281,18 @@ chatV2Route.post('/chat/stream', async (c) => {
                       args: { file_path: tempPath }
                     });
                   }
+                } else if (readTool) {
+                  // Add Excel tool calls for Excel files
+                  mcpToolCalls.push({
+                    server: 'excel',
+                    tool: 'excel_read_sheet',
+                    args: { file_path: tempPath, sheet_name: 'Sheet1', limit: 100 }
+                  });
                 }
               }
             }
+            
+            // TODO: Add PDF tool calls when PDF tools are available
           }
         }
         
@@ -352,8 +369,7 @@ When relevant, mention these tools and how they can help with the user's request
             model: request.modelConfig.model,
             enableThinking: request.modelConfig.enableThinking,
             temperature: request.modelConfig.temperature,
-            maxTokens: request.modelConfig.maxTokens,
-            apiKey: request.modelConfig.apiKey || process.env.ANTHROPIC_API_KEY
+            maxTokens: request.modelConfig.maxTokens
           }
         );
 
@@ -382,7 +398,8 @@ When relevant, mention these tools and how they can help with the user's request
             data: JSON.stringify({
               type: 'toolCalls',
               toolCalls: mcpToolCalls,
-              message: `Executing ${mcpToolCalls.length} MCP tool(s)...`
+              message: `Executing ${mcpToolCalls.length} MCP tool(s)...`,
+              savedFiles: Object.keys(savedFilePaths).length > 0 ? savedFilePaths : undefined
             })
           });
           
@@ -397,6 +414,7 @@ When relevant, mention these tools and how they can help with the user's request
             content: accumulatedText,
             isStreaming: false,
             thinking: response.thinking,
+            isMock: response.isMock,
             mcpToolCalls: mcpToolCalls.length > 0 ? mcpToolCalls : undefined,
             savedFiles: Object.keys(savedFilePaths).length > 0 ? savedFilePaths : undefined
           })
@@ -443,6 +461,18 @@ chatV2Route.post('/chat', async (c) => {
     // Perform AI-based tool selection (same as streaming)
     let mcpToolCalls: any[] = [];
     let savedFilePaths: Record<string, string> = {};
+    
+    // First, save all uploaded files to temp storage to create file mappings
+    if (request.attachments && request.attachments.length > 0) {
+      console.log('💾 Saving uploaded files to temp storage...');
+      for (const attachment of request.attachments) {
+        const tempPath = saveUploadedFile(attachment);
+        if (tempPath) {
+          savedFilePaths[attachment.name] = tempPath;
+          console.log(`📋 File mapping: "${attachment.name}" -> "${tempPath}"`);
+        }
+      }
+    }
     
     if (request.mcpTools && request.mcpTools.length > 0) {
       console.log('🤖 Using AI to select appropriate MCP tools...');
@@ -590,8 +620,7 @@ When relevant, mention these tools and how they can help with the user's request
         model: request.modelConfig.model,
         enableThinking: request.modelConfig.enableThinking,
         temperature: request.modelConfig.temperature,
-        maxTokens: request.modelConfig.maxTokens,
-        apiKey: request.modelConfig.apiKey || process.env.ANTHROPIC_API_KEY
+        maxTokens: request.modelConfig.maxTokens
       }
     );
 
@@ -604,6 +633,7 @@ When relevant, mention these tools and how they can help with the user's request
       success: true,
       response: response.response,
       thinking: response.thinking,
+      isMock: response.isMock,
       model: request.modelConfig.model,
       timestamp: new Date().toISOString(),
       mcpToolCalls: mcpToolCalls.length > 0 ? mcpToolCalls : undefined,

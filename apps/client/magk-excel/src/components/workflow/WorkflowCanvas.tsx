@@ -4,6 +4,7 @@
  */
 
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import './WorkflowCard.css'; // Import CSS fixes for card transparency and spacing
 import {
   ReactFlow,
   Node,

@@ -17,6 +17,7 @@
     "status": "echo 'Checking development server status...' && lsof -i :5173 -i :8000 -i :3001 || echo 'No servers running on expected ports'"
   },
   "dependencies": {
+    "deno": "^2.4.3",
     "husky": "^9.1.7",
     "pdfjs-dist": "^5.4.54",
     "react-markdown": "^10.1.0",

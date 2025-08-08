@@ -48,7 +48,7 @@ export class ChatRouter {
     }
   }
 
-  private analyzeIntent(message: string, history: ChatMessage[]): ChatAction {
+  private analyzeIntent(message: string, _history: ChatMessage[]): ChatAction {
     const lowerMessage = message.toLowerCase();
     
     // Check for workflow creation keywords
@@ -87,13 +87,13 @@ export class ChatRouter {
     return keywords.some(keyword => text.includes(keyword));
   }
 
-  private async handleCreateWorkflow(message: string, history: ChatMessage[]): Promise<ChatResult> {
+  private async handleCreateWorkflow(message: string, _history: ChatMessage[]): Promise<ChatResult> {
     try {
       // Generate workflow based on user request
       const workflow = await this.workflowService.generateWorkflow(message);
       
       return {
-        response: `I've created a workflow for you: "${workflow.name}"\n\n${workflow.natural_language_plan.overview}\n\nHere's what I'll do:\n${workflow.natural_language_plan.steps.map((step, i) => `${i + 1}. ${step}`).join('\n')}\n\nWould you like me to execute this workflow or would you like to modify it first?`,
+        response: `I've created a workflow for you: "${workflow.name}"\n\n${workflow.natural_language_plan.overview}\n\nHere's what I'll do:\n${workflow.natural_language_plan.steps.map((step: string, i: number) => `${i + 1}. ${step}`).join('\n')}\n\nWould you like me to execute this workflow or would you like to modify it first?`,
         action: 'create-workflow',
         workflowId: workflow.id,
         requiresConfirmation: false
@@ -107,7 +107,7 @@ export class ChatRouter {
     }
   }
 
-  private async handleChangeWorkflow(message: string, history: ChatMessage[]): Promise<ChatResult> {
+  private async handleChangeWorkflow(_message: string, history: ChatMessage[]): Promise<ChatResult> {
     // Find the most recent workflow from conversation context
     const workflowId = this.extractWorkflowIdFromHistory(history);
     
@@ -127,7 +127,7 @@ export class ChatRouter {
     };
   }
 
-  private async handleDeleteWorkflow(message: string, history: ChatMessage[]): Promise<ChatResult> {
+  private async handleDeleteWorkflow(_message: string, history: ChatMessage[]): Promise<ChatResult> {
     const workflowId = this.extractWorkflowIdFromHistory(history);
     
     if (!workflowId) {
@@ -146,7 +146,7 @@ export class ChatRouter {
     };
   }
 
-  private async handleExecuteWorkflow(message: string, history: ChatMessage[]): Promise<ChatResult> {
+  private async handleExecuteWorkflow(_message: string, history: ChatMessage[]): Promise<ChatResult> {
     const workflowId = this.extractWorkflowIdFromHistory(history);
     
     if (!workflowId) {
@@ -187,7 +187,7 @@ export class ChatRouter {
     };
   }
 
-  private generateConversationalResponse(message: string, history: ChatMessage[]): string {
+  private generateConversationalResponse(_message: string, _history: ChatMessage[]): string {
     const responses = [
       "I'm here to help you create Excel workflows for data extraction. You can ask me to:\n\n• **Extract data** from websites, PDFs, or other sources\n• **Create workflows** for repetitive data tasks\n• **Export results** to Excel with custom formatting\n\nWhat would you like to work on?",
       

@@ -38,8 +38,9 @@
       }
     ],
     "artifactName": "${productName}-Windows-${version}-${arch}.${ext}",
-    "sign": false,
-    "icon": "public/icons/icon.ico"
+    "icon": "public/icons/icon.ico",
+    "signingHashAlgorithms": [],
+    "verifyUpdateCodeSignature": false
   },
   "linux": {
     "target": [

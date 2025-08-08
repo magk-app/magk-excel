@@ -1,0 +1,15 @@
+# ExecutorMCPTool reliability & Deno-free fallback
+
+- Prior: Executor required Deno; tests failed when Deno not present. Schema lacked `filePathMap`. File mapping was not passed in Node env. Errors surfaced as non-JSON strings, causing JSON.parse failures in tests.
+- Changes:
+  - Added `filePathMap` to `run_ts` input schema in `apps/client/magk-excel/src/services/executor/ExecutorMCPTool.ts`.
+  - Added pre-run validation for exported `async main(ctx)` and consistent error messaging.
+  - Implemented execution router: prefer Deno if available; otherwise run a Node.js VM fallback.
+  - Node fallback:
+    - Transforms `npm:exceljs` imports to `require('exceljs')` and strips simple TS annotations.
+    - Converts `export async function main` to `module.exports.main = async function main`.
+    - Provides execution context mirroring Deno runner: `env`, `paths`, `files` (getPath/listMapped/getMapping/exists/read/write/createOutputPath), `excel` (MIME_TYPES/generateOutputName/getFileType), `log`.
+    - Injected `TextDecoder`/`TextEncoder` and safe `require` into sandbox.
+  - Deno path now merges `_filePathMap` into inputs so `sandbox_runner.ts` can resolve uploaded files.
+- Effect: All executor tests pass without requiring Deno; Excel operations and file path mapping work consistently in both environments.
+- Tests: `apps/client/magk-excel/src/services/executor/__tests__/ExecutorMCPTool.test.ts` — 12/12 passing.

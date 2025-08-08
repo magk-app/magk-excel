@@ -246,8 +246,28 @@ function createWindow() {
     title: 'MAGK Excel',
     icon: path.join(process.env.VITE_PUBLIC, 'icons', 'icon.png'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
+      // Use CommonJS preload built as preload.cjs
+      preload: path.join(__dirname, 'preload.cjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
     },
+  })
+
+  // Set Content Security Policy for security
+  win.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+          "connect-src 'self' ws: wss: https: data: http://localhost:*; " +
+          "img-src 'self' data: https:; " +
+          "media-src 'self' data:; " +
+          "font-src 'self' data:;"
+        ]
+      }
+    })
   })
 
   // Test active push message to Renderer-process.
@@ -341,33 +361,156 @@ function setupMCPHandlers() {
     return mcpManager.getSmitheryServers()
   })
   
-  // File download handlers
-  ipcMain.handle('download-file', async (_, filePath: string) => {
+  // Enhanced file download handlers
+  ipcMain.handle('download-file', async (_, filePath: string, options?: { 
+    defaultPath?: string, 
+    showDialog?: boolean,
+    autoSave?: boolean 
+  }) => {
     try {
       // Check if file exists
       if (!fs.existsSync(filePath)) {
         return { success: false, error: 'File not found' }
       }
-      
-      // Open save dialog
-      const result = await dialog.showSaveDialog(win!, {
-        defaultPath: path.basename(filePath),
-        filters: [
-          { name: 'Excel Files', extensions: ['xlsx', 'xls'] },
-          { name: 'All Files', extensions: ['*'] }
-        ]
-      })
-      
-      if (!result.canceled && result.filePath) {
-        // Copy file to selected location
-        fs.copyFileSync(filePath, result.filePath)
-        return { success: true, savedPath: result.filePath }
+
+      const fileName = path.basename(filePath)
+      const fileExt = path.extname(fileName)
+      let targetPath: string
+
+      if (options?.autoSave) {
+        // Auto-save to Downloads/MAGK-Excel directory
+        const excelDir = path.join(os.homedir(), 'Downloads', 'MAGK-Excel')
+        if (!fs.existsSync(excelDir)) {
+          fs.mkdirSync(excelDir, { recursive: true })
+        }
+        
+        // Generate unique filename if file already exists
+        let counter = 0
+        const baseName = path.parse(fileName).name
+        targetPath = path.join(excelDir, fileName)
+        
+        while (fs.existsSync(targetPath)) {
+          counter++
+          const newName = `${baseName}_${counter}${fileExt}`
+          targetPath = path.join(excelDir, newName)
+        }
+      } else {
+        // Show save dialog
+        const result = await dialog.showSaveDialog(win!, {
+          defaultPath: options?.defaultPath || fileName,
+          filters: [
+            { name: 'Excel Files', extensions: ['xlsx', 'xls'] },
+            { name: 'PDF Files', extensions: ['pdf'] },
+            { name: 'CSV Files', extensions: ['csv'] },
+            { name: 'All Files', extensions: ['*'] }
+          ]
+        })
+        
+        if (result.canceled || !result.filePath) {
+          return { success: false, error: 'Save canceled' }
+        }
+        
+        targetPath = result.filePath
       }
       
-      return { success: false, error: 'Save canceled' }
+      // Copy file to target location
+      fs.copyFileSync(filePath, targetPath)
+      
+      console.log(`📥 File downloaded successfully: ${targetPath}`)
+      return { 
+        success: true, 
+        savedPath: targetPath,
+        fileName: path.basename(targetPath)
+      }
     } catch (error) {
       console.error('Download error:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  })
+
+  // Download file from URL or base64 content
+  ipcMain.handle('download-from-content', async (_, options: {
+    content: string | Buffer,
+    fileName: string,
+    mimeType?: string,
+    encoding?: 'base64' | 'utf8' | 'binary',
+    autoSave?: boolean
+  }) => {
+    try {
+      const { content, fileName, mimeType, encoding = 'utf8', autoSave = false } = options
+      
+      // Prepare file content
+      let fileBuffer: Buffer
+      if (Buffer.isBuffer(content)) {
+        fileBuffer = content
+      } else if (encoding === 'base64') {
+        fileBuffer = Buffer.from(content, 'base64')
+      } else if (content.startsWith('data:')) {
+        // Handle data URL
+        const base64Data = content.split(',')[1]
+        fileBuffer = Buffer.from(base64Data, 'base64')
+      } else {
+        fileBuffer = Buffer.from(content, encoding as BufferEncoding)
+      }
+
+      let targetPath: string
+      
+      if (autoSave) {
+        // Auto-save to Downloads/MAGK-Excel directory
+        const excelDir = path.join(os.homedir(), 'Downloads', 'MAGK-Excel')
+        if (!fs.existsSync(excelDir)) {
+          fs.mkdirSync(excelDir, { recursive: true })
+        }
+        
+        // Generate unique filename if file already exists
+        let counter = 0
+        const baseName = path.parse(fileName).name
+        const fileExt = path.extname(fileName)
+        targetPath = path.join(excelDir, fileName)
+        
+        while (fs.existsSync(targetPath)) {
+          counter++
+          const newName = `${baseName}_${counter}${fileExt}`
+          targetPath = path.join(excelDir, newName)
+        }
+      } else {
+        // Show save dialog
+        const fileExt = path.extname(fileName)
+        const filters = []
+        
+        if (['.xlsx', '.xls'].includes(fileExt.toLowerCase())) {
+          filters.push({ name: 'Excel Files', extensions: ['xlsx', 'xls'] })
+        } else if (fileExt.toLowerCase() === '.pdf') {
+          filters.push({ name: 'PDF Files', extensions: ['pdf'] })
+        } else if (fileExt.toLowerCase() === '.csv') {
+          filters.push({ name: 'CSV Files', extensions: ['csv'] })
+        }
+        filters.push({ name: 'All Files', extensions: ['*'] })
+        
+        const result = await dialog.showSaveDialog(win!, {
+          defaultPath: fileName,
+          filters
+        })
+        
+        if (result.canceled || !result.filePath) {
+          return { success: false, error: 'Save canceled' }
+        }
+        
+        targetPath = result.filePath
+      }
+      
+      // Write file
+      fs.writeFileSync(targetPath, fileBuffer)
+      
+      console.log(`📥 File downloaded from content: ${targetPath}`)
+      return { 
+        success: true, 
+        savedPath: targetPath,
+        fileName: path.basename(targetPath)
+      }
+    } catch (error) {
+      console.error('Download from content error:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
   })
   
@@ -378,7 +521,7 @@ function setupMCPHandlers() {
       return { success: true }
     } catch (error) {
       console.error('Open file error:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
     }
   })
   
@@ -389,7 +532,7 @@ function setupMCPHandlers() {
       return { success: true }
     } catch (error) {
       console.error('Show in folder error:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
     }
   })
   
@@ -427,7 +570,7 @@ function setupMCPHandlers() {
       return { success: true, filePath }
     } catch (error) {
       console.error('❌ Failed to write persistent file:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
     }
   })
 
@@ -441,7 +584,7 @@ function setupMCPHandlers() {
       }
     } catch (error) {
       console.error('❌ Failed to read persistent file:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
     }
   })
 
@@ -470,7 +613,7 @@ function setupMCPHandlers() {
       return { success: true, files }
     } catch (error) {
       console.error('❌ Failed to list persistent files:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
     }
   })
 
@@ -488,7 +631,332 @@ function setupMCPHandlers() {
       }
     } catch (error) {
       console.error('❌ Failed to delete persistent file:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  // Temporary file operations
+  ipcMain.handle('save-temp-file', async (_, params: { fileId: string, fileName: string, content: string }) => {
+    try {
+      const { fileId, fileName, content } = params
+      
+      // Create temp directory if it doesn't exist
+      const tempDir = path.join(APP_DATA_DIR, 'temp')
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true })
+      }
+      
+      // Create a unique filename to avoid conflicts
+      const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+      const uniqueFileName = `${fileId}_${sanitizedFileName}`
+      const tempFilePath = path.join(tempDir, uniqueFileName)
+      
+      // Decode base64 content if it's a data URL
+      let fileContent: Buffer
+      if (content.startsWith('data:')) {
+        const base64Data = content.split(',')[1]
+        fileContent = Buffer.from(base64Data, 'base64')
+      } else {
+        fileContent = Buffer.from(content, 'base64')
+      }
+      
+      fs.writeFileSync(tempFilePath, fileContent)
+      console.log('💾 Saved temp file:', tempFilePath)
+      
+      return { success: true, tempFilePath }
+    } catch (error) {
+      console.error('❌ Failed to save temp file:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  })
+
+  // Clean up old temp files
+  ipcMain.handle('cleanup-temp-files', async (_, olderThanHours: number = 24) => {
+    try {
+      const tempDir = path.join(APP_DATA_DIR, 'temp')
+      
+      if (!fs.existsSync(tempDir)) {
+        return { success: true, cleaned: 0 }
+      }
+      
+      const cutoffTime = Date.now() - (olderThanHours * 60 * 60 * 1000)
+      const files = fs.readdirSync(tempDir)
+      let cleanedCount = 0
+      
+      for (const file of files) {
+        const filePath = path.join(tempDir, file)
+        const stats = fs.statSync(filePath)
+        
+        if (stats.isFile() && stats.mtime.getTime() < cutoffTime) {
+          fs.unlinkSync(filePath)
+          cleanedCount++
+          console.log('🗑️ Cleaned up old temp file:', filePath)
+        }
+      }
+      
+      console.log(`🧹 Cleaned up ${cleanedCount} temp files older than ${olderThanHours} hours`)
+      return { success: true, cleaned: cleanedCount }
+    } catch (error) {
+      console.error('❌ Failed to cleanup temp files:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  })
+
+  // Find files by name in various directories
+  ipcMain.handle('find-file-by-name', async (_, fileName: string) => {
+    try {
+      const searchDirectories = [
+        path.join(APP_DATA_DIR, 'temp'),
+        path.join(APP_DATA_DIR, 'excel'),
+        path.join(APP_DATA_DIR, 'uploads'),
+        APP_DATA_DIR,
+        path.join(os.homedir(), 'Downloads', 'MAGK-Excel'),
+        os.tmpdir()
+      ]
+      
+      const foundFiles: { path: string, size: number, modified: Date }[] = []
+      
+      for (const dir of searchDirectories) {
+        if (!fs.existsSync(dir)) continue
+        
+        const files = fs.readdirSync(dir)
+        for (const file of files) {
+          const filePath = path.join(dir, file)
+          const stats = fs.statSync(filePath)
+          
+          if (stats.isFile() && (file === fileName || file.includes(fileName) || fileName.includes(file))) {
+            foundFiles.push({
+              path: filePath,
+              size: stats.size,
+              modified: stats.mtime
+            })
+          }
+        }
+      }
+      
+      // Sort by modification time, newest first
+      foundFiles.sort((a, b) => b.modified.getTime() - a.modified.getTime())
+      
+      console.log(`🔍 Found ${foundFiles.length} files matching "${fileName}":`, foundFiles.map(f => f.path))
+      return { success: true, files: foundFiles }
+    } catch (error) {
+      console.error('❌ Failed to find file by name:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  })
+
+  // Test executor IPC handlers
+  ipcMain.handle('test:read-file', async (_, filePath: string) => {
+    try {
+      // Security check - only allow reading from testing directory and app data
+      const allowedPaths = [
+        path.join(process.cwd(), 'testing'),
+        path.join(APP_DATA_DIR, 'tests'),
+        APP_DATA_DIR
+      ]
+      
+      const normalizedPath = path.normalize(filePath)
+      const isAllowed = allowedPaths.some(allowedPath => 
+        normalizedPath.startsWith(path.normalize(allowedPath))
+      )
+      
+      if (!isAllowed && !filePath.startsWith('testing/')) {
+        throw new Error('Access denied: file path not allowed')
+      }
+      
+      // Resolve relative paths
+      let fullPath = filePath
+      if (!path.isAbsolute(filePath)) {
+        fullPath = path.join(process.cwd(), filePath)
+      }
+      
+      if (!fs.existsSync(fullPath)) {
+        throw new Error(`File not found: ${fullPath}`)
+      }
+      
+      const content = fs.readFileSync(fullPath, 'utf-8')
+      return { success: true, content }
+    } catch (error) {
+      console.error('❌ Failed to read test file:', error)
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      }
+    }
+  })
+
+  ipcMain.handle('test:read-directory', async (_, dirPath: string) => {
+    try {
+      // Security check - only allow reading testing directory
+      if (!dirPath.startsWith('testing') && dirPath !== 'testing') {
+        throw new Error('Access denied: only testing directory is allowed')
+      }
+      
+      const fullPath = path.join(process.cwd(), dirPath)
+      
+      if (!fs.existsSync(fullPath)) {
+        throw new Error(`Directory not found: ${fullPath}`)
+      }
+      
+      const files = fs.readdirSync(fullPath)
+        .filter(file => {
+          const filePath = path.join(fullPath, file)
+          const stats = fs.statSync(filePath)
+          return stats.isFile() && /\.(html|js|md|xlsx)$/i.test(file)
+        })
+        .sort()
+      
+      return { success: true, files }
+    } catch (error) {
+      console.error('❌ Failed to read test directory:', error)
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      }
+    }
+  })
+
+  ipcMain.handle('test:save-artifact', async (_, params: {
+    testId: string
+    artifactName: string
+    content: string
+    type: string
+  }) => {
+    try {
+      const { testId, artifactName, content, type } = params
+      
+      // Create test artifacts directory
+      const artifactsDir = path.join(APP_DATA_DIR, 'test-artifacts', testId)
+      if (!fs.existsSync(artifactsDir)) {
+        fs.mkdirSync(artifactsDir, { recursive: true })
+      }
+      
+      // Save artifact
+      const filePath = path.join(artifactsDir, artifactName)
+      
+      // Handle different content types
+      if (content.startsWith('data:')) {
+        // Handle data URLs (screenshots, etc.)
+        const base64Data = content.split(',')[1]
+        const buffer = Buffer.from(base64Data, 'base64')
+        fs.writeFileSync(filePath, buffer)
+      } else {
+        // Handle text content
+        fs.writeFileSync(filePath, content, 'utf-8')
+      }
+      
+      console.log(`💾 Saved test artifact: ${filePath}`)
+      return { success: true, path: filePath }
+    } catch (error) {
+      console.error('❌ Failed to save test artifact:', error)
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      }
+    }
+  })
+
+  ipcMain.handle('test:list-artifacts', async (_, testId: string) => {
+    try {
+      const artifactsDir = path.join(APP_DATA_DIR, 'test-artifacts', testId)
+      
+      if (!fs.existsSync(artifactsDir)) {
+        return { success: true, artifacts: [] }
+      }
+      
+      const files = fs.readdirSync(artifactsDir)
+        .filter(file => {
+          const filePath = path.join(artifactsDir, file)
+          return fs.statSync(filePath).isFile()
+        })
+        .map(file => {
+          const filePath = path.join(artifactsDir, file)
+          const stats = fs.statSync(filePath)
+          return {
+            name: file,
+            path: filePath,
+            size: stats.size,
+            modified: stats.mtime,
+            type: path.extname(file).slice(1) || 'unknown'
+          }
+        })
+        .sort((a, b) => b.modified.getTime() - a.modified.getTime())
+      
+      return { success: true, artifacts: files }
+    } catch (error) {
+      console.error('❌ Failed to list test artifacts:', error)
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      }
+    }
+  })
+
+  ipcMain.handle('test:cleanup-artifacts', async (_, testId?: string) => {
+    try {
+      const baseDir = path.join(APP_DATA_DIR, 'test-artifacts')
+      
+      if (testId) {
+        // Clean specific test artifacts
+        const testDir = path.join(baseDir, testId)
+        if (fs.existsSync(testDir)) {
+          fs.rmSync(testDir, { recursive: true, force: true })
+          console.log(`🗑️ Cleaned test artifacts for: ${testId}`)
+        }
+      } else {
+        // Clean all old artifacts (older than 24 hours)
+        if (fs.existsSync(baseDir)) {
+          const cutoffTime = Date.now() - (24 * 60 * 60 * 1000)
+          const testDirs = fs.readdirSync(baseDir)
+          let cleanedCount = 0
+          
+          for (const testDir of testDirs) {
+            const testPath = path.join(baseDir, testDir)
+            const stats = fs.statSync(testPath)
+            
+            if (stats.isDirectory() && stats.mtime.getTime() < cutoffTime) {
+              fs.rmSync(testPath, { recursive: true, force: true })
+              cleanedCount++
+            }
+          }
+          
+          console.log(`🗑️ Cleaned ${cleanedCount} old test artifact directories`)
+        }
+      }
+      
+      return { success: true }
+    } catch (error) {
+      console.error('❌ Failed to cleanup test artifacts:', error)
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      }
+    }
+  })
+
+  ipcMain.handle('test:get-environment-info', async () => {
+    try {
+      const info = {
+        platform: process.platform,
+        arch: process.arch,
+        nodeVersion: process.version,
+        electronVersion: process.versions.electron,
+        chromeVersion: process.versions.chrome,
+        appDataDir: APP_DATA_DIR,
+        testingDir: path.join(process.cwd(), 'testing'),
+        artifactsDir: path.join(APP_DATA_DIR, 'test-artifacts'),
+        tempDir: os.tmpdir(),
+        availableMemory: os.freemem(),
+        totalMemory: os.totalmem()
+      }
+      
+      return { success: true, info }
+    } catch (error) {
+      console.error('❌ Failed to get environment info:', error)
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      }
     }
   })
 }

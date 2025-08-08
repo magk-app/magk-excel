@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Alert, AlertDescription } from './ui/alert';
 import { useMCPStore } from '../services/mcpService';
 import { SmitheryServerInfo, SmitheryServerDetails, smitheryClient } from '../services/smitheryClient';
+import { loadApiKeys, saveApiKeys, updateApiKey, getApiKey } from '../utils/apiKeyStorage';
 
 interface ServerConfigModalProps {
   server: SmitheryServerInfo;
@@ -297,7 +298,13 @@ export const SmitheryServerBrowser: React.FC = () => {
   ]);
 
   useEffect(() => {
-    // Check API key status on mount
+    // Load API key from unified storage using utility function
+    const smitheryKey = getApiKey('smithery');
+    if (smitheryKey) {
+      smitheryClient.setApiKey(smitheryKey);
+    }
+    
+    // Check API key status
     const status = smitheryClient.getApiKeyStatus();
     setApiKeyStatus(status);
     
@@ -309,7 +316,12 @@ export const SmitheryServerBrowser: React.FC = () => {
 
   const handleConfigureApiKey = () => {
     if (apiKey.trim()) {
+      // Set the API key in the smithery client
       smitheryClient.setApiKey(apiKey.trim());
+      
+      // Save to unified API key storage using utility function
+      updateApiKey('smithery', apiKey.trim());
+      
       const newStatus = smitheryClient.getApiKeyStatus();
       setApiKeyStatus(newStatus);
       setShowApiKeyDialog(false);
@@ -417,7 +429,14 @@ export const SmitheryServerBrowser: React.FC = () => {
           <Button 
             size="sm" 
             variant="ghost" 
-            onClick={() => setShowApiKeyDialog(true)}
+            onClick={() => {
+              setShowApiKeyDialog(true);
+              // Pre-fill the current key for editing
+              const currentKey = getApiKey('smithery');
+              if (currentKey) {
+                setApiKey(currentKey);
+              }
+            }}
             className="text-gray-500 hover:text-gray-700"
           >
             Update Key

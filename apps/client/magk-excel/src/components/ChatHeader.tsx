@@ -1,5 +1,5 @@
 import React, { memo, useState } from 'react';
-import { MessageSquare, Settings, Server, Download, Cog, FileIcon } from 'lucide-react';
+import { MessageSquare, Menu, Settings, Server, Download, Cog, FileIcon, Code2, Key, TestTube } from 'lucide-react';
 import { Button } from './ui/button';
 import { ModelSelector, ModelConfig } from './ModelSelector';
 import { MCPServerToggle } from './MCPServerToggle';
@@ -16,9 +16,13 @@ interface ChatHeaderProps {
   onOpenToolMonitor: () => void;
   onExportToExcel: () => void;
   onTogglePDFPanel: () => void;
+  onToggleForceExecutor?: () => void;
+  forceExecutorEnabled?: boolean;
   mcpToolCallsCount?: number;
   onToggleMCPStatus?: () => void;
   onOpenFilePersistence?: () => void;
+  onOpenApiKeys?: () => void;
+  onToggleDevTestPanel?: () => void;
   children?: React.ReactNode;
 }
 
@@ -33,9 +37,13 @@ export const ChatHeader = memo(function ChatHeader({
   onOpenToolMonitor,
   onExportToExcel,
   onTogglePDFPanel,
+  onToggleForceExecutor,
+  forceExecutorEnabled = false,
   mcpToolCallsCount = 0,
   onToggleMCPStatus,
   onOpenFilePersistence,
+  onOpenApiKeys,
+  onToggleDevTestPanel,
   children
 }: ChatHeaderProps) {
   const [showMCPDialog, setShowMCPDialog] = useState(false);
@@ -80,7 +88,46 @@ export const ChatHeader = memo(function ChatHeader({
             )}
           </div>
           
+<<<<<<< HEAD
           {/* MCP Servers Status - Always visible but compact on mobile */}
+=======
+          <Button size="sm" variant="outline" onClick={onTogglePDFPanel}>
+            PDF Extract
+          </Button>
+
+          {onToggleForceExecutor && (
+            <Button size="sm" variant={forceExecutorEnabled ? 'default' : 'outline'} onClick={onToggleForceExecutor}>
+              <Code2 className="h-4 w-4 mr-1" />
+              Code Run {forceExecutorEnabled ? 'ON' : 'OFF'}
+            </Button>
+          )}
+          
+          {/* File Persistence Button */}
+          {onOpenFilePersistence && (
+            <Button size="sm" variant="outline" onClick={onOpenFilePersistence}>
+              <FileIcon className="h-4 w-4 mr-1" />
+              Files
+            </Button>
+          )}
+          
+          {/* API Keys Button */}
+          {onOpenApiKeys && (
+            <Button size="sm" variant="outline" onClick={onOpenApiKeys} title="Configure API Keys">
+              <Key className="h-4 w-4 mr-1" />
+              API Keys
+            </Button>
+          )}
+          
+          {/* Developer Test Panel Button */}
+          {process.env.NODE_ENV === 'development' && onToggleDevTestPanel && (
+            <Button size="sm" variant="outline" onClick={onToggleDevTestPanel} title="Open Developer Test Panel">
+              <TestTube className="h-4 w-4 mr-1" />
+              Dev Tests
+            </Button>
+          )}
+          
+          {/* MCP Servers Status */}
+>>>>>>> origin/2.1
           <Dialog open={showMCPDialog} onOpenChange={setShowMCPDialog}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline" className="relative">

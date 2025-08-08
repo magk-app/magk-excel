@@ -8,6 +8,11 @@ import TestWorkflowStore from './components/workflow/TestWorkflowStore'
 import WorkflowBlockLibrary from './components/workflow/WorkflowBlockLibrary'
 import ChatWorkflowIntegration from './components/ChatWorkflowIntegration'
 import { PDFExtractorPanel } from './components/PDFExtractorPanel'
+import WorkflowBuilder from './components/workflow/WorkflowBuilder'
+import { CreateWorkflowDialog } from './components/workflow/CreateWorkflowDialog'
+import FileManager from './components/FileManager'
+import DocumentationViewer from './components/DocumentationViewer'
+import { DeveloperTestPanel } from './components/DeveloperTestPanel'
 import { Button } from './components/ui/button'
 import { Badge } from './components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
@@ -16,18 +21,36 @@ import { ScrollArea } from './components/ui/scroll-area'
 import { cn } from './lib/utils'
 import { useMCPStore } from './services/mcpService'
 import { useWorkflowStore, WorkflowType } from './stores/workflowStore'
+import { initializeApiKeyStorage } from './utils/apiKeyStorage'
+import { storageIntegrationService } from './services/persistence/StorageIntegrationService'
 import { 
   MessageSquare, 
   Settings, 
   Plus,
   FolderOpen,
   Workflow,
-  FileText
+  FileText,
+  Eye,
+  EyeOff,
+  Files,
+  HardDrive,
+  BookOpen,
+  FlaskConical
 } from 'lucide-react'
 import './App.css'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'chat' | 'workflow' | 'demo' | 'mcp' | 'debug' | 'pdf'>('chat')
+  const [activeTab, setActiveTab] = useState<'chat' | 'chat-workflow' | 'builder' | 'editor' | 'library' | 'blocks' | 'demo' | 'mcp' | 'debug' | 'pdf' | 'files' | 'docs' | 'devtest'>('chat')
+  const [chatSessionId] = useState(`session-${Date.now()}`)
+  const [showWorkflowInChat, setShowWorkflowInChat] = useState(true)
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [currentBuilderWorkflow, setCurrentBuilderWorkflow] = useState<any>(null)
+  const [isDevelopmentMode, setIsDevelopmentMode] = useState(() => {
+    // Check if we're in development mode
+    const isDevEnv = import.meta.env.DEV
+    const storedPref = localStorage.getItem('magk-dev-mode')
+    return isDevEnv || storedPref === 'true'
+  })
   const { initialize, tools, enabledServers } = useMCPStore()
   const { 
     createWorkflow, 
@@ -46,8 +69,23 @@ function App() {
     });
   }, [temporaryWorkflows, permanentWorkflows, activeWorkflow])
   
-  // Initialize MCP on app startup - ONLY ONCE
+  // Initialize API keys, MCP, and Storage Integration on app startup - ONLY ONCE
   useEffect(() => {
+    // Initialize API key storage with migration
+    console.log('🔑 App: Initializing API key storage...')
+    const keys = initializeApiKeyStorage()
+    console.log('✅ App: API keys loaded/migrated:', Object.keys(keys))
+    
+    // Initialize storage integration service
+    console.log('💾 App: Initializing storage integration...')
+    try {
+      // Storage integration service is already initialized as a singleton
+      const status = storageIntegrationService.getIntegrationStatus()
+      console.log('✅ App: Storage integration ready with', status.integrationPoints.length, 'integration points')
+    } catch (error) {
+      console.error('❌ App: Storage integration failed:', error)
+    }
+    
     console.log('🚀 App: Initializing MCP store on startup...')
     initialize().then(async () => {
       const state = useMCPStore.getState()
@@ -69,8 +107,14 @@ function App() {
     })
   }, []) // Empty dependency array - run only once on mount
 
-  // Handle creating a new workflow with dedicated chat session (1:1 relationship)
+  // Handle creating a new workflow (opens dialog)
   const handleCreateWorkflow = () => {
+    console.log('🚀 Opening Create Workflow Dialog');
+    setShowCreateDialog(true);
+  };
+  
+  // Handle creating a workflow in editor (old flow)
+  const handleCreateWorkflowInEditor = () => {
     console.log('🚀 handleCreateWorkflow called');
     console.log('Store functions available:', {
       createWorkflow: typeof createWorkflow,
@@ -190,9 +234,25 @@ function App() {
                 <MessageSquare className="h-4 w-4" />
                 Chat
               </TabsTrigger>
-              <TabsTrigger value="workflow" className="gap-2">
+              <TabsTrigger value="chat-workflow" className="gap-2">
                 <Workflow className="h-4 w-4" />
-                Workflow
+                Chat + Workflow
+              </TabsTrigger>
+              <TabsTrigger value="builder" className="gap-2">
+                <Plus className="h-4 w-4" />
+                Workflow Builder
+              </TabsTrigger>
+              <TabsTrigger value="editor" className="gap-2">
+                <Workflow className="h-4 w-4" />
+                Workflow Editor
+              </TabsTrigger>
+              <TabsTrigger value="library" className="gap-2">
+                <Workflow className="h-4 w-4" />
+                Workflow Library
+              </TabsTrigger>
+              <TabsTrigger value="blocks" className="gap-2">
+                <Workflow className="h-4 w-4" />
+                Block Library
               </TabsTrigger>
               
               <TabsTrigger value="demo" className="gap-2">
@@ -211,6 +271,21 @@ function App() {
                 <FileText className="h-4 w-4" />
                 PDF Extractor
               </TabsTrigger>
+              <TabsTrigger value="files" className="gap-2">
+                <Files className="h-4 w-4" />
+                File Manager
+              </TabsTrigger>
+              <TabsTrigger value="docs" className="gap-2">
+                <BookOpen className="h-4 w-4" />
+                Documentation
+              </TabsTrigger>
+              {isDevelopmentMode && (
+                <TabsTrigger value="devtest" className="gap-2">
+                  <FlaskConical className="h-4 w-4" />
+                  Dev Tests
+                  <Badge variant="secondary" className="ml-2 text-xs">DEV</Badge>
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
 
@@ -234,7 +309,7 @@ function App() {
                       )
                       if (workflowId) {
                         loadWorkflow(workflowId)
-                        setActiveTab('workflow')
+                        setActiveTab('chat-workflow')
                       }
                     }}
                     className="gap-2"
@@ -253,6 +328,49 @@ function App() {
                 <ChatInterface />
               </div>
             </div>
+          </TabsContent>
+
+          {/* Workflow Builder (NEW!) */}
+          <TabsContent value="builder" className="flex-1 mt-0 overflow-hidden">
+            <WorkflowBuilder
+              mode="create"
+              initialWorkflow={currentBuilderWorkflow}
+              onSave={(workflow) => {
+                console.log('Workflow saved from builder:', workflow);
+                // Create the workflow in store
+                const workflowId = createWorkflow(
+                  workflow.name || 'New Workflow',
+                  WorkflowType.PERMANENT,
+                  chatSessionId
+                );
+                
+                if (workflowId) {
+                  // Save workflow data
+                  const workflowStore = useWorkflowStore.getState();
+                  workflowStore.saveWorkflow(workflowId, {
+                    nodes: workflow.nodes || [],
+                    edges: workflow.edges || []
+                  });
+                  
+                  // Switch to editor to view/edit the saved workflow
+                  loadWorkflow(workflowId);
+                  setActiveTab('editor');
+                  setCurrentBuilderWorkflow(null); // Clear the builder workflow
+                }
+              }}
+              onExecute={(workflow) => {
+                console.log('Executing workflow from builder:', workflow);
+              }}
+            />
+          </TabsContent>
+
+          {/* Chat + Workflow Integration */}
+          <TabsContent value="chat-workflow" className="flex-1 mt-0 overflow-hidden">
+            <ChatWorkflowIntegration 
+              sessionId={chatSessionId}
+              showWorkflow={showWorkflowInChat}
+              onToggleWorkflow={() => setShowWorkflowInChat(!showWorkflowInChat)}
+            />
           </TabsContent>
 
           {/* Unified Workflow Tab */}
@@ -424,7 +542,23 @@ function App() {
             </div>
           </TabsContent>
 
+          {/* Workflow Editor */}
+          <TabsContent value="editor" className="flex-1 mt-0 overflow-hidden">
+            <WorkflowStoreEditor />
+          </TabsContent>
 
+          {/* Workflow Library */}
+          <TabsContent value="library" className="flex-1 mt-0 overflow-hidden">
+            <div className="p-6">
+              <h2 className="text-lg font-semibold mb-4">Workflow Library</h2>
+              <p className="text-muted-foreground">Browse and manage your saved workflows.</p>
+            </div>
+          </TabsContent>
+
+          {/* Block Library */}
+          <TabsContent value="blocks" className="flex-1 mt-0 overflow-hidden">
+            <WorkflowBlockLibrary />
+          </TabsContent>
 
           {/* Original Demo */}
           <TabsContent value="demo" className="flex-1 mt-0 overflow-hidden">
@@ -459,6 +593,27 @@ function App() {
               />
             </div>
           </TabsContent>
+
+          {/* File Manager */}
+          <TabsContent value="files" className="flex-1 mt-0 overflow-hidden">
+            <div className="p-6 h-full overflow-auto">
+              <FileManager sessionId={chatSessionId} />
+            </div>
+          </TabsContent>
+
+          {/* Documentation */}
+          <TabsContent value="docs" className="flex-1 mt-0 overflow-hidden">
+            <DocumentationViewer />
+          </TabsContent>
+
+          {/* Developer Tests */}
+          {isDevelopmentMode && (
+            <TabsContent value="devtest" className="flex-1 mt-0 overflow-hidden">
+              <div className="p-6 h-full overflow-auto">
+                <DeveloperTestPanel />
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </main>
 
@@ -482,6 +637,44 @@ function App() {
           <span>{enabledServers.length} MCP servers</span>
         </div>
       </footer>
+      
+      {/* Create Workflow Dialog */}
+      <CreateWorkflowDialog
+        isOpen={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        onCreate={(data) => {
+          console.log('Creating workflow with:', data);
+          
+          // Set up initial workflow based on type
+          if (data.type === 'blank') {
+            setCurrentBuilderWorkflow({
+              name: data.name,
+              description: data.description,
+              nodes: [],
+              edges: []
+            });
+          } else if (data.type === 'template') {
+            // Load template (you can expand this)
+            setCurrentBuilderWorkflow({
+              name: data.name,
+              description: data.description,
+              nodes: [
+                {
+                  id: 'node-1',
+                  type: data.template === 'web-scrape' ? 'web-scraping' : 'code',
+                  position: { x: 100, y: 100 },
+                  data: { label: 'Start Node' }
+                }
+              ],
+              edges: []
+            });
+          }
+          
+          // Switch to builder tab
+          setActiveTab('builder');
+          setShowCreateDialog(false);
+        }}
+      />
     </div>
   )
 }

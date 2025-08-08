@@ -26,7 +26,8 @@ import {
   Settings,
   Info,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  X
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 
 import WorkflowCanvas from './workflow/WorkflowCanvas';
+import WorkflowBuilder from './workflow/WorkflowBuilder';
 import WorkflowEditor from './workflow/WorkflowEditor';
 import { useWorkflowStore, WorkflowType, ExtendedWorkflow } from '@/stores/workflowStore';
 import { WorkflowNode, WorkflowEdge } from '@/types/workflow';
@@ -100,6 +102,7 @@ export const ChatWorkflowIntegration: React.FC<ChatWorkflowIntegrationProps> = (
   const [workflowPrompts, setWorkflowPrompts] = useState<WorkflowPrompt[]>([]);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
   const [generatingWorkflow, setGeneratingWorkflow] = useState(false);
+  const [showWorkflowBuilder, setShowWorkflowBuilder] = useState(false);
 
   // Get workflows associated with this chat session
   const sessionWorkflows = useMemo(() => {
@@ -321,10 +324,13 @@ export const ChatWorkflowIntegration: React.FC<ChatWorkflowIntegrationProps> = (
               ) : (
                 <Button
                   size="sm"
-                  onClick={() => setShowGenerateDialog(true)}
+                  onClick={() => {
+                    setShowWorkflowBuilder(true);
+                    setIsExpanded(true);
+                  }}
                 >
                   <Plus className="h-4 w-4 mr-1" />
-                  Generate Workflow
+                  Create Workflow
                 </Button>
               )}
 
@@ -395,10 +401,86 @@ export const ChatWorkflowIntegration: React.FC<ChatWorkflowIntegrationProps> = (
         </CardContent>
       </Card>
 
-      {/* Main Content Area */}
-      <div className={cn('flex-1 overflow-hidden', isExpanded && 'fixed inset-0 z-50 bg-background')}>
+      {/* Main Content Area - Fix Issue #9: Proper navigation when collapsed */}
+      <div className={cn('flex-1 overflow-hidden position-relative')}>
+        {/* Only expand to fullscreen if explicitly expanded, not just showing */}
+        {isExpanded && (
+          <div className="fixed inset-0 z-50 bg-background">
+            <div className="absolute top-4 right-4 z-10">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setIsExpanded(false);
+                }}
+                className="bg-background"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Close Fullscreen
+              </Button>
+            </div>
+            <div className="h-full p-4">
+              {currentWorkflow && workflowViewMode === 'view' ? (
+                <WorkflowCanvas
+                  nodes={currentWorkflow.nodes || []}
+                  edges={currentWorkflow.edges || []}
+                  isReadOnly={true}
+                  showStatusPanel={true}
+                  onWorkflowExecute={() => handleExecuteWorkflow(currentWorkflow.id)}
+                  className="h-full"
+                />
+              ) : currentWorkflow && workflowViewMode === 'edit' ? (
+                <WorkflowEditor
+                  workflowId={currentWorkflow.id}
+                  onSave={() => saveWorkflow(currentWorkflow.id)}
+                  onExecute={() => handleExecuteWorkflow(currentWorkflow.id)}
+                  className="h-full"
+                />
+              ) : null}
+            </div>
+          </div>
+        )}
         <AnimatePresence mode="wait">
-          {showWorkflow && currentWorkflow ? (
+          {showWorkflowBuilder ? (
+            <motion.div
+              key="builder"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.2 }}
+              className="h-full"
+            >
+              <WorkflowBuilder
+                mode="create"
+                onSave={(workflow) => {
+                  console.log('Workflow saved:', workflow);
+                  // Save workflow to store
+                  const workflowId = createWorkflow(
+                    workflow.name || 'New Workflow',
+                    workflow.description || 'Created from chat'
+                  );
+                  // Save the workflow nodes and edges
+                  if (workflowId && workflow.nodes) {
+                    saveWorkflow(workflowId, {
+                      nodes: workflow.nodes,
+                      edges: workflow.edges || []
+                    });
+                  }
+                  // Association happens automatically in createWorkflow when chatSessionId is provided
+                  setShowWorkflowBuilder(false);
+                  setShowWorkflow(true);
+                  setSelectedWorkflowId(workflowId);
+                  loadWorkflow(workflowId);
+                }}
+                onExecute={(workflow) => {
+                  console.log('Executing workflow:', workflow);
+                  if (selectedWorkflowId && onWorkflowExecute) {
+                    onWorkflowExecute(selectedWorkflowId);
+                  }
+                }}
+              />
+            </motion.div>
+          ) : showWorkflow && currentWorkflow ? (
             <motion.div
               key="workflow"
               initial={{ opacity: 0, y: 20 }}
@@ -500,6 +582,13 @@ export const ChatWorkflowIntegration: React.FC<ChatWorkflowIntegrationProps> = (
                         <p className="text-sm text-muted-foreground">
                           Start a conversation about data extraction or processing, and we'll help you create a workflow
                         </p>
+                        <Button onClick={() => {
+                          setShowWorkflowBuilder(true);
+                          setIsExpanded(true);
+                        }}>
+                          <Plus className="h-4 w-4 mr-1" />
+                          Create Workflow
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>

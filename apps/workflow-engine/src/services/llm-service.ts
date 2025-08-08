@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { ChatService } from './chat-service.js';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -14,14 +15,7 @@ export interface ModelConfig {
   // API keys should only be managed via environment variables
 }
 
-// Valid models for validation
-const VALID_ANTHROPIC_MODELS = new Set([
-  'claude-3-5-sonnet-20241022',
-  'claude-3-5-sonnet-latest',
-  'claude-3-5-haiku-20241022',
-  'claude-3-opus-20240229',
-  'claude-3-sonnet-20240229'
-]);
+// Note: Model validation handled via ChatService.getValidModel
 
 export class LLMService {
   private anthropic: Anthropic | null = null;
@@ -52,7 +46,7 @@ export class LLMService {
     message: string, 
     history: ChatMessage[] = [], 
     modelConfig?: Partial<ModelConfig>
-  ): Promise<{ response: string, thinking?: string }> {
+  ): Promise<{ response: string, thinking?: string, isMock: boolean }> {
     // Merge with defaults
     const config: ModelConfig = {
       provider: modelConfig?.provider || this.defaultProvider,
@@ -62,13 +56,16 @@ export class LLMService {
       maxTokens: modelConfig?.maxTokens ?? 4096
     };
     
-    // Validate model before proceeding
-    if (config.provider === 'anthropic' && !VALID_ANTHROPIC_MODELS.has(config.model)) {
-      console.error(`❌ Invalid Anthropic model: ${config.model}`);
-      return { 
-        response: `Error: Invalid model "${config.model}". Valid models are: ${Array.from(VALID_ANTHROPIC_MODELS).join(', ')}`,
-        thinking: undefined 
-      };
+    // Apply model fallback for unsupported models
+    const originalModel = config.model;
+    config.model = ChatService.getValidModel(config.model);
+    if (originalModel !== config.model) {
+      console.log(`📝 Model fallback: ${originalModel} -> ${config.model}`);
+    }
+    
+    // Get MAGK system prompt if not provided
+    if (!systemPrompt) {
+      systemPrompt = ChatService.getSystemPrompt();
     }
     
     try {
@@ -79,17 +76,17 @@ export class LLMService {
         if (!this.anthropic) {
           // No API key available
           console.log('⚠️ No Anthropic API key configured, using mock response...');
-          return { response: this.generateMockWorkflowResponse(message) };
+          return { response: this.generateMockWorkflowResponse(message), thinking: undefined, isMock: true };
         }
       } else {
         // Other providers not yet implemented
         console.log(`⚠️ Provider ${config.provider} not yet implemented, using mock response...`);
-        return { response: this.generateMockWorkflowResponse(message) };
+        return { response: this.generateMockWorkflowResponse(message), thinking: undefined, isMock: true };
       }
 
       if (!apiClient) {
         console.log('⚠️ No API client available, using mock response...');
-        return { response: this.generateMockWorkflowResponse(message) };
+        return { response: this.generateMockWorkflowResponse(message), thinking: undefined, isMock: true };
       }
 
       console.log(`🤖 Sending request to ${config.provider} (${config.model})...`);
@@ -100,6 +97,13 @@ export class LLMService {
       if (config.enableThinking && config.provider === 'anthropic') {
         // Map to thinking variants for Claude models
         const thinkingModels: Record<string, string> = {
+          // Claude 4 models already support thinking natively
+          'claude-opus-4-1-20250805': 'claude-opus-4-1-20250805',
+          'claude-opus-4-20250514': 'claude-opus-4-20250514',
+          'claude-sonnet-4-20250514': 'claude-sonnet-4-20250514',
+          'claude-3-7-sonnet-20250219': 'claude-3-7-sonnet-20250219',
+          
+          // Claude 3.5 models need v2:0 suffix for thinking
           'claude-3-5-sonnet-20241022': 'claude-3-5-sonnet-20241022-v2:0',
           'claude-3-5-sonnet-latest': 'claude-3-5-sonnet-20241022-v2:0',
           'claude-3-opus-20240229': 'claude-3-opus-20240229-v2:0'
@@ -123,7 +127,7 @@ export class LLMService {
         }
       ];
 
-      const defaultSystemPrompt = `You are Eliza, MAGK's Excel workflow specialist. You help users create Excel workflows for data extraction, transformation, and export.
+      const defaultSystemPrompt = systemPrompt || `You are MAGK (Multi-Agent Generative Kit), an advanced AI assistant specializing in data processing, Excel automation, and intelligent workflow creation.
 
 IMPORTANT RULES:
 - DO NOT ask unnecessary clarifying questions if the request is clear
@@ -190,29 +194,29 @@ Be conversational and helpful, but prioritize action over questions. If the user
       console.log('📝 Response length:', responseText.length);
       console.log('🧠 Thinking length:', thinking.length);
       
-      return { response: responseText, thinking: thinking || undefined };
+      return { response: responseText, thinking: thinking || undefined, isMock: false };
 
     } catch (error) {
       console.error('❌ LLM Service error:', error);
       console.error('❌ Error details:', {
         provider: config.provider,
         model: config.model,
-        hasApiKey: !!config.apiKey,
         hasEnvKey: !!process.env.ANTHROPIC_API_KEY
       });
       
       if (error instanceof Error) {
         if (error.message.includes('api_key')) {
-          return { response: 'I\'m having trouble connecting to my AI service. Please check that the API key is configured correctly.' };
+          return { response: 'I\'m having trouble connecting to my AI service. Please check that the API key is configured correctly.', thinking: undefined, isMock: false };
         }
         // Return more specific error message
-        return { response: `Error: ${error.message}. Please try again or check your configuration.` };
+        return { response: `Error: ${error.message}. Please try again or check your configuration.`, thinking: undefined, isMock: false };
       }
       
       // Consistent error response format
       return { 
         response: 'Sorry, I encountered an error while processing your request. Please try again.',
-        thinking: undefined
+        thinking: undefined,
+        isMock: false
       };
     }
   }
