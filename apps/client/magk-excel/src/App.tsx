@@ -56,6 +56,12 @@ function App() {
         console.log('🔧 App: Auto-enabling Excel MCP server...')
         await state.toggleServer('excel', true)
       }
+      
+      // Auto-enable PDF server if not already enabled
+      if (!state.enabledServers.includes('pdf')) {
+        console.log('🔧 App: Auto-enabling PDF MCP server...')
+        await state.toggleServer('pdf', true)
+      }
     }).catch((error) => {
       console.error('❌ App: MCP initialization failed:', error)
     })
