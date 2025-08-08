@@ -1,280 +1,221 @@
-# Excel Standardization Spec — Year-over-Year (2022 → 2023)
+# Excel Standardization Spec — Generalized (Any PDF → Standardized Excel)
 
-This document defines the canonical Excel workbook structure, schema, formatting, and data processing rules for producing a 2023 Excel from a new 2023 PDF while using a prior-year (2022) Excel as the schema reference and comparison baseline.
+This document defines a domain-agnostic, configurable standard for turning any PDF (tables, mixed layouts, or narrative text) into a consistent, auditable Excel workbook. It supports single-dataset exports and arbitrary comparisons (e.g., prior vs current period, vendor A vs vendor B, 2022 vs 2023), without hard-coding year semantics.
 
-The goal: deterministic, auditable, and user-friendly workbooks that are consistent across years and sources.
+## 1. Core Concepts
+- Dataset: A logically grouped result set from one or more sources (e.g., a single PDF, a batch of PDFs, a time period, a vendor).
+- Schema: A named, versioned set of columns with types, formats, and validation rules for a given domain (e.g., Facilities, Invoices, Inventory). Schemas are defined in config.
+- Baseline/Target (optional): Any two datasets can be compared to produce a Delta sheet (not limited to years).
 
-## 1. Scope
-- Inputs
-  - 2022 Excel workbook with a standardized “Data_2022” sheet (or similar).
-  - 2023 PDF containing new/updated information.
-- Outputs
-  - 2023 workbook containing:
-    - `Data_2023` (primary dataset in standardized schema)
-    - `Delta_2022_2023` (change log between 2022 and 2023)
-    - `Summary` (KPIs & counts)
-    - `Errors_2023` (parse/validation issues)
-    - `Lineage_2023` (provenance mapping to PDF pages/tables)
-- Non-goals
-  - OCR provider selection and ETL are defined elsewhere; this spec focuses on Excel standardization and year-over-year behavior.
+## 2. Workbook Outputs (Generalized)
+- Data_<datasetId>: Standardized records for a dataset (e.g., Data_Q2_2024, Data_VendorX, Data_Run123).
+- Delta_<baselineId>_<targetId>: Change log between two datasets (optional).
+- Summary: KPIs, counts, confidence distribution, totals by key fields.
+- Errors_<datasetId>: Parse/validation issues with suggested actions.
+- Lineage_<datasetId>: Provenance linking values to PDF locations and extractor rules.
 
-## 2. Canonical Schema (Facilities)
-The canonical schema is applied to each record in `Data_2023` and must be identical in `Data_2022` for comparison.
+Notes:
+- Multiple Data sheets can coexist in one workbook to support side-by-side analysis (e.g., Data_2022 and Data_2023).
+- Naming is driven by config and sanitized to Excel limits.
 
-Column order is fixed and stable across years.
+## 3. Canonical Schema Model (Config-Driven)
+Schemas are declared in configuration (YAML/JSON). Each schema defines columns with:
+- key: unique column key (machine-readable)
+- label: human-readable header
+- type: one of [string, integer, number, currency, percent, date, enum, boolean]
+- required: boolean
+- format: Excel number/date format (optional)
+- enumValues: for enum types (optional)
+- validation: constraints (min/max, regex, list) (optional)
+- synonyms: header variants used in PDFs for mapping (optional)
+- derive: computed expression or function name (optional)
 
-1. `Company` (string)
-2. `Borrower` (string, optional if same as Company)
-3. `Facility Name` (string)
-4. `Facility Type` (enum: Revolver | Term Loan | MTN | Bond | Notes | CP | Other)
-5. `Currency` (string, ISO 4217; default USD)
-6. `Total Commitment (Base)` (number; base currency, e.g., USD)
-7. `Total Commitment (Native)` (number; original currency value)
-8. `Valuation (Base)` (number)
-9. `Valuation (Native)` (number)
-10. `Interest Rate (%)` (number; percent)
-11. `Base Rate` (string; e.g., SOFR, LIBOR, Prime)
-12. `Spread (bps)` (integer)
-13. `Issue Date` (date; ISO 8601)
-14. `Maturity Date` (date; ISO 8601)
-15. `Country` (string; optional enrichment)
-16. `Region` (string; optional enrichment)
-17. `Source File` (string; filename only)
-18. `Source Pages` (string; e.g., "12-13")
-19. `Table Id` (string; e.g., "P12_T2")
-20. `Record Id` (string; deterministic hash over identity fields; see §6)
-21. `Confidence` (number 0..1)
-
-Number formats (Excel):
-- Currency (Base): `"$#,##0.00"` (configurable per base currency)
-- Currency (Native): `"#,##0.00"` (no symbol)
-- Percent: `"0.00%"`
-- Dates: `"yyyy-mm-dd"`
-- Integers (bps): `"#,##0"`
-
-Data validation (Excel):
-- `Facility Type`: list validation with fixed enum values.
-- `Currency`: list validation of supported ISO codes (configurable).
-
-## 3. Sheet Layouts and Formatting
-### 3.1 Data_2023
-- Excel Table: name `tblData_2023`
-- Freeze panes: Row 1
-- AutoFilter: on header row
-- Column widths: auto-calculated by max content length (clamped 10..60)
-- Header style: bold, light-gray fill (#DCE6F1), thin border
-- Conditional Formatting:
-  - Highlight `Confidence < 0.60` (light red fill)
-  - Highlight `Maturity Date < Issue Date` (red)
-  - Highlight missing mandatory fields (Company, Facility Name, Facility Type, Total Commitment (Base), Issue Date) in yellow
-
-### 3.2 Delta_2022_2023
-- Shows changes between 2022 and 2023 by `Record Id` (see §6).
-- Columns:
-  1. `Record Id`
-  2. `Company`
-  3. `Facility Name`
-  4. `Facility Type`
-  5. `Change Type` (enum: New | Removed | Modified | Unchanged)
-  6. For each comparable field F in schema, provide triple columns: `F_2022`, `F_2023`, `ΔF` (difference) and for numeric fields also `%ΔF`.
-  7. `Source Pages (2022)`
-  8. `Source Pages (2023)`
-- Conditional Formatting:
-  - `Change Type = New` → green fill
-  - `Change Type = Removed` → gray fill with strikethrough for 2022 values
-  - `Modified` rows: highlight cells where values changed
-- Comparison rules:
-  - Text fields: case-insensitive, trimmed, Unicode-normalized; Levenshtein distance ≤ 2 treated as equal (configurable) for identity only; otherwise exact for delta.
-  - Numbers: compare within tolerance (absolute or relative) from config (default: toleranceAbs=0.005 for rates, 1 bps for spread, 0.1% relative for currency after normalization).
-  - Dates: ISO string equality.
-
-### 3.3 Summary
-- KPIs:
-  - Counts: total records, new, removed, modified, unchanged
-  - Totals: sum of `Total Commitment (Base)` for 2022 vs 2023 and Δ
-  - Average `Interest Rate (%)` and `Spread (bps)` for both years
-  - Confidence histogram buckets
-- Charts (optional): stacked bar of change types; donut of facility types; bar of commitments by type.
-
-### 3.4 Errors_2023
-- Row-level parse and validation errors/warnings:
-  - Columns: `Record Id?`, `Company?`, `Facility Name?`, `Field`, `Value`, `Issue`, `Page`, `Table Id`, `Severity` (Error|Warning), `Confidence`, `Suggestion`
-  - Include raw cell text and the mapping rule used (header→field) to aid triage
-
-### 3.5 Lineage_2023
-- Provenance table linking each `Record Id` and field to PDF artifacts:
-  - Columns: `Record Id`, `Field`, `Value`, `Page`, `Table Id`, `Cell Coordinates` (x,y,w,h), `OCR/Vector`, `Extraction Confidence`, `Parser Rule`
-
-## 4. Year-over-Year Process (2022 → 2023)
-1. Load 2022 Excel (`Data_2022`) and validate it conforms to the canonical schema (column names, order, and formats).
-2. Extract 2023 from PDF (vector/OCR) → raw tables + free-text → normalize → map to canonical schema → yield `records_2023` with provenance and confidence per field.
-3. Normalize 2023 records:
-   - Unicode normalization (NFKC), whitespace collapse
-   - Currency normalization to base (USD by default) using conversion date = `Issue Date` or report date; preserve native values/currency
-   - Numeric normalization (remove commas, parentheses→negative, units K/M/B)
-   - Date parsing to ISO 8601
-   - Header mapping via synonyms and heuristics (see §5)
-4. Identity matching against 2022 to compute `Record Id` (see §6).
-5. Build `Data_2023` from normalized 2023 records (ensure column order & formatting rules).
-6. Generate `Delta_2022_2023` by aligning on `Record Id`:
-   - `New`: appears in 2023 only
-   - `Removed`: appears in 2022 only
-   - `Modified`: appears in both but any comparable field differs beyond tolerance
-   - `Unchanged`: appears in both and all comparable fields match within tolerance
-7. Populate `Summary`, `Errors_2023`, `Lineage_2023`.
-8. Save workbook with filename pattern: `{CompanyOrSource}_Facilities_2023.xlsx` or generic `Facilities_2023.xlsx` if multi-company.
-
-## 5. Header Mapping & Field Parsing
-### 5.1 Header Synonyms (examples)
-- `Total Commitment` synonyms: `Facility Size`, `Total Commitments`, `Commitment`, `Facility Amount`
-- `Interest Rate (%)` synonyms: `Interest`, `Rate`, `Coupon`, `APR`
-- `Spread (bps)` synonyms: `Spread`, `Margin`, `OAS (bps)` (context dependent)
-- `Base Rate`: `Benchmark`, `Index`, `Reference Rate` (SOFR/LIBOR/Prime)
-- `Valuation`: `Valuation`, `Fair Value` (ensure unit mapping)
-
-Mapping rules:
-- Case-insensitive exact match > synonym match > fuzzy match (Levenshtein ≤ 2) with type hint.
-- Column type inference by regex on sample values to disambiguate (percent, currency, date, integer bps).
-
-### 5.2 Regex Extractors (examples)
-- Currency Value: `(?P<sign>\()?[$£€¥]?\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?)(?P<unit>[kKmMbB]?)\)?`
-- Percent: `(?P<pct>\d+(?:\.\d+)?)\s*%`
-- Basis Points: `(?P<bps>\d{1,4})\s*(?:bps|basis\s*points)`
-- Dates: `\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},\s+\d{4}\b|\b\d{4}-\d{2}-\d{2}\b`
-
-### 5.3 Units & Currency Handling
-- Parentheses denote negative; strip and multiply by -1
-- Suffix multipliers: `k=1e3, m/M=1e6, b/B=1e9`
-- Base currency: USD (configurable); convert native→base at `Issue Date` or file date (configurable)
-- If FX rate unavailable, leave base as null and log warning in `Errors_2023`
-
-## 6. Identity & Deduplication
-### 6.1 Record Identity Key
-Default identity tuple (configurable): `(Company, Facility Name, Facility Type, Issue Date)`
-- Normalization before hashing:
-  - Trim, case-fold
-  - Unicode NFKC
-  - Replace em/en dashes with hyphen
-  - Collapse whitespace
-  - Remove punctuation except alphanumerics and spaces
-- `Record Id = SHA-256( join('|', normalized_tuple) )`
-
-### 6.2 Matching & Tolerances
-- Fuzzy name normalization for `Facility Name` to increase match rate (e.g., "Term Loan — A" → "Term Loan A")
-- Numeric tolerances for equality (default):
-  - Percent fields: abs diff ≤ 0.005 (0.5 bps)
-  - Spread (bps): abs diff ≤ 1
-  - Currency values: relative diff ≤ 0.1% or abs ≤ 1 (whichever larger)
-
-### 6.3 Deduplication Strategy
-Configurable modes:
-- `first_wins`: keep first occurrence by `Record Id`
-- `override`: keep latest (2023) and replace 2022
-- `merge`: merge fields when one side has null and the other has value; prefer higher-confidence values
-- `flag`: output all duplicates; set `dup_flag = TRUE` and record in `Errors_2023`
-
-## 7. Computed Fields (optional)
-- `spread_bps = (Interest Rate (%) – base_rate_percent) × 10000`
-- `yoy_growth_pct_commitment = (Commitment_2023 – Commitment_2022) / Commitment_2022`
-- `days_to_maturity = Maturity Date – Issue Date`
-- Include on `Delta_2022_2023` when applicable; on `Data_2023` only if configured.
-
-## 8. Validation Rules
-- Mandatory fields: Company, Facility Name, Facility Type, Total Commitment (Base), Issue Date
-- Date sanity: Maturity Date ≥ Issue Date; Year falls within accepted range (2000..2100)
-- Numeric sanity: 0 ≤ Interest Rate ≤ 100; 0 ≤ Spread ≤ 3000; Commitment ≥ 0
-- Currency code must be a known ISO 4217 or configured override
-- Confidence threshold warnings: any field confidence < 0.6 produces a warning row in `Errors_2023`
-
-## 9. Lineage & Auditability
-- Each field in `Data_2023` must have provenance references stored in `Lineage_2023`:
-  - `Record Id`, `Field`, `Value`, `Page`, `Table Id`, `Cell Coordinates`, `Extraction Method` (Vector|OCR), `Extraction Confidence`, `Mapping Rule`
-- `Summary` shows counts of lineage completeness and min/avg/max confidences.
-
-## 10. File & Sheet Naming
-- Workbook filename: `Facilities_2023.xlsx` (or `{Org}_Facilities_2023.xlsx` if single-org)
-- Sheets: `Data_2023`, `Delta_2022_2023`, `Summary`, `Errors_2023`, `Lineage_2023`
-- Excel table names: `tblData_2023`, `tblDelta_2022_2023`, `tblErrors_2023`, `tblLineage_2023`
-
-## 11. Configuration (YAML/JSON)
-Example (YAML):
+Example (Finance/Facilities, illustrative):
 ```yaml
-base_currency: USD
-identity_fields: [Company, Facility Name, Facility Type, Issue Date]
-comparison_tolerance:
+schema:
+  name: Facilities
+  version: 1
+  columns:
+    - key: company
+      label: Company
+      type: string
+      required: true
+      synonyms: [Issuer, Borrower, Parent]
+    - key: facility_name
+      label: Facility Name
+      type: string
+      required: true
+    - key: facility_type
+      label: Facility Type
+      type: enum
+      enumValues: [Revolver, Term Loan, MTN, Bond, Notes, CP, Other]
+      required: true
+    - key: currency
+      label: Currency
+      type: string
+      validation:
+        list: [USD, EUR, GBP, JPY]
+    - key: commitment_base
+      label: Total Commitment (Base)
+      type: currency
+      required: true
+      format: "$#,##0.00"
+    - key: commitment_native
+      label: Total Commitment (Native)
+      type: currency
+      format: "#,##0.00"
+    - key: interest_rate
+      label: Interest Rate (%)
+      type: percent
+      format: "0.00%"
+    - key: spread_bps
+      label: Spread (bps)
+      type: integer
+    - key: issue_date
+      label: Issue Date
+      type: date
+      format: "yyyy-mm-dd"
+    - key: maturity_date
+      label: Maturity Date
+      type: date
+      format: "yyyy-mm-dd"
+    - key: confidence
+      label: Confidence
+      type: number
+```
+
+## 4. Sheet Layouts and Formatting (Standard)
+- Header style: bold, light-gray fill (#DCE6F1), thin border (all Data/Delta/Errors/Lineage sheets).
+- Freeze panes: row 1 on Data_* and Delta_* sheets.
+- AutoFilter: header row enabled.
+- Column widths: auto-sized by content length with clamping [10..60] characters.
+- Data validation:
+  - enum/list columns: Excel list validation.
+  - dates: Excel date format enforced; parse to ISO internally.
+- Conditional formatting:
+  - Cells with missing required fields in Data_*: yellow fill.
+  - Confidence < threshold (config, default 0.60): light red fill.
+  - Delta_*: highlight changed cells; optional color coding for New/Removed/Modified rows.
+
+## 5. Data Mapping & Normalization (Generic)
+- Header mapping: match PDF headers to schema labels using (in order): exact (case-insensitive), synonym list, fuzzy match (Levenshtein ≤ N, configurable), type hints.
+- Value parsing (generic regex library):
+  - Numbers: `[-+]?\d{1,3}(?:,\d{3})*(?:\.\d+)?`
+  - Currency amounts: detect symbols [$£€¥], parentheses → negative, unit suffixes [k,m,b].
+  - Percent: `\d+(?:\.\d+)?%`
+  - Dates: U.S. month names and ISO `YYYY-MM-DD` (extensible via config locale).
+- Units and currency:
+  - Suffix multipliers: k=1e3, m/M=1e6, b/B=1e9.
+  - Parentheses indicate negative.
+  - Base vs native currency optional; conversion rules configurable (source, as-of date).
+- Text normalization: Unicode NFKC, whitespace collapse, dash unification, trimming.
+
+## 6. Identity & Deduplication (Configurable)
+- Identity key: ordered list of column keys used to create a deterministic `record_id` (e.g., SHA-256 of normalized concatenation).
+- Normalization for identity: lowercasing, trimming, punctuation removal (configurable), dash unification.
+- Strategies:
+  - first_wins
+  - override (prefer later dataset)
+  - merge (fill nulls; prefer higher confidence)
+  - flag (retain all; mark duplicates)
+
+## 7. Delta Computation (Any Two Datasets)
+- Inputs: two Data sheets (baselineId, targetId) of the same schema.
+- Row alignment: by `record_id`.
+- Change types:
+  - New: present only in target
+  - Removed: present only in baseline
+  - Modified: present in both with at least one comparable field different
+  - Unchanged: present in both with all comparable fields equal within tolerance
+- Field comparison rules:
+  - Strings: case-insensitive exact (after normalization). Fuzzy equality may be enabled for identity only.
+  - Numbers: tolerance absolute/relative per column (config defaults: percent_abs=0.005, spread_bps_abs=1, currency_relative=0.001).
+  - Dates: ISO string equality.
+- Delta_* columns (for each comparable field F): `F_baseline`, `F_target`, `ΔF` (numeric diff where applicable), `%ΔF` (optional).
+
+## 8. Errors & Lineage (Auditability)
+- Errors_<datasetId> rows:
+  - `record_id?`, `field`, `value`, `issue`, `severity` (Error|Warning), `hint/suggestion`, `page?`, `table_id?`, `confidence?`
+- Lineage_<datasetId> rows:
+  - `record_id`, `field`, `value`, `page`, `table_id`, `cell_coordinates (x,y,w,h)`, `extraction_method (Vector|OCR)`, `extraction_confidence`, `parser_rule`
+
+## 9. Summary (Generic KPIs)
+- Counts: total records, completeness (required fields filled), duplicate count (pre/post-dedupe).
+- Confidence: min/avg/max, histogram buckets.
+- Totals: configurable aggregates (e.g., sum over currency fields), by category (e.g., facility type) if present.
+- If Delta sheet exists: counts of New/Removed/Modified/Unchanged; total differences for selected numeric fields.
+
+## 10. Configuration (YAML Example)
+```yaml
+workbook:
+  default_sheet_prefix: Data
+  confidence_threshold: 0.6
+  auto_charts: false
+
+schemaRef: Facilities  # pick which schema to use for this run
+
+identity:
+  keys: [company, facility_name, facility_type, issue_date]
+  normalize:
+    case_fold: true
+    trim: true
+    remove_punctuation: true
+    unify_dashes: true
+
+tolerance:
   percent_abs: 0.005
   spread_bps_abs: 1
   currency_relative: 0.001
+
 currency:
-  convert: true
-  fx_source: 'ECB'   # or 'OANDA', 'None'
-  fallback_on_missing: false
-schema:
-  facility_type_enum: [Revolver, Term Loan, MTN, Bond, Notes, CP, Other]
-header_synonyms:
-  Total Commitment (Base): [Total Commitment, Facility Size, Total Commitments, Commitment]
-  Interest Rate (%): [Interest, Rate, Coupon, APR]
-  Spread (bps): [Spread, Margin, OAS (bps)]
-  Base Rate: [Benchmark, Index, Reference Rate]
-workbook:
-  enable_charts: true
-  include_computed_fields: false
-  conditional_formatting:
-    low_confidence_threshold: 0.6
-    highlight_removed: true
-    highlight_modified: true
+  base: USD
+  convert: false       # true to enable conversion
+  fx_source: ECB       # or OANDA
+  as_of: issue_date    # conversion date policy
+
+mapping:
+  fuzzy_distance: 2
+  prefer_type_hints: true
+
+dedup:
+  strategy: merge      # first_wins | override | merge | flag
+
+computed:
+  enable: false
+  fields:
+    - key: spread_bps
+      formula: "(interest_rate - base_rate_percent) * 10000"
 ```
 
-## 12. Example Delta Calculation
-Given:
-- 2022: `Total Commitment (Base) = 1,000,000.00`, `Interest Rate (%) = 5.25%`
-- 2023: `Total Commitment (Base) = 1,200,000.00`, `Interest Rate (%) = 5.50%`
+## 11. Sheet Construction Rules
+- Data_<datasetId>
+  - Use configured schema columns in declared order.
+  - Apply number/date formats and data validation from schema.
+  - Apply conditional formatting for missing required fields and low confidence.
+- Delta_<baselineId>_<targetId>
+  - Generate only if two datasets are provided and share the same schema.
+  - Include change type and per-field comparisons.
+- Errors_<datasetId> and Lineage_<datasetId>
+  - Always generate when parsing/validation/lineage is enabled.
 
-Delta row shows:
-- `Change Type = Modified`
-- `Total Commitment (Base)_2022 = 1,000,000.00`
-- `Total Commitment (Base)_2023 = 1,200,000.00`
-- `ΔTotal Commitment (Base) = 200,000.00`
-- `%ΔTotal Commitment (Base) = 20.00%`
-- `Interest Rate (%)_2022 = 5.25%`
-- `Interest Rate (%)_2023 = 5.50%`
-- `ΔInterest Rate (%) = 0.25%`
+## 12. QA Checklist (Generic)
+- [ ] All Data_* sheets conform to their schema definitions (labels, order, types, formats).
+- [ ] Required fields present or captured as errors.
+- [ ] Identity and dedupe applied per config; `record_id` uniqueness holds.
+- [ ] Delta_* reflects differences consistent with tolerances.
+- [ ] Summary metrics match row counts and aggregates.
+- [ ] Lineage populated for fields with extractor provenance (target coverage ≥ configured threshold).
 
-## 13. Error Recording Examples (Errors_2023)
-- Missing `Issue Date` → Severity: Error; Suggestion: Check header mapping; Page/Table references attached.
-- Unrecognized currency `US$` → Severity: Warning; Suggestion: Map to `USD`.
-- Low confidence field (0.42) for `Spread (bps)` → Severity: Warning; Suggestion: Manually verify.
+## 13. Acceptance Criteria
+- Workbook generation is deterministic for the same inputs and config.
+- Schemas can be extended or swapped without code changes (config-only).
+- Comparisons work for any two datasets of the same schema, not limited to time-based periods.
+- Errors and lineage provide enough context for manual QA without re-running extraction.
 
-## 14. QA Checklist
-- [ ] Column names, order, formats match canonical schema
-- [ ] `Data_2023` row count equals number of unique `Record Id`
-- [ ] `Delta_2022_2023` totals add up: New + Removed + Modified + Unchanged = union size
-- [ ] All mandatory fields populated or logged in `Errors_2023`
-- [ ] Conditional formatting visible for modified/new/removed rows
-- [ ] Provenance populated for ≥ 95% of fields
+## 14. Example Scenarios (Non-Exhaustive)
+- Period-over-period: Data_2022 vs Data_2023 → Delta_2022_2023.
+- Vendor consolidation: Data_VendorA vs Data_VendorB → Delta_VendorA_VendorB.
+- Before/After corrections: Data_Run001 vs Data_Run002 → Delta_Run001_Run002.
 
-## 15. Acceptance Criteria
-- Workbooks are reproducible with same inputs and config.
-- `Data_2023` conforms to schema and styles; `Delta_2022_2023` accurately reflects changes with tolerances.
-- Errors and lineage provide sufficient detail for manual QA without revisiting code.
-
-## 16. Implementation Hooks
-- Exporter uses `exceljs` to:
-  - Create sheets and tables with styles, validation, and filters
-  - Apply conditional formatting (where supported; otherwise emulate with rules)
-  - Auto-fit columns by content length (capped 60)
-- Schema enforcement via centralized column definition with type, format, and validation metadata.
-- Delta calculator module consumes two arrays of normalized records and emits change rows per spec.
-
-## 17. Worked Example (2022 → 2023)
-1. Load `Facilities_2022.xlsx` → read `Data_2022` into memory.
-2. Process `2023.pdf` → normalize to records_2023 with base/native values.
-3. Compute `Record Id` for each 2023 record using identity tuple.
-4. Emit `Data_2023` with formatted columns and validation.
-5. Align with 2022 by `Record Id` and compute deltas with tolerances; create `Delta_2022_2023`.
-6. Generate `Summary`, `Errors_2023`, and `Lineage_2023`.
-7. Save `Facilities_2023.xlsx`.
-
---
-
-This standard guarantees that year-over-year workbooks remain stable, comparable, and auditable, while giving analysts confidence in both the raw values and the provenance of every field.
+## 15. Notes on Domains
+This standard is domain-agnostic. Provide one or more schema definitions tailored to your domain (e.g., Facilities, Invoices, Inventory). The extractor maps PDF content to the selected schema using header synonyms, regex/type hints, and normalization rules defined here.
