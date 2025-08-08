@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Workflow Creation</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { margin: 10px; padding: 10px 20px; font-size: 16px; cursor: pointer; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        pre { background: #f5f5f5; padding: 10px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <h1>Workflow Creation Test</h1>
+    
+    <button id="testWorkflowCreation">Test Workflow Creation</button>
+    <button id="clearConsole">Clear Console</button>
+    
+    <div id="output"></div>
+
+    <script type="module">
+        // Simulate the workflow store logic
+        class WorkflowStore {
+            constructor() {
+                this.temporaryWorkflows = new Map();
+                this.permanentWorkflows = new Map();
+                this.activeWorkflow = null;
+                this.activeWorkflowId = null;
+            }
+
+            createWorkflow(name, type, chatSessionId) {
+                console.log('🔧 Creating workflow:', { name, type, chatSessionId });
+                
+                const id = `workflow-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const workflow = {
+                    id,
+                    name,
+                    type,
+                    chatSessionId,
+                    nodes: [],
+                    edges: [],
+                    status: 'draft',
+                    metadata: {
+                        created: new Date(),
+                        modified: new Date(),
+                        tags: [],
+                        category: 'general'
+                    },
+                    version: 1
+                };
+
+                if (type === 'temporary') {
+                    this.temporaryWorkflows.set(id, workflow);
+                    console.log('✅ Added to temporary workflows:', id, 'Total:', this.temporaryWorkflows.size);
+                } else {
+                    this.permanentWorkflows.set(id, workflow);
+                    console.log('✅ Added to permanent workflows:', id, 'Total:', this.permanentWorkflows.size);
+                }
+
+                return id;
+            }
+
+            loadWorkflow(id) {
+                console.log('📂 Loading workflow:', id);
+                
+                const workflow = this.temporaryWorkflows.get(id) || 
+                                this.permanentWorkflows.get(id);
+                
+                if (workflow) {
+                    console.log('✅ Found workflow:', workflow.name);
+                    this.activeWorkflowId = id;
+                    this.activeWorkflow = workflow;
+                    return workflow;
+                } else {
+                    console.warn('⚠️ Workflow not found:', id);
+                    return null;
+                }
+            }
+
+            getWorkflowById(id) {
+                return this.temporaryWorkflows.get(id) || 
+                       this.permanentWorkflows.get(id);
+            }
+        }
+
+        // Create store instance
+        const store = new WorkflowStore();
+
+        // Log function
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const div = document.createElement('div');
+            div.className = type;
+            div.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            output.appendChild(div);
+            console.log(message);
+        }
+
+        // Test workflow creation
+        document.getElementById('testWorkflowCreation').addEventListener('click', () => {
+            log('=== Testing Workflow Creation ===', 'info');
+            
+            // Step 1: Create workflow
+            const workflowId = store.createWorkflow(
+                `Test Workflow ${new Date().toLocaleTimeString()}`,
+                'temporary',
+                'test-session-123'
+            );
+            
+            log(`Created workflow with ID: ${workflowId}`, 'success');
+            
+            // Step 2: Load workflow
+            const loadedWorkflow = store.loadWorkflow(workflowId);
+            
+            if (loadedWorkflow) {
+                log(`Successfully loaded workflow: ${loadedWorkflow.name}`, 'success');
+                log(`Active workflow is now: ${store.activeWorkflow?.name}`, 'success');
+                
+                // Display workflow details
+                const details = document.createElement('pre');
+                details.textContent = JSON.stringify(loadedWorkflow, null, 2);
+                document.getElementById('output').appendChild(details);
+                
+                // Step 3: Verify workflow is in store
+                const verification = store.getWorkflowById(workflowId);
+                if (verification) {
+                    log('✅ Workflow verified in store', 'success');
+                } else {
+                    log('❌ Workflow not found in store', 'error');
+                }
+                
+                // Step 4: Check Maps
+                log(`Temporary workflows count: ${store.temporaryWorkflows.size}`, 'info');
+                log(`Permanent workflows count: ${store.permanentWorkflows.size}`, 'info');
+                
+            } else {
+                log('❌ Failed to load workflow', 'error');
+            }
+        });
+
+        // Clear console
+        document.getElementById('clearConsole').addEventListener('click', () => {
+            document.getElementById('output').innerHTML = '';
+            console.clear();
+        });
+
+        // Run initial test
+        window.addEventListener('load', () => {
+            log('=== Workflow Store Test Ready ===', 'info');
+            log('Click "Test Workflow Creation" to begin', 'info');
+        });
+    </script>
+</body>
+</html>

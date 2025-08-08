@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel MCP Functionality Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 { color: #4CAF50; }
+        .test-section {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #45a049; }
+        button.secondary { background: #2196F3; }
+        button.danger { background: #f44336; }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background: #3a3a3a;
+        }
+        .status.success { background: #1b5e20; }
+        .status.error { background: #b71c1c; }
+        .status.info { background: #01579b; }
+        pre {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .file-info {
+            background: #3a3a3a;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .download-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Excel MCP Functionality Test</h1>
+        <p>Test Excel creation, writing, and download functionality</p>
+
+        <!-- Test 1: Create Excel with Rabbit Data -->
+        <div class="test-section">
+            <h2>Test 1: Create Rabbit Population Excel</h2>
+            <p>Create an Excel sheet with rabbit population data from 2023-2025</p>
+            <button onclick="createRabbitExcel()">Create Rabbit Excel</button>
+            <div id="rabbit-status"></div>
+        </div>
+
+        <!-- Test 2: Create Excel with Complex Data -->
+        <div class="test-section">
+            <h2>Test 2: Create Complex Excel</h2>
+            <p>Create an Excel with multiple columns and formatting</p>
+            <button onclick="createComplexExcel()">Create Complex Excel</button>
+            <div id="complex-status"></div>
+        </div>
+
+        <!-- Test 3: Download Controls -->
+        <div class="test-section">
+            <h2>Download Controls</h2>
+            <div id="download-info" style="display: none;">
+                <div class="file-info">
+                    <h3>📁 File Created</h3>
+                    <p><strong>Filename:</strong> <span id="filename"></span></p>
+                    <p><strong>Path:</strong> <code id="filepath"></code></p>
+                    <div class="download-controls">
+                        <button onclick="downloadFile()">💾 Save As</button>
+                        <button onclick="openFile()" class="secondary">📂 Open File</button>
+                        <button onclick="showInFolder()" class="secondary">📁 Show in Folder</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Log Output -->
+        <div class="test-section">
+            <h2>Log Output</h2>
+            <pre id="log"></pre>
+        </div>
+    </div>
+
+    <script>
+        let currentFilePath = null;
+        let currentFileName = null;
+
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            logEl.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        // Mock MCP Tool Call
+        async function mockMCPToolCall(tool, args) {
+            log(`Calling MCP tool: ${tool}`, 'info');
+            log(`Arguments: ${JSON.stringify(args, null, 2)}`, 'info');
+            
+            // Simulate tool execution
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Generate mock file path
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            const filename = args.filename || `excel-${timestamp}.xlsx`;
+            const filePath = `/Users/Downloads/MAGK-Excel/${filename}`;
+            
+            return {
+                success: true,
+                downloadInfo: {
+                    filePath: filePath,
+                    filename: filename,
+                    url: null
+                },
+                content: [{
+                    type: 'text',
+                    text: `✅ Excel file created successfully!\n📁 File: ${filename}\n📂 Location: ${filePath}`
+                }]
+            };
+        }
+
+        async function createRabbitExcel() {
+            const statusEl = document.getElementById('rabbit-status');
+            statusEl.className = 'status info';
+            statusEl.textContent = 'Creating Excel file...';
+            
+            try {
+                const result = await mockMCPToolCall('excel_create', {
+                    filename: 'rabbit_population',
+                    data: {
+                        'Year': [2023, 2024, 2025],
+                        'Number of Rabbits': [1, 2, 5]
+                    }
+                });
+                
+                if (result.success) {
+                    statusEl.className = 'status success';
+                    statusEl.innerHTML = `✅ Excel created: <strong>${result.downloadInfo.filename}</strong>`;
+                    showDownloadInfo(result.downloadInfo);
+                    log('Rabbit population Excel created successfully', 'success');
+                }
+            } catch (error) {
+                statusEl.className = 'status error';
+                statusEl.textContent = `Error: ${error.message}`;
+                log(`Error creating Excel: ${error.message}`, 'error');
+            }
+        }
+
+        async function createComplexExcel() {
+            const statusEl = document.getElementById('complex-status');
+            statusEl.className = 'status info';
+            statusEl.textContent = 'Creating complex Excel file...';
+            
+            try {
+                const result = await mockMCPToolCall('excel_create', {
+                    filename: 'sales_report',
+                    data: {
+                        'Month': ['January', 'February', 'March', 'April', 'May'],
+                        'Sales': [45000, 52000, 48000, 61000, 58000],
+                        'Expenses': [32000, 35000, 33000, 38000, 36000],
+                        'Profit': [13000, 17000, 15000, 23000, 22000],
+                        'Growth %': [0, 15.6, -7.7, 27.1, -4.9]
+                    }
+                });
+                
+                if (result.success) {
+                    statusEl.className = 'status success';
+                    statusEl.innerHTML = `✅ Excel created: <strong>${result.downloadInfo.filename}</strong>`;
+                    showDownloadInfo(result.downloadInfo);
+                    log('Complex Excel created successfully', 'success');
+                }
+            } catch (error) {
+                statusEl.className = 'status error';
+                statusEl.textContent = `Error: ${error.message}`;
+                log(`Error creating Excel: ${error.message}`, 'error');
+            }
+        }
+
+        function showDownloadInfo(info) {
+            currentFilePath = info.filePath;
+            currentFileName = info.filename;
+            
+            document.getElementById('download-info').style.display = 'block';
+            document.getElementById('filename').textContent = info.filename;
+            document.getElementById('filepath').textContent = info.filePath;
+        }
+
+        async function downloadFile() {
+            if (!currentFilePath) {
+                log('No file to download', 'error');
+                return;
+            }
+            
+            log(`Downloading file: ${currentFileName}`, 'info');
+            
+            // Check if fileAPI is available (Electron)
+            if (window.fileAPI) {
+                try {
+                    const result = await window.fileAPI.downloadFile(currentFilePath);
+                    if (result.success) {
+                        log(`File saved to: ${result.savedPath}`, 'success');
+                    } else {
+                        log(`Download failed: ${result.error}`, 'error');
+                    }
+                } catch (error) {
+                    log(`Download error: ${error.message}`, 'error');
+                }
+            } else {
+                log('Download API not available (running in browser)', 'error');
+                // Simulate download for web version
+                log('In production, this would trigger a download from the server', 'info');
+            }
+        }
+
+        async function openFile() {
+            if (!currentFilePath) {
+                log('No file to open', 'error');
+                return;
+            }
+            
+            log(`Opening file: ${currentFileName}`, 'info');
+            
+            if (window.fileAPI) {
+                try {
+                    await window.fileAPI.openFile(currentFilePath);
+                    log('File opened in default application', 'success');
+                } catch (error) {
+                    log(`Open error: ${error.message}`, 'error');
+                }
+            } else {
+                log('Open API not available (running in browser)', 'error');
+            }
+        }
+
+        async function showInFolder() {
+            if (!currentFilePath) {
+                log('No file to show', 'error');
+                return;
+            }
+            
+            log(`Showing file in folder: ${currentFileName}`, 'info');
+            
+            if (window.fileAPI) {
+                try {
+                    await window.fileAPI.showInFolder(currentFilePath);
+                    log('File location opened in file explorer', 'success');
+                } catch (error) {
+                    log(`Show folder error: ${error.message}`, 'error');
+                }
+            } else {
+                log('Show folder API not available (running in browser)', 'error');
+            }
+        }
+
+        // Initialize
+        window.addEventListener('load', () => {
+            log('Excel MCP Test Interface loaded', 'success');
+            log('Ready to test Excel creation and download functionality', 'info');
+            
+            // Check if running in Electron
+            if (window.fileAPI) {
+                log('✅ Running in Electron - Full download support available', 'success');
+            } else {
+                log('⚠️ Running in browser - Limited download support', 'info');
+            }
+        });
+    </script>
+</body>
+</html>

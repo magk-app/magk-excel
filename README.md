@@ -2,7 +2,6 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)](https://www.microsoft.com/en-us/windows)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ## 📋 Project Overview
 
@@ -288,6 +287,63 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
    ```bash
    pytest
    ```
+
+## 📂 Development Scripts
+
+The project includes helper scripts organized in the `scripts/` directory:
+
+### Script Organization
+
+```
+scripts/
+├── setup/          # Environment setup and configuration
+│   ├── check-env.bat      # Windows: Pre-setup environment verification
+│   ├── setup.bat          # Windows: Create venv and install dependencies
+│   └── setup.sh           # Linux/Mac: Create venv and install dependencies
+│
+└── testing/        # Testing and validation scripts
+    ├── test.bat           # Windows: Run pytest test suite
+    ├── test_python.bat    # Windows: Debug Python/venv detection
+    └── verify_fix.bat     # Windows: Verify setup fixes
+```
+
+### Using Development Scripts
+
+#### Initial Setup
+1. **Check your environment** (Windows only):
+   ```bash
+   cd apps/server
+   ..\..\scripts\setup\check-env.bat
+   ```
+
+2. **Run setup**:
+   - Windows: `..\..\scripts\setup\setup.bat`
+   - Linux/Mac: `../../scripts/setup/setup.sh`
+
+#### Running Tests
+From the app directory (e.g., `apps/server`):
+- Windows: `..\..\scripts\testing\test.bat`
+- Linux/Mac: `pytest tests/ -v`
+
+### Virtual Environment Strategy
+
+Each app maintains its own virtual environment:
+- Server: `apps/server/venv/`
+- Client: `apps/client/venv/`
+
+This approach ensures:
+- Dependency isolation between apps
+- No version conflicts
+- Standard Python project structure
+- Easy CI/CD integration
+
+### Cross-Platform Notes
+
+- Windows scripts use `.bat` extension and `py` command
+- Linux/Mac scripts use `.sh` extension and `python3` command
+- Virtual environments have different structures:
+  - Windows: `venv\Scripts\activate.bat`
+  - Linux/Mac: `venv/bin/activate`
 
 ## 📁 Project Structure
 

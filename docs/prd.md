@@ -124,6 +124,12 @@ Equity researchers at firms like China Galaxy Securities International currently
 - **As a** developer, **I want** the generated executable to have a simple UI with context-aware controls, **so that** the tool is customizable.
 - **Acceptance Criteria:** 1. A small AI model analyzes the workflow context. 2. Based on the context, it selects appropriate pre-built UI controls. 3. The selected controls are included in the final packaged UI.
 
+**Story 2.5: Interaction with the AI to create my ideal tool** (ref)
+
+- As an analyst, I want to be able to have a variety of control on the tool I make.
+- Acceptance Criteria: 1. The AI is able to interact and ask questions if it has difficulty understanding the user’s vision for creating a workflow automation tool. 2. The user can choose how much tinkering it wants to do with the tool. If they leave the tool very general, edge cases/confusion may be flagged to the user. 3. (optional for demo as it is difficult) the user should be able to see a demo of the tool as it is being created, to make sure it is obtaining the right data/doing the right tasks.
+- For example, if the program is collecting annual report data, and the program realises that some data was restated, the user should recieve a popup from the program asking for advice (should we take original, or restated data?)
+
 ### Epic 3: Demo Showcase & Live Integration
 
 **Goal:** To implement the specific, high-impact demo use cases and the "magical" real-time Excel integration that will be shown to senior management.
@@ -140,7 +146,7 @@ Equity researchers at firms like China Galaxy Securities International currently
 - **As a** Junior Analyst, **I want** to create a tool for the Alibaba annual report PDF, **so that** I can automate key financial data extraction.
 - **Acceptance Criteria:** 1. The system can parse the Alibaba PDF. 2. The tool extracts the correct financial tables. 3. The tool's UI includes a year selector. 4. The final Excel output is 100% accurate.
 
-**Story 3.3: Use Case C - Excel Supermacro**
+**Story 3.3: Use Case C - Excel Supermacro < - THIS IS NO LONGER AS IMPORTANT**
 
 - **As a** Junior Analyst, **I want** to create a tool that combines multiple monthly Excel files into one master file, **so that** I can consolidate time-series data quickly.
 - **Acceptance Criteria:** 1. The system can process a folder of Excel files. 2. The tool appends data correctly to a master workbook. 3. The tool's UI allows specifying input/output paths. 4. The consolidated data is 100% accurate.
@@ -149,3 +155,19 @@ Equity researchers at firms like China Galaxy Securities International currently
 
 - **As a** Senior Analyst (audience member), **I want** to see data appear in an open Excel sheet in real-time, **so that** I can be wowed by the seamless integration.
 - **Acceptance Criteria:** 1. The system can detect if a target Excel file is open. 2. The tool writes data row-by-row into the open spreadsheet. 3. Updates are visible without manual refresh.
+
+**Story 3.5: Standardisation**
+
+- **As an analyst, I want my generalized tool to get data from different companies annual reports to have options to standardize the excel output, so that I can easily compare data across companies**
+    - Different companies report data in slightly different ways, eg. Operating profit may be called EBIT, Cost of goods sold might be called Cost of sales, there may not be any inventories etc.
+- **Acceptance Criteria: If the user desires, programs are able to standardize differing reports data, so that the same metrics (eg. total assets, net cash from investing etc.) are easy to access and in the same place**
+
+**Story 3.6: Reusability**
+
+- **As an analsyt, I want an easy repository to access all the tools I made, so with my zero tech knowledge, I can easily open them in Excel and share them with other analysts**
+- **Acceptance Criteria: 1. An in-app repository of tools with easy ability to re-edit for further tinkering, sharing/exporting, and execution, 2. and/(or?) an Excel tab giving access to previously-crated tools, located in the same place Excel tabs like ‘Data’ and ‘File’ are (forget what that is called)**
+
+**Story 3.8: Simple Excel menu (Optional) NOT PRIORITY**
+
+- **As an analyst, I want the menu to open be very smooth in Excel.**
+- **Acceptance Criteria: 1. For the demo, I do not want anything fancy, but if possible make it so I can open directly in excel, with a tab and buttons like the ones shown here.**

@@ -1,0 +1,58 @@
+{
+  "mcpServers": {
+    "excel": {
+      "command": "npx",
+      "args": [
+        "--yes",
+        "@negokaz/excel-mcp-server"
+      ],
+      "type": "stdio",
+      "displayName": "Excel MCP",
+      "description": "Read and write Excel files, manipulate spreadsheets",
+      "env": {
+        "EXCEL_MCP_PAGING_CELLS_LIMIT": "4000"
+      }
+    },
+    "pdf": {
+      "command": "npx",
+      "args": [
+        "--yes",
+        "@modelcontextprotocol/server-pdf"
+      ],
+      "type": "stdio",
+      "displayName": "PDF Tools",
+      "description": "Read and extract data from PDF files"
+    },
+    "puppeteer": {
+      "command": "npx",
+      "args": [
+        "@hisma/server-puppeteer"
+      ],
+      "type": "stdio",
+      "displayName": "Puppeteer",
+      "description": "Browser automation and web scraping"
+    },
+    "fetch": {
+      "command": "npx",
+      "args": [
+        "mcp-fetch-server"
+      ],
+      "type": "stdio",
+      "displayName": "Fetch API",
+      "description": "HTTP requests and API calling"
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "--yes",
+        "@modelcontextprotocol/server-filesystem"
+      ],
+      "type": "stdio",
+      "displayName": "Filesystem",
+      "description": "Read and write files in allowed directories",
+      "env": {
+        "FILESYSTEM_ALLOWED_DIRECTORIES": ""
+      }
+    }
+  }
+}

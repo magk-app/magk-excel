@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test File Upload</title>
+</head>
+<body>
+    <h1>Test Excel File Upload</h1>
+    <form id="uploadForm">
+        <input type="file" id="fileInput" accept=".xlsx,.xls" />
+        <input type="text" id="messageInput" placeholder="Enter message..." value="Analyze this Excel file" />
+        <button type="submit">Upload & Analyze</button>
+    </form>
+    
+    <div id="result"></div>
+    
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('fileInput');
+            const messageInput = document.getElementById('messageInput');
+            const result = document.getElementById('result');
+            
+            if (!fileInput.files[0]) {
+                result.innerHTML = 'Please select a file';
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('message', messageInput.value);
+            formData.append('mcpTools', JSON.stringify([
+                {"name": "excel_describe_sheets", "server": "excel", "description": "List sheets in Excel file"},
+                {"name": "excel_read_sheet", "server": "excel", "description": "Read Excel sheet data"}
+            ]));
+            formData.append('mcpServers', JSON.stringify({}));
+            formData.append('history', JSON.stringify([]));
+            formData.append('file_0', fileInput.files[0]);
+            formData.append('file_0_type', fileInput.files[0].type);
+            formData.append('file_0_name', fileInput.files[0].name);
+            formData.append('fileCount', '1');
+            
+            result.innerHTML = 'Uploading...';
+            
+            try {
+                const response = await fetch('http://localhost:3001/chat', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                result.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (error) {
+                result.innerHTML = 'Error: ' + error.message;
+            }
+        });
+    </script>
+</body>
+</html>

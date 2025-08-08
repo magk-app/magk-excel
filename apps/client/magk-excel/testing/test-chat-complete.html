@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Chat Test with Debug</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .chat-messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 8px;
+        }
+        .message.user {
+            background: #007bff;
+            color: white;
+            margin-left: 20%;
+            text-align: right;
+        }
+        .message.assistant {
+            background: #f0f0f0;
+            margin-right: 20%;
+        }
+        .message.thinking {
+            background: #fff3cd;
+            color: #856404;
+            font-style: italic;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+        input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .debug-log {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .log-entry {
+            margin-bottom: 4px;
+        }
+        .log-entry.error { color: #f48771; }
+        .log-entry.success { color: #89d185; }
+        .log-entry.info { color: #75beff; }
+        .log-entry.warning { color: #ffcc00; }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        h3 { margin-top: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="panel">
+            <h3>Chat Interface</h3>
+            <div id="status" class="status info">Ready to test</div>
+            <div id="chatMessages" class="chat-messages"></div>
+            <div class="input-group">
+                <input type="text" id="messageInput" placeholder="Type a message..." 
+                       onkeypress="if(event.key === 'Enter') sendMessage()">
+                <button id="sendBtn" onclick="sendMessage()">Send</button>
+            </div>
+            <div style="margin-top: 10px;">
+                <button onclick="testSimple()">Test Simple</button>
+                <button onclick="testWithHistory()">Test History</button>
+                <button onclick="testMarkdown()">Test Markdown</button>
+                <button onclick="clearChat()">Clear</button>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h3>Debug Console</h3>
+            <div id="debugLog" class="debug-log"></div>
+            <button onclick="clearLogs()">Clear Logs</button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000';
+        let messages = [];
+        let currentAssistantMessage = null;
+        let isStreaming = false;
+        
+        function log(message, type = 'info') {
+            const debugLog = document.getElementById('debugLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            debugLog.appendChild(entry);
+            debugLog.scrollTop = debugLog.scrollHeight;
+            console.log(`[${type.toUpperCase()}]`, message);
+        }
+        
+        function setStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+        
+        function addMessage(role, content, messageId = null) {
+            const chatMessages = document.getElementById('chatMessages');
+            
+            if (messageId && currentAssistantMessage && currentAssistantMessage.id === messageId) {
+                // Update existing message
+                currentAssistantMessage.element.textContent = content || '...';
+                log(`Updated message ${messageId}: ${content?.substring(0, 50)}...`, 'info');
+            } else {
+                // Create new message
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${role}`;
+                messageDiv.textContent = content || '...';
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+                if (role === 'assistant' && messageId) {
+                    currentAssistantMessage = {
+                        id: messageId,
+                        element: messageDiv
+                    };
+                }
+                
+                log(`Added ${role} message${messageId ? ' with ID ' + messageId : ''}: ${content?.substring(0, 50)}...`, 'success');
+            }
+        }
+        
+        async function sendMessage(text = null) {
+            const input = document.getElementById('messageInput');
+            const message = text || input.value.trim();
+            if (!message) return;
+            
+            if (!text) input.value = '';
+            
+            if (isStreaming) {
+                log('Already streaming, please wait...', 'warning');
+                return;
+            }
+            
+            // Add user message
+            addMessage('user', message);
+            messages.push({ role: 'user', content: message });
+            
+            // Create assistant message placeholder
+            const assistantId = `msg_${Date.now()}`;
+            addMessage('assistant', '', assistantId);
+            
+            setStatus('Sending message...', 'info');
+            document.getElementById('sendBtn').disabled = true;
+            isStreaming = true;
+            
+            try {
+                log(`Sending request to ${API_BASE}/api/v2/chat/stream`, 'info');
+                
+                const response = await fetch(`${API_BASE}/api/v2/chat/stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message,
+                        modelConfig: {
+                            provider: 'anthropic',
+                            model: 'claude-3-5-sonnet-20241022',
+                            enableThinking: false,
+                            temperature: 0.7,
+                            maxTokens: 1000
+                        },
+                        history: messages.slice(0, -1),
+                        mcpTools: [
+                            {
+                                name: 'excel_write_to_sheet',
+                                server: 'excel',
+                                description: 'Write data to an Excel spreadsheet'
+                            }
+                        ],
+                        attachments: []
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                log('Response received, starting stream...', 'success');
+                setStatus('Streaming response...', 'success');
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let fullContent = '';
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) {
+                        log('Stream complete', 'success');
+                        break;
+                    }
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                log(`SSE Event: ${data.type}`, 'info');
+                                
+                                if (data.type === 'content') {
+                                    fullContent = data.content;
+                                    addMessage('assistant', fullContent, assistantId);
+                                } else if (data.type === 'complete') {
+                                    fullContent = data.content;
+                                    addMessage('assistant', fullContent, assistantId);
+                                    messages.push({ role: 'assistant', content: fullContent });
+                                    setStatus('Response complete', 'success');
+                                } else if (data.type === 'error') {
+                                    throw new Error(data.error);
+                                }
+                            } catch (e) {
+                                if (!e.message?.includes('error')) {
+                                    log(`Parse error: ${e.message}`, 'warning');
+                                }
+                            }
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                setStatus(`Error: ${error.message}`, 'error');
+                addMessage('assistant', `Error: ${error.message}`, assistantId);
+            } finally {
+                document.getElementById('sendBtn').disabled = false;
+                isStreaming = false;
+                currentAssistantMessage = null;
+            }
+        }
+        
+        function testSimple() {
+            sendMessage('Hello, can you see this message?');
+        }
+        
+        function testWithHistory() {
+            sendMessage('My name is Bob. Please remember it.');
+            setTimeout(() => {
+                sendMessage('What is my name?');
+            }, 3000);
+        }
+        
+        function testMarkdown() {
+            sendMessage('Please create a simple markdown table with 3 rows of sample data');
+        }
+        
+        function clearChat() {
+            document.getElementById('chatMessages').innerHTML = '';
+            messages = [];
+            currentAssistantMessage = null;
+            log('Chat cleared', 'info');
+            setStatus('Chat cleared', 'info');
+        }
+        
+        function clearLogs() {
+            document.getElementById('debugLog').innerHTML = '';
+        }
+        
+        // Initial setup
+        window.onload = () => {
+            log('Chat test interface loaded', 'success');
+            log(`API endpoint: ${API_BASE}`, 'info');
+        };
+    </script>
+</body>
+</html>

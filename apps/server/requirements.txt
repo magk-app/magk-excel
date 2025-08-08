@@ -1,0 +1,41 @@
+# Core framework and dependencies
+chalice==1.32.0
+selenium==4.16.0
+boto3==1.34.0
+botocore==1.34.0
+openpyxl==3.1.2
+xlwt==1.3.0
+PyMuPDF==1.26.3
+requests==2.32.4
+pandas==2.2.0
+
+# Story 2.3 Executable Packaging Dependencies
+# pyinstaller==6.14.2
+
+# Testing dependencies
+pytest==8.0.0
+pytest-cov==4.1.0
+moto[s3]==4.2.0
+
+# Code quality
+flake8==6.0.0
+
+# Local development dependencies
+# localstack==3.0.0
+python-dotenv==1.0.0
+
+# # Story 3.4 Real-Time Excel Update Dependencies
+# pywin32==307  # Windows COM interface for Excel integration
+# psutil==5.9.8  # System and process monitoring
+
+# Type hints and static analysis (optional but recommended)
+mypy==1.8.0
+types-boto3==1.39.16
+
+# Lambda deployment requirements:
+# The following layers are required for Lambda deployment:
+# - Chrome binary layer (provides /opt/chrome/chrome)
+# - ChromeDriver layer (provides /opt/chromedriver)
+# Environment variables:
+# - CHROME_BINARY_PATH=/opt/chrome/chrome
+# - CHROMEDRIVER_PATH=/opt/chromedriver

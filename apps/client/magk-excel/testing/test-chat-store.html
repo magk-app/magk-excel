@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Store Debug Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .output {
+            background: #2d2d2d;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .success { color: #4caf50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        .info { color: #2196f3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Chat Store Debug Test</h1>
+        
+        <div>
+            <button onclick="testZustandStore()">Test Zustand Store</button>
+            <button onclick="testAddMessage()">Test Add Message</button>
+            <button onclick="testGetSession()">Test Get Session</button>
+            <button onclick="clearLocalStorage()">Clear Local Storage</button>
+            <button onclick="window.location.reload()">Reload Page</button>
+        </div>
+
+        <div id="output" class="output"></div>
+    </div>
+
+    <script type="module">
+        window.log = function(msg, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type;
+            output.innerHTML += `<span class="${className}">[${timestamp}] ${msg}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        };
+
+        window.testZustandStore = function() {
+            log('Testing Zustand Store...', 'info');
+            
+            // Check localStorage
+            const storedData = localStorage.getItem('magk-chat-history');
+            if (storedData) {
+                try {
+                    const parsed = JSON.parse(storedData);
+                    log('✅ Found stored data:', 'success');
+                    log(JSON.stringify(parsed, null, 2), 'info');
+                } catch (e) {
+                    log('❌ Failed to parse stored data: ' + e.message, 'error');
+                }
+            } else {
+                log('⚠️ No stored data found in localStorage', 'warning');
+            }
+        };
+
+        window.testAddMessage = function() {
+            log('Testing Add Message...', 'info');
+            
+            // Simulate adding a message to localStorage
+            const mockSession = {
+                state: {
+                    sessions: [{
+                        id: 'test-session-' + Date.now(),
+                        title: 'Test Session',
+                        createdAt: Date.now(),
+                        updatedAt: Date.now(),
+                        messages: [
+                            {
+                                id: 'msg-1',
+                                role: 'user',
+                                content: 'Test message from user',
+                                timestamp: Date.now()
+                            },
+                            {
+                                id: 'msg-2',
+                                role: 'assistant',
+                                content: 'Test response from assistant',
+                                timestamp: Date.now()
+                            }
+                        ],
+                        isActive: true
+                    }],
+                    activeSessionId: 'test-session-' + Date.now()
+                },
+                version: 1
+            };
+            
+            localStorage.setItem('magk-chat-history', JSON.stringify(mockSession));
+            log('✅ Added test session with messages', 'success');
+            log('Reload the app to see if messages appear', 'warning');
+        };
+
+        window.testGetSession = function() {
+            log('Testing Get Session...', 'info');
+            
+            // Try to get the current session
+            const storedData = localStorage.getItem('magk-chat-history');
+            if (storedData) {
+                const parsed = JSON.parse(storedData);
+                const activeSession = parsed.state.sessions.find(
+                    s => s.id === parsed.state.activeSessionId
+                );
+                
+                if (activeSession) {
+                    log('✅ Active session found:', 'success');
+                    log('Title: ' + activeSession.title, 'info');
+                    log('Messages: ' + activeSession.messages.length, 'info');
+                    log('Messages:', 'info');
+                    activeSession.messages.forEach((msg, i) => {
+                        log(`  ${i + 1}. [${msg.role}]: ${msg.content.substring(0, 50)}...`, 'info');
+                    });
+                } else {
+                    log('⚠️ No active session found', 'warning');
+                }
+            } else {
+                log('❌ No data in localStorage', 'error');
+            }
+        };
+
+        window.clearLocalStorage = function() {
+            if (confirm('This will clear all chat history. Are you sure?')) {
+                localStorage.removeItem('magk-chat-history');
+                log('✅ Local storage cleared', 'success');
+                log('Reload the app to start fresh', 'warning');
+            }
+        };
+
+        // Auto-run test on load
+        window.addEventListener('load', () => {
+            log('Page loaded. Click buttons to test chat store.', 'info');
+            testZustandStore();
+        });
+    </script>
+</body>
+</html>

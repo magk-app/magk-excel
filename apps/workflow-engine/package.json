@@ -1,0 +1,28 @@
+{
+  "name": "magk-workflow-engine",
+  "version": "0.1.0",
+  "description": "MAGK Excel Workflow Engine - Node.js + Hono.js backend for workflow generation and execution",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "eslint . --max-warnings 0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.0",
+    "@hono/node-server": "^1.8.0",
+    "dotenv": "^16.3.0",
+    "exceljs": "^4.4.0",
+    "hono": "^4.0.0",
+    "playwright": "^1.40.0",
+    "ws": "^8.18.3",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "eslint": "^8.57.1",
+    "tsx": "^4.7.0",
+    "typescript": "^5.2.2"
+  }
+}
