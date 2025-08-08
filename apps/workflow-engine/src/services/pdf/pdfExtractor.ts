@@ -61,7 +61,7 @@ export class LargePDFExtractor {
   private chunkSize: number = 25;
   private outputDir: string;
   
-  constructor(chunkSize: number = 25, outputDir: string = './output') {
+  constructor(chunkSize: number = 25, outputDir: string = path.join(__dirname, '../../output')) {
     this.chunkSize = chunkSize;
     this.outputDir = outputDir;
     
@@ -102,11 +102,6 @@ export class LargePDFExtractor {
         console.log(`\n⚡ Processing chunk: pages ${startPage}-${endPage} (${progress}%)`);
         
         const chunkResult = await this.processChunk(pdfDocument, startPage, endPage);
-        
-        // Save chunk to file
-        const chunkFile = path.join(this.outputDir, `chunk_${startPage}-${endPage}.txt`);
-        fs.writeFileSync(chunkFile, chunkResult.text);
-        console.log(`💾 Saved chunk to: ${chunkFile}`);
         
         allText.push(chunkResult.text);
         allTables.push(...chunkResult.tables);
@@ -460,41 +455,101 @@ export class LargePDFExtractor {
     markdown += `**Pages:** ${result.totalPages}\n`;
     markdown += `**Tables Found:** ${result.tables.length} (${result.tables.filter(t => t.tableType === 'financial').length} financial)\n\n`;
     
-    if (result.tables.length === 0) {
-      markdown += `## Document Text\n\n${this.cleanText(result.text)}\n\n`;
-      return markdown;
-    }
-    
-    // Group and organize tables by type and page
-    const financialTables = result.tables.filter(t => t.tableType === 'financial');
-    const otherTables = result.tables.filter(t => t.tableType !== 'financial');
-    
-    // Add financial data section
-    if (financialTables.length > 0) {
-      markdown += `## Financial Data\n\n`;
-      
-      // Try to identify statement types and merge related tables
-      const mergedFinancialData = this.mergeRelatedTables(financialTables);
-      
-      mergedFinancialData.forEach((tableGroup, index) => {
-        const statementType = this.identifyStatementType(tableGroup);
-        markdown += `### ${statementType}\n\n`;
-        markdown += this.tableGroupToMarkdown(tableGroup);
-        markdown += `\n`;
-      });
-    }
-    
-    // Add other tables if any
-    if (otherTables.length > 0) {
-      markdown += `## Additional Data\n\n`;
-      otherTables.forEach((table, index) => {
-        markdown += `### Table ${index + 1} (Page ${table.page})\n\n`;
-        markdown += this.singleTableToMarkdown(table);
-        markdown += `\n`;
-      });
-    }
+    // Include the full document text with preserved page structure and inline tables
+    markdown += `## Complete Document with Inline Tables\n\n`;
+    markdown += this.createPageStructuredTextWithTables(result.text, result.tables);
+    markdown += `\n\n`;
     
     return markdown;
+  }
+  
+  /**
+   * Create page-structured text with clear page breaks and formatting
+   */
+  private createPageStructuredText(text: string): string {
+    // Split by the page markers that we add during extraction
+    const pages = text.split(/\n=== PAGE \d+ ===\n/);
+    
+    if (pages.length <= 1) {
+      // No page markers found, return cleaned text as-is
+      return this.cleanText(text);
+    }
+    
+    let structuredText = '';
+    
+    // Skip the first empty element and process each page
+    for (let i = 1; i < pages.length; i++) {
+      const pageContent = pages[i].trim();
+      if (pageContent) {
+        structuredText += `---\n\n## Page ${i}\n\n`;
+        structuredText += this.cleanText(pageContent);
+        structuredText += `\n\n`;
+      }
+    }
+    
+    return structuredText;
+  }
+  
+  /**
+   * Create page-structured text with inline tables
+   */
+  private createPageStructuredTextWithTables(text: string, tables: FinancialTable[]): string {
+    // Split by the page markers that we add during extraction
+    const pages = text.split(/\n=== PAGE \d+ ===\n/);
+    
+    if (pages.length <= 1) {
+      // No page markers found, return cleaned text as-is
+      return this.cleanText(text);
+    }
+    
+    // Group tables by page number for easy lookup
+    const tablesByPage = new Map<number, FinancialTable[]>();
+    tables.forEach(table => {
+      if (!tablesByPage.has(table.page)) {
+        tablesByPage.set(table.page, []);
+      }
+      tablesByPage.get(table.page)!.push(table);
+    });
+    
+    let structuredText = '';
+    
+    // Skip the first empty element and process each page
+    for (let i = 1; i < pages.length; i++) {
+      const pageContent = pages[i].trim();
+      if (pageContent) {
+        structuredText += `---\n\n## Page ${i}\n\n`;
+        structuredText += this.cleanText(pageContent);
+        
+        // Add any tables found on this page
+        const pageTables = tablesByPage.get(i);
+        if (pageTables && pageTables.length > 0) {
+          structuredText += `\n\n### Structured Data from Page ${i}\n\n`;
+          
+          pageTables.forEach((table, index) => {
+            const tableType = this.getTableTypeDescription(table.tableType);
+            structuredText += `#### ${tableType} (Confidence: ${(table.confidence * 100).toFixed(1)}%)\n\n`;
+            structuredText += this.singleTableToMarkdown(table);
+            structuredText += `\n\n`;
+          });
+        }
+        
+        structuredText += `\n\n`;
+      }
+    }
+    
+    return structuredText;
+  }
+  
+  /**
+   * Get a human-readable description for table type
+   */
+  private getTableTypeDescription(tableType: 'financial' | 'data' | 'unknown'): string {
+    switch (tableType) {
+      case 'financial': return 'Financial Data Table';
+      case 'data': return 'Data Table';
+      case 'unknown': return 'Table';
+      default: return 'Table';
+    }
   }
   
   /**
@@ -626,20 +681,22 @@ async function main() {
     console.log(`
 📄 Large PDF Financial Data Extractor
 
-Usage: npx tsx largePdfExtractor.ts <pdf_file> [output_dir] [--chunk-size N]
+Usage: npx tsx pdfExtractor.ts <pdf_file> [output_dir] [--chunk-size N]
 
 Examples:
-  npx tsx largePdfExtractor.ts ../../../pdf_misc/test-cases/Google.pdf
-  npx tsx largePdfExtractor.ts report.pdf ./output --chunk-size 50
+  npx tsx pdfExtractor.ts pdf_misc/test-cases/Google.pdf
+  npx tsx pdfExtractor.ts report.pdf ../../../output --chunk-size 50
 
 Options:
   --chunk-size N    Pages per chunk (default: 25)
+  
+Default output directory: apps/workflow-engine/output/
     `);
     process.exit(1);
   }
   
   const pdfFile = args[0];
-  let outputDir = './output';
+  let outputDir = path.join(__dirname, '../../output');
   let chunkSize = 25;
   
   // Parse arguments
