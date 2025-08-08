@@ -1,8 +1,31 @@
 {
+  "name": "magk-excel-monorepo",
+  "version": "0.1.2",
+  "description": "MAGK Excel - Full-stack application with Electron frontend, Python backend, and Node.js workflow engine",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names \"Frontend,Backend\" --prefix-colors \"cyan,green\" \"npm run dev:frontend\" \"npm run dev:workflow-engine\"",
+    "dev:frontend": "cd apps/client/magk-excel && npm run dev",
+    "dev:backend": "cd apps/server && chalice local --host 0.0.0.0 --port 8000",
+    "dev:workflow-engine": "cd apps/workflow-engine && npm run dev",
+    "dev:frontend-only": "cd apps/client/magk-excel && npm run dev",
+    "dev:backend-only": "cd apps/server && chalice local --host 0.0.0.0 --port 8000",
+    "dev:workflow-engine-only": "cd apps/workflow-engine && npm run dev",
+    "install:all": "npm install && cd apps/client/magk-excel && npm install && cd ../../../apps/workflow-engine && npm install",
+    "build": "cd apps/client/magk-excel && npm run build",
+    "test": "cd apps/client/magk-excel && npm test",
+    "status": "echo 'Checking development server status...' && lsof -i :5173 -i :8000 -i :3001 || echo 'No servers running on expected ports'"
+  },
   "dependencies": {
     "deno": "^2.4.3",
     "husky": "^9.1.7",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1",
     "ws": "^8.18.3",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
   }
 }
