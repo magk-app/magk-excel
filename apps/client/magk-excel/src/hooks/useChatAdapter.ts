@@ -109,7 +109,7 @@ export function useChatAdapter({
     }
 
     // Try the new streaming API
-    const WORKFLOW_API = 'http://localhost:3000'; // Using port 3000
+    const WORKFLOW_API = 'http://localhost:3001'; // Using port 3001 (workflow-engine)
     
     try {
       console.log('📡 Calling streaming API...');
@@ -143,6 +143,24 @@ export function useChatAdapter({
       // Add file context to the message if available
       const enhancedMessage = fileContext ? message + fileContext : message;
       
+      // Get API key from localStorage
+      const savedKeys = localStorage.getItem('magk_api_keys');
+      let apiKey = '';
+      if (savedKeys) {
+        try {
+          const parsedKeys = JSON.parse(savedKeys);
+          if (modelConfig.provider === 'anthropic') {
+            apiKey = parsedKeys.anthropic || '';
+          } else if (modelConfig.provider === 'openai') {
+            apiKey = parsedKeys.openai || '';
+          }
+        } catch (e) {
+          console.error('Failed to parse API keys from localStorage');
+        }
+      }
+
+      console.log('🔑 Using API key for provider:', modelConfig.provider, apiKey ? 'Found' : 'Missing');
+
       // Use EventSource for SSE streaming
       const response = await fetch(`${WORKFLOW_API}/api/v2/chat/stream`, {
         method: 'POST',
@@ -157,7 +175,8 @@ export function useChatAdapter({
             displayName: modelConfig.displayName,
             enableThinking: modelConfig.enableThinking || false,
             temperature: modelConfig.temperature,
-            maxTokens: modelConfig.maxTokens
+            maxTokens: modelConfig.maxTokens,
+            apiKey: apiKey // Add the API key!
           },
           history: (currentSession || getActiveSession())?.messages?.filter((m: any) => 
             m.role !== 'system' && m.content && m.content.trim() !== ''
@@ -312,7 +331,10 @@ export function useChatAdapter({
           },
           body: JSON.stringify({
             message,
-            modelConfig,
+            modelConfig: {
+              ...modelConfig,
+              apiKey: apiKey // Use the same API key we got above
+            },
             history: (currentSession || getActiveSession())?.messages?.filter((m: any) => 
               m.role !== 'system' && m.content && m.content.trim() !== ''
             ) || [],

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ModelConfig } from './ModelSelector';
-import { FileAttachment } from './FileUploadArea';
+
 import { ChatSessionsSidebar } from './ChatSessionsSidebar';
 import { ToolCallStatusWindow, useToolCallMonitor } from './ToolCallStatusWindow';
-import { useChatHistory, chatHistoryHelpers } from '../services/chatHistoryService';
+import { useChatHistory } from '../services/chatHistoryService';
 import { ClientExcelService } from '../services/pdfExtractionService';
 
 // Import optimized components and hooks
@@ -38,7 +38,7 @@ export function ChatInterface() {
   const [mcpStatusVisible, setMcpStatusVisible] = useState(false);
   
   // API Key management
-  const { apiKeys, missingKeys, checkRequiredKeys, updateApiKeys } = useApiKeys();
+  const { checkRequiredKeys, updateApiKeys } = useApiKeys();
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [hasShownApiKeyDialog, setHasShownApiKeyDialog] = useState(false);
   
@@ -127,6 +127,9 @@ export function ChatInterface() {
     }
   }, [sessions.length, createSession]);
 
+  // Store required keys in state so we can pass them to the dialog
+  const [requiredApiKeys, setRequiredApiKeys] = useState<string[]>([]);
+
   // Check for required API keys on mount and when model changes
   useEffect(() => {
     const requiredKeys = [];
@@ -143,11 +146,13 @@ export function ChatInterface() {
       // Handle both Array and Set
       const hasFirecrawl = Array.isArray(enabledServers) 
         ? enabledServers.includes('firecrawl')
-        : enabledServers.has && enabledServers.has('firecrawl');
+        : (enabledServers as any).has && (enabledServers as any).has('firecrawl');
       if (hasFirecrawl) {
         requiredKeys.push('firecrawl');
       }
     }
+    
+    setRequiredApiKeys(requiredKeys);
     
     const missing = checkRequiredKeys(requiredKeys);
     // Only show the dialog once per session, not every time the effect runs
@@ -361,10 +366,11 @@ export function ChatInterface() {
       <ApiKeyManager
         isOpen={showApiKeyDialog}
         onClose={() => setShowApiKeyDialog(false)}
-        requiredKeys={missingKeys}
+        requiredKeys={requiredApiKeys}
         onKeysSet={(keys) => {
           updateApiKeys(keys);
           setShowApiKeyDialog(false);
+          setHasShownApiKeyDialog(false); // Reset so it can check again
         }}
       />
       
