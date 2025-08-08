@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { excelMCPTool, ExcelMCPTool } from '../src/services/excel/ExcelMCPTool.js';
 import { pdfMCPTool, PDFMCPTool } from '../src/services/pdf/PDFMCPTool.js';
+import { executorMCPTool, ExecutorMCPTool } from '../src/services/executor/ExecutorMCPTool.js';
 import { persistenceMCPTool, PersistenceAccessTool } from '../src/services/persistence/PersistenceMCPTool.js';
 import { filesystemMCPTool, FilesystemMCPTool } from '../src/services/persistence/FilesystemMCPTool.js';
 
@@ -192,8 +193,8 @@ export class MCPManager {
     console.log(`🔄 Toggle request: ${serverName} -> ${enabled ? 'ON' : 'OFF'}`);
     
     try {
-      // Handle built-in Excel, PDF, Persistence, and Filesystem servers
-      if (serverName === 'excel' || serverName === 'pdf' || serverName === 'persistence' || serverName === 'filesystem') {
+      // Handle built-in Excel, PDF, Executor, Persistence, and Filesystem servers
+      if (serverName === 'excel' || serverName === 'pdf' || serverName === 'executor' || serverName === 'persistence' || serverName === 'filesystem') {
         if (enabled) {
           this.enabledServers.add(serverName);
           console.log(`✅ Built-in ${serverName} server enabled`);
@@ -239,6 +240,15 @@ export class MCPManager {
     if (serverName === 'pdf' && toolName.startsWith('pdf_')) {
       console.log('🔧 Handling built-in PDF operation:', toolName);
       return await pdfMCPTool.handleToolCall({
+        name: toolName,
+        arguments: args
+      });
+    }
+
+    // Handle built-in Executor operations
+    if (serverName === 'executor' && toolName === 'run_ts') {
+      console.log('🔧 Handling built-in Executor operation:', toolName);
+      return await executorMCPTool.handleToolCall({
         name: toolName,
         arguments: args
       });
@@ -302,6 +312,14 @@ export class MCPManager {
       }));
     }
 
+    if (serverName === 'executor') {
+      // Return built-in Executor tools
+      return ExecutorMCPTool.getToolDefinitions().map(tool => ({
+        ...tool,
+        server: 'executor'
+      }));
+    }
+
     if (serverName === 'persistence') {
       // Return built-in Persistence tools
       return PersistenceAccessTool.getToolDefinitions().map(tool => ({
@@ -343,6 +361,14 @@ export class MCPManager {
       allTools.push({
         ...tool,
         server: 'pdf'
+      });
+    }
+
+    // Add built-in Executor tools
+    for (const tool of ExecutorMCPTool.getToolDefinitions()) {
+      allTools.push({
+        ...tool,
+        server: 'executor'
       });
     }
 
@@ -432,7 +458,7 @@ export class MCPManager {
   }
 
   getAvailableServers(): string[] {
-    const builtInServers = ['excel', 'pdf', 'persistence']; // Built-in Excel, PDF, and Persistence servers
+    const builtInServers = ['excel', 'pdf', 'executor', 'persistence']; // Built-in Excel, PDF, Executor, and Persistence servers
     const staticServers = this.config ? Object.keys(this.config.mcpServers) : [];
     const smitheryServerNames = Array.from(this.smitheryServers.keys());
     
