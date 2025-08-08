@@ -61,7 +61,7 @@ export function ChatInterface() {
 
   const pdfExtraction = usePDFExtraction();
   const { tools, enabledServers, mcpServers, serverStatus } = useMCPTools();
-
+  
   // Tool call monitoring
   const {
     toolCalls,
@@ -69,7 +69,7 @@ export function ChatInterface() {
     openWindow,
     closeWindow
   } = useToolCallMonitor();
-
+  
   // Chat history management - subscribe to all changes
   const sessions = useChatHistory(state => state.sessions);
   const activeSessionId = useChatHistory(state => state.activeSessionId);
