@@ -260,6 +260,12 @@ const ServerConfigModal: React.FC<ServerConfigModalProps> = ({ server, onInstall
 };
 
 export const SmitheryServerBrowser: React.FC = () => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(12);
+  const [sortBy, setSortBy] = useState<'name' | 'useCount' | 'recent'>('useCount');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [filterText, setFilterText] = useState('');
+  
   const {
     smitheryServers,
     smitheryLoading,
@@ -421,14 +427,31 @@ export const SmitheryServerBrowser: React.FC = () => {
 
       {/* Search and Filters */}
       <div className="mb-6 space-y-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search servers... (e.g., 'web scraping', 'database', 'AI tools')"
-            value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="pl-10"
-          />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search servers... (e.g., 'web scraping', 'database', 'AI tools')"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setFilterText(e.target.value);
+              }}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleSearch(searchQuery);
+                }
+              }}
+              className="pl-10"
+            />
+          </div>
+          <Button
+            onClick={() => handleSearch(searchQuery)}
+            variant="default"
+          >
+            <Search className="h-4 w-4 mr-2" />
+            Search
+          </Button>
         </div>
 
         {/* Category filters */}
@@ -468,9 +491,46 @@ export const SmitheryServerBrowser: React.FC = () => {
         </div>
       )}
 
-      {/* Servers Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {smitheryServers.map((server) => (
+      {/* Servers Grid with Scrollable Container */}
+      <div className="max-h-[600px] overflow-y-auto border rounded-lg p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {(() => {
+            // Apply filters and sorting
+            let filteredServers = [...smitheryServers];
+            
+            // Text filter
+            if (filterText) {
+              filteredServers = filteredServers.filter(server => 
+                server.displayName.toLowerCase().includes(filterText.toLowerCase()) ||
+                server.description.toLowerCase().includes(filterText.toLowerCase()) ||
+                server.tags?.some(tag => tag.toLowerCase().includes(filterText.toLowerCase()))
+              );
+            }
+            
+            // Sorting
+            filteredServers.sort((a, b) => {
+              let compareValue = 0;
+              switch (sortBy) {
+                case 'name':
+                  compareValue = a.displayName.localeCompare(b.displayName);
+                  break;
+                case 'useCount':
+                  compareValue = a.useCount - b.useCount;
+                  break;
+                case 'recent':
+                  compareValue = 0; // Would need creation date for this
+                  break;
+              }
+              return sortOrder === 'asc' ? compareValue : -compareValue;
+            });
+            
+            // Pagination
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const paginatedServers = filteredServers.slice(startIndex, endIndex);
+            const totalPages = Math.ceil(filteredServers.length / itemsPerPage);
+            
+            return paginatedServers.map((server) => (
           <Card key={server.qualifiedName} className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -572,8 +632,75 @@ export const SmitheryServerBrowser: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-        ))}
+            ));
+          })()}
+        </div>
       </div>
+      
+      {/* Pagination and Sort Controls */}
+      {smitheryServers.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between mt-6 p-4 border-t gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Items per page:</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="px-2 py-1 text-sm border rounded"
+            >
+              <option value={6}>6</option>
+              <option value={12}>12</option>
+              <option value={24}>24</option>
+              <option value={48}>48</option>
+            </select>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <span className="text-sm px-3">
+              Page {currentPage} of {Math.ceil(smitheryServers.length / itemsPerPage)}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setCurrentPage(prev => Math.min(Math.ceil(smitheryServers.length / itemsPerPage), prev + 1))}
+              disabled={currentPage >= Math.ceil(smitheryServers.length / itemsPerPage)}
+            >
+              Next
+            </Button>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Sort by:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'name' | 'useCount' | 'recent')}
+              className="px-2 py-1 text-sm border rounded"
+            >
+              <option value="name">Name</option>
+              <option value="useCount">Popularity</option>
+              <option value="recent">Recent</option>
+            </select>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+              className="px-2"
+            >
+              {sortOrder === 'asc' ? '↑' : '↓'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Empty State */}
       {!smitheryLoading && smitheryServers.length === 0 && (

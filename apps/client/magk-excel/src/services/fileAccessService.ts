@@ -158,6 +158,21 @@ class FileAccessService {
   }
 
   /**
+   * Add a file to the persistence store
+   */
+  async addFile(file: File, isPersistent: boolean, sessionId: string): Promise<string | null> {
+    try {
+      const store = useFilePersistenceStore.getState();
+      const fileId = await store.addFile(file, isPersistent, sessionId);
+      console.log(`📁 File added to ${isPersistent ? 'persistent' : 'temporary'} storage: ${file.name}`);
+      return fileId;
+    } catch (error) {
+      console.error('Error adding file:', error);
+      return null;
+    }
+  }
+
+  /**
    * Clean up old temporary files (delegated to Electron main process)
    */
   async cleanupTempFiles(olderThanHours: number = 24): Promise<void> {

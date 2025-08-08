@@ -85,6 +85,7 @@ interface WorkflowLibraryInterfaceProps {
   onWorkflowSelect?: (workflow: ExtendedWorkflow) => void;
   onWorkflowCreate?: () => void;
   onWorkflowExecute?: (workflowId: string) => void;
+  onBackToEditor?: () => void;
   selectedWorkflowId?: string;
   viewMode?: 'grid' | 'list';
   className?: string;
@@ -94,6 +95,7 @@ export const WorkflowLibraryInterface: React.FC<WorkflowLibraryInterfaceProps> =
   onWorkflowSelect,
   onWorkflowCreate,
   onWorkflowExecute,
+  onBackToEditor,
   selectedWorkflowId,
   viewMode: initialViewMode = 'grid',
   className
@@ -534,7 +536,19 @@ export const WorkflowLibraryInterface: React.FC<WorkflowLibraryInterfaceProps> =
       {/* Header */}
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Workflow Library</h2>
+          <div className="flex items-center gap-2">
+            {onBackToEditor && (
+              <Button
+                onClick={onBackToEditor}
+                variant="ghost"
+                size="sm"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Back to Editor
+              </Button>
+            )}
+            <h2 className="text-lg font-semibold">Workflow Library</h2>
+          </div>
           <div className="flex gap-2">
             <Button onClick={onWorkflowCreate}>
               <Plus className="h-4 w-4 mr-1" />
