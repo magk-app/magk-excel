@@ -40,7 +40,7 @@ import {
 import './App.css'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'chat' | 'chat-workflow' | 'builder' | 'editor' | 'library' | 'blocks' | 'demo' | 'mcp' | 'debug' | 'pdf' | 'files' | 'docs' | 'devtest'>('chat')
+  const [activeTab, setActiveTab] = useState<'chat' | 'builder' | 'editor' | 'library' | 'blocks' | 'demo' | 'mcp' | 'debug' | 'pdf' | 'files' | 'docs' | 'devtest'>('chat')
   const [chatSessionId] = useState(`session-${Date.now()}`)
   const [showWorkflowInChat, setShowWorkflowInChat] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -234,10 +234,6 @@ function App() {
                 <MessageSquare className="h-4 w-4" />
                 Chat
               </TabsTrigger>
-              <TabsTrigger value="chat-workflow" className="gap-2">
-                <Workflow className="h-4 w-4" />
-                Chat + Workflow
-              </TabsTrigger>
               <TabsTrigger value="builder" className="gap-2">
                 <Plus className="h-4 w-4" />
                 Workflow Builder
@@ -289,43 +285,76 @@ function App() {
             </TabsList>
           </div>
 
-          {/* Quick Chat */}
+          {/* Chat with Optional Workflow Builder */}
           <TabsContent value="chat" className="flex-1 mt-0 overflow-hidden">
             <div className="h-full flex flex-col">
-              {/* Header */}
+              {/* Header with Workflow Toggle */}
               <div className="px-4 py-2 border-b bg-muted/30 flex-shrink-0">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Quick Chat</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      // Create workflow with dedicated chat session (1:1 relationship)
-                      const uniqueChatSessionId = `workflow-chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-                      const workflowId = createWorkflow(
-                        `Workflow ${new Date().toLocaleTimeString()}`,
-                        WorkflowType.TEMPORARY,
-                        uniqueChatSessionId
-                      )
-                      if (workflowId) {
-                        loadWorkflow(workflowId)
-                        setActiveTab('chat-workflow')
-                      }
-                    }}
-                    className="gap-2"
-                  >
-                    <Workflow className="h-4 w-4" />
-                    Create Workflow
-                  </Button>
+                  <span className="text-sm font-medium">Chat</span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant={showWorkflowInChat ? "default" : "outline"}
+                      onClick={() => setShowWorkflowInChat(!showWorkflowInChat)}
+                      className="gap-2"
+                    >
+                      <Workflow className="h-4 w-4" />
+                      {showWorkflowInChat ? "Hide Workflow" : "Show Workflow"}
+                    </Button>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  For complex tasks, create a workflow to organize your work
-                </p>
+                {showWorkflowInChat && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Build workflows alongside your chat conversation
+                  </p>
+                )}
               </div>
               
-              {/* Simple Chat Interface */}
-              <div className="flex-1 min-h-0 overflow-hidden">
-                <ChatInterface />
+              {/* Split View: Chat + Optional Workflow Builder */}
+              <div className="flex-1 min-h-0 overflow-hidden flex">
+                {/* Chat Interface */}
+                <div className={`${showWorkflowInChat ? 'w-1/2' : 'w-full'} flex flex-col min-h-0`}>
+                  <ChatInterface />
+                </div>
+                
+                {/* Workflow Builder (when visible) */}
+                {showWorkflowInChat && (
+                  <div className="w-1/2 border-l flex flex-col min-h-0">
+                    <div className="p-2 border-b bg-muted/20">
+                      <h3 className="text-sm font-medium">Workflow Builder</h3>
+                    </div>
+                    <div className="flex-1 min-h-0 overflow-hidden">
+                      <WorkflowBuilder
+                        mode="create"
+                        initialWorkflow={currentBuilderWorkflow}
+                        onSave={(workflow) => {
+                          console.log('Workflow saved from chat builder:', workflow);
+                          // Create the workflow in store
+                          const workflowId = createWorkflow(
+                            workflow.name || 'New Workflow',
+                            WorkflowType.PERMANENT,
+                            chatSessionId
+                          );
+                          
+                          if (workflowId) {
+                            // Save workflow data
+                            const workflowStore = useWorkflowStore.getState();
+                            workflowStore.saveWorkflow(workflowId, {
+                              nodes: workflow.nodes || [],
+                              edges: workflow.edges || []
+                            });
+                            
+                            setCurrentBuilderWorkflow(null); // Clear the builder workflow
+                          }
+                        }}
+                        onExecute={(workflow) => {
+                          console.log('Executing workflow from chat builder:', workflow);
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </TabsContent>
@@ -361,15 +390,6 @@ function App() {
               onExecute={(workflow) => {
                 console.log('Executing workflow from builder:', workflow);
               }}
-            />
-          </TabsContent>
-
-          {/* Chat + Workflow Integration */}
-          <TabsContent value="chat-workflow" className="flex-1 mt-0 overflow-hidden">
-            <ChatWorkflowIntegration 
-              sessionId={chatSessionId}
-              showWorkflow={showWorkflowInChat}
-              onToggleWorkflow={() => setShowWorkflowInChat(!showWorkflowInChat)}
             />
           </TabsContent>
 

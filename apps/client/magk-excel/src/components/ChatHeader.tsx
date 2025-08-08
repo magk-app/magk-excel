@@ -88,9 +88,6 @@ export const ChatHeader = memo(function ChatHeader({
             )}
           </div>
           
-<<<<<<< HEAD
-          {/* MCP Servers Status - Always visible but compact on mobile */}
-=======
           <Button size="sm" variant="outline" onClick={onTogglePDFPanel}>
             PDF Extract
           </Button>
@@ -102,6 +99,7 @@ export const ChatHeader = memo(function ChatHeader({
             </Button>
           )}
           
+          {/* MCP Servers Status - Always visible but compact on mobile */}
           {/* File Persistence Button */}
           {onOpenFilePersistence && (
             <Button size="sm" variant="outline" onClick={onOpenFilePersistence}>
@@ -127,7 +125,6 @@ export const ChatHeader = memo(function ChatHeader({
           )}
           
           {/* MCP Servers Status */}
->>>>>>> origin/2.1
           <Dialog open={showMCPDialog} onOpenChange={setShowMCPDialog}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline" className="relative">
