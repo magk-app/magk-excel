@@ -1,0 +1,3 @@
+# MAGK Excel Client Requirements
+PyQt6>=6.4.0
+pytest>=8.0.0
