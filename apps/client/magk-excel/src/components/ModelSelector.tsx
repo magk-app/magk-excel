@@ -13,6 +13,7 @@ import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Input } from './ui/input';
 import { RefreshCw } from 'lucide-react';
+import { loadApiKeys, saveApiKeys } from '../utils/apiKeyStorage';
 
 export interface ModelConfig {
   provider: string;
@@ -43,43 +44,104 @@ interface ModelInfo {
 }
 
 const AVAILABLE_MODELS: ModelInfo[] = [
-  // Eliza Models (Custom tuned based on Claude Sonnet)
+  // Claude 4 Models (Latest - Released 2025) - Using correct API model names
   {
-    value: 'eliza-4.0',
-    displayName: 'Eliza 4.0',
-    baseModel: 'claude-3-5-sonnet-20241022',
+    value: 'claude-opus-4-1-20250805',
+    displayName: 'Claude Opus 4.1',
+    baseModel: 'claude-opus-4-1-20250805',
     provider: 'anthropic',
     contextWindow: 200000,
-    features: ['Excel-Expert', 'Fast', 'Data-Analysis', 'Workflow'],
+    features: ['Most-Capable', 'Extended-Thinking', 'Best-Coding', 'Vision'],
     tier: 'flagship',
     supportsThinking: true,
     requiresApiKey: true,
-    description: 'Excel and data workflow specialist - optimized for spreadsheet tasks'
+    description: 'Latest Opus 4.1 - World\'s best coding model with 72.5% on SWE-bench'
   },
   {
-    value: 'eliza-3.5',
-    displayName: 'Eliza 3.5',
-    baseModel: 'claude-3-sonnet-20240229',
+    value: 'claude-opus-4-20250514',
+    displayName: 'Claude Opus 4',
+    baseModel: 'claude-opus-4-20250514',
     provider: 'anthropic',
     contextWindow: 200000,
-    features: ['Balanced', 'Reliable', 'Excel', 'Fast'],
+    features: ['Most-Capable', 'Extended-Thinking', 'Complex-Tasks', 'Vision'],
+    tier: 'flagship',
+    supportsThinking: true,
+    requiresApiKey: true,
+    description: 'Most capable model - Highest intelligence and capability'
+  },
+  {
+    value: 'claude-sonnet-4-20250514',
+    displayName: 'Claude Sonnet 4',
+    baseModel: 'claude-sonnet-4-20250514',
+    provider: 'anthropic',
+    contextWindow: 200000,
+    features: ['High-Performance', 'Extended-Thinking', 'Fast', 'Vision'],
+    tier: 'flagship',
+    supportsThinking: true,
+    requiresApiKey: true,
+    description: 'High-performance model - 72.7% on SWE-bench, balanced performance'
+  },
+  {
+    value: 'claude-3-7-sonnet-20250219',
+    displayName: 'Claude Sonnet 3.7',
+    baseModel: 'claude-3-7-sonnet-20250219',
+    provider: 'anthropic',
+    contextWindow: 200000,
+    features: ['Extended-Thinking', 'High-Intelligence', 'Vision', 'Fast'],
+    tier: 'flagship',
+    supportsThinking: true,
+    requiresApiKey: true,
+    description: 'First model with extended thinking - Up to 128k output tokens'
+  },
+  // Model Aliases (for convenience during development)
+  {
+    value: 'claude-opus-4-1',
+    displayName: 'Claude Opus 4.1 (Alias)',
+    baseModel: 'claude-opus-4-1-20250805',
+    provider: 'anthropic',
+    contextWindow: 200000,
+    features: ['Most-Capable', 'Extended-Thinking', 'Alias', 'Vision'],
+    tier: 'flagship',
+    supportsThinking: true,
+    requiresApiKey: true,
+    description: 'Alias for latest Opus 4.1 - automatically points to newest version'
+  },
+  {
+    value: 'claude-opus-4-0',
+    displayName: 'Claude Opus 4 (Alias)',
+    baseModel: 'claude-opus-4-20250514',
+    provider: 'anthropic',
+    contextWindow: 200000,
+    features: ['Most-Capable', 'Extended-Thinking', 'Alias', 'Vision'],
+    tier: 'flagship',
+    supportsThinking: true,
+    requiresApiKey: true,
+    description: 'Alias for Opus 4 - automatically points to newest version'
+  },
+  {
+    value: 'claude-sonnet-4-0',
+    displayName: 'Claude Sonnet 4 (Alias)',
+    baseModel: 'claude-sonnet-4-20250514',
+    provider: 'anthropic',
+    contextWindow: 200000,
+    features: ['High-Performance', 'Extended-Thinking', 'Alias', 'Vision'],
+    tier: 'flagship',
+    supportsThinking: true,
+    requiresApiKey: true,
+    description: 'Alias for Sonnet 4 - automatically points to newest version'
+  },
+  // Claude 3.5 Models
+  {
+    value: 'claude-3-5-sonnet-20241022',
+    displayName: 'Claude 3.5 Sonnet',
+    baseModel: 'claude-3-5-sonnet-20241022',
+    provider: 'anthropic',
+    contextWindow: 200000,
+    features: ['Coding', 'Vision', 'Computer-Use', 'Fast'],
     tier: 'fast',
-    supportsThinking: true,
+    supportsThinking: false,
     requiresApiKey: true,
-    description: 'Efficient Excel assistant - balanced performance and cost'
-  },
-  // Claude Models (Anthropic) - Latest versions as of Dec 2024
-  {
-    value: 'claude-3-5-sonnet-latest',
-    displayName: 'Claude 3.5 Sonnet (Latest)',
-    baseModel: 'claude-3-5-sonnet-20241022',
-    provider: 'anthropic',
-    contextWindow: 200000,
-    features: ['Best-Coding', 'Vision', 'Computer-Use', 'Fast'],
-    tier: 'flagship',
-    supportsThinking: true,
-    requiresApiKey: true,
-    description: 'Latest and most capable Claude model - 2x faster than Opus'
+    description: 'Previous generation flagship - Still excellent for most tasks'
   },
   {
     value: 'claude-3-5-haiku',
@@ -87,15 +149,16 @@ const AVAILABLE_MODELS: ModelInfo[] = [
     baseModel: 'claude-3-5-haiku-20241022',
     provider: 'anthropic',
     contextWindow: 200000,
-    features: ['Fast', 'Efficient', 'Coding', 'Low-cost'],
+    features: ['Fastest', 'Efficient', 'Low-cost', 'Vision'],
     tier: 'fast',
     supportsThinking: false,
     requiresApiKey: true,
-    description: 'Fastest Claude model - outperforms Claude 3 Opus on many tasks'
+    description: 'Fastest model - Intelligence at blazing speeds'
   },
+  // Legacy Claude 3 Models
   {
     value: 'claude-3-opus',
-    displayName: 'Claude 3 Opus',
+    displayName: 'Claude 3 Opus (Legacy)',
     baseModel: 'claude-3-opus-20240229',
     provider: 'anthropic',
     contextWindow: 200000,
@@ -404,13 +467,10 @@ export function ModelSelector({ currentModel, onModelChange }: ModelSelectorProp
     setTemperature(currentModel.temperature || 0.7);
     setMaxTokens(currentModel.maxTokens || 4096);
     
-    // Load saved API keys from localStorage
-    const savedKeys = localStorage.getItem('magk-api-keys');
-    if (savedKeys) {
-      const keys = JSON.parse(savedKeys);
-      setApiKeys(keys);
-      checkModelAvailability(keys);
-    }
+    // Load saved API keys using the utility function
+    const keys = loadApiKeys();
+    setApiKeys(keys);
+    checkModelAvailability(keys);
   }, [currentModel]);
 
   // Check model availability when dialog opens
@@ -452,7 +512,7 @@ export function ModelSelector({ currentModel, onModelChange }: ModelSelectorProp
 
     // Check backend for supported models
     try {
-      const response = await fetch('http://localhost:3000/api/models', {
+      const response = await fetch('https://b1fcb47dfd4d.ngrok-free.app/api/models', {
         method: 'GET',
         signal: AbortSignal.timeout(2000)
       }).catch(() => null);
@@ -493,7 +553,8 @@ export function ModelSelector({ currentModel, onModelChange }: ModelSelectorProp
     const selectedModelConfig = AVAILABLE_MODELS.find(m => m.value === selectedModel);
     if (selectedModelConfig) {
       // Save API keys to localStorage
-      localStorage.setItem('magk-api-keys', JSON.stringify(apiKeys));
+      // Save using the utility function
+      saveApiKeys(apiKeys);
       
       // For Eliza models, add (Thinking) to the display name when thinking is enabled
       const displayName = selectedModelConfig.displayName.startsWith('Eliza') 

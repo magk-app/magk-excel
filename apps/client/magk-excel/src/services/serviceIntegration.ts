@@ -384,6 +384,39 @@ export function cleanupGlobalRealtimeService(): void {
   }
 }
 
+/**
+ * Integrate services with enhanced persistence functionality
+ */
+export const integrateServices = async () => {
+  console.log('🔗 Integrating all services with enhanced persistence...');
+  
+  try {
+    // Import storage integration service dynamically
+    const { storageIntegrationService } = await import('./persistence/StorageIntegrationService');
+    
+    // Set up storage integration event handlers
+    storageIntegrationService.addEventListener('executor-output-processed', (data) => {
+      console.log('📊 Executor output processed:', data);
+      // Could trigger chat notification or UI update
+    });
+    
+    storageIntegrationService.addEventListener('file-uploaded', (data) => {
+      console.log('📁 File uploaded:', data);
+      // Could update file browser or chat context
+    });
+    
+    storageIntegrationService.addEventListener('file-chat-linked', (data) => {
+      console.log('🔗 File linked to chat:', data);
+      // Could update chat history with file reference
+    });
+    
+    console.log('✅ Services integrated successfully with enhanced persistence layer');
+  } catch (error) {
+    console.warn('⚠️ Storage integration not available:', error);
+    console.log('✅ Services integrated successfully (basic mode)');
+  }
+};
+
 export default {
   useRealtimeIntegration,
   useWorkflowRealtime,
@@ -391,4 +424,5 @@ export default {
   createGlobalRealtimeService,
   getGlobalRealtimeService,
   cleanupGlobalRealtimeService,
+  integrateServices
 };

@@ -59,11 +59,30 @@ export const useMCPStore = create<MCPState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const config = await window.mcpAPI.loadConfig();
+      
+      // Define default servers that should be enabled
+      const defaultEnabledServers = ['excel', 'executor', 'persistent', 'filesystem'];
+      
+      // Merge default enabled servers with config
+      const enabledServers = [...new Set([...config.enabledServers, ...defaultEnabledServers])];
+      
       set({ 
         availableServers: config.availableServers,
-        enabledServers: config.enabledServers,
+        enabledServers: enabledServers,
         isLoading: false 
       });
+      
+      // Enable default servers if they're available but not enabled
+      for (const serverName of defaultEnabledServers) {
+        if (config.availableServers.includes(serverName) && !config.enabledServers.includes(serverName)) {
+          try {
+            await window.mcpAPI.toggleServer(serverName, true);
+            console.log(`✅ Enabled default server: ${serverName}`);
+          } catch (error) {
+            console.warn(`Failed to enable default server ${serverName}:`, error);
+          }
+        }
+      }
       
       // Load tools and resources after initialization
       await get().loadTools();

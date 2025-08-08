@@ -38,10 +38,19 @@ export function FilePersistenceManager({
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // Load files when dialog opens or session changes
+  // Fix Issue #6: Auto-update when files are added
   useEffect(() => {
     if (isOpen) {
-      setSessionFiles(getSessionFiles(sessionId));
-      setPersistentFiles(getAllPersistentFiles());
+      // Set up interval to refresh file lists
+      const refreshFiles = () => {
+        setSessionFiles(getSessionFiles(sessionId));
+        setPersistentFiles(getAllPersistentFiles());
+      };
+      
+      refreshFiles(); // Initial load
+      const interval = setInterval(refreshFiles, 1000); // Refresh every second
+      
+      return () => clearInterval(interval);
     }
   }, [isOpen, sessionId, getSessionFiles, getAllPersistentFiles]);
 

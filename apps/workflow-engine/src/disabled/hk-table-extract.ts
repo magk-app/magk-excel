@@ -115,7 +115,7 @@ export class HKTableExtractService {
 
       const allRows: string[][] = [];
       
-      rows.forEach((row, index) => {
+      rows.forEach((row) => {
         const cells = Array.from(row.querySelectorAll('th, td'));
         const rowData = cells.map(cell => cell.textContent?.trim() || '');
         

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ModelConfig } from './ModelSelector';
 import { FileAttachment } from './FileUploadArea';
 import { ChatSessionsSidebar } from './ChatSessionsSidebar';
@@ -21,6 +21,10 @@ import { MCPToolExecutionStatus, MCPToolCall } from './MCPToolExecutionStatus';
 import { ApiKeyManager, useApiKeys } from './ApiKeyManager';
 import { FilePersistenceManager } from './FilePersistenceManager';
 import { ExcelDownloadHandler } from './ExcelDownloadHandler';
+import { ModelCompatibilityCheck } from './ModelCompatibilityCheck';
+import { WorkflowGeneratedNotification } from './workflow/WorkflowGeneratedNotification';
+// TODO: Remove this import after testing
+// import { ThinkingTokensTest } from './ThinkingTokensTest';
 
 export function ChatInterface() {
   // Core state
@@ -28,25 +32,33 @@ export function ChatInterface() {
   const [nluxKey, setNluxKey] = useState(0); // Force NLUX re-render when switching sessions
   const [modelConfig, setModelConfig] = useState<ModelConfig>({
     provider: 'anthropic',
-    model: 'claude-3-5-sonnet-20241022',
-    displayName: 'Eliza 4.0',
-    enableThinking: false
+    model: 'claude-opus-4-1-20250805',
+    displayName: 'Claude Opus 4.1',
+    enableThinking: true
   });
 
   // MCP tool execution tracking
   const [mcpToolCalls, setMcpToolCalls] = useState<MCPToolCall[]>([]);
   const [mcpStatusVisible, setMcpStatusVisible] = useState(false);
   
+  // Claude API file upload state
+  const [useDirectClaudeApi, setUseDirectClaudeApi] = useState(false);
+  const [fileUploadProgress, setFileUploadProgress] = useState<Record<string, any>>({});
+  
   // API Key management
   const { apiKeys, missingKeys, checkRequiredKeys, updateApiKeys } = useApiKeys();
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
-  const [hasShownApiKeyDialog, setHasShownApiKeyDialog] = useState(false);
+  const [hasShownApiKeyDialog, setHasShownApiKeyDialog] = useState(() => {
+    // Check if we've already shown the dialog in this session
+    return sessionStorage.getItem('hasShownApiKeyDialog') === 'true';
+  });
   
   // File persistence management
   const [showFilePersistenceDialog, setShowFilePersistenceDialog] = useState(false);
   
   // Excel download management
   const [excelDownloadInfo, setExcelDownloadInfo] = useState<any>(null);
+  const [forceExecutor, setForceExecutor] = useState<boolean>(false);
 
   // Custom hooks for state management
   const {
@@ -92,8 +104,13 @@ export function ChatInterface() {
 
   // Direct addMessage without wrapper since we have proper reactivity now
   const addMessageWithUpdate = addMessage;
+  
+  // Workflow integration state
+  const [generatedWorkflow, setGeneratedWorkflow] = useState<any>(null);
+  const [showWorkflowNotification, setShowWorkflowNotification] = useState(false);
 
   // Chat adapter with memoization
+  // @ts-expect- error: extending adapter options to include forceExecutor flag (there is an extra space hereA)
   const { streamText } = useChatAdapter({
     activeSessionId: activeSessionId || undefined,
     attachments,
@@ -106,6 +123,11 @@ export function ChatInterface() {
     getActiveSession,
     updateSessionTitle,
     currentSession,
+    forceExecutor,
+    useDirectClaudeApi,
+    onFileUploadProgress: (fileId: string, progress: any) => {
+      setFileUploadProgress(prev => ({ ...prev, [fileId]: progress }));
+    },
     onToolCallStart: (toolCall) => {
       console.log('🔧 Tool call started:', toolCall);
       handleToolCallStart(toolCall);
@@ -117,6 +139,16 @@ export function ChatInterface() {
     onToolCallError: (toolCall) => {
       console.log('❌ Tool call error:', toolCall);
       handleToolCallError(toolCall);
+    },
+    onWorkflowGenerated: (workflow) => {
+      console.log('🎯 Workflow generated from chat:', workflow);
+      setGeneratedWorkflow(workflow);
+      setShowWorkflowNotification(true);
+      // Auto-open workflow builder after 2 seconds
+      setTimeout(() => {
+        // You can trigger workflow builder opening here
+        // For now, just show notification
+      }, 2000);
     }
   });
 
@@ -130,24 +162,19 @@ export function ChatInterface() {
   // Check for required API keys on mount and when model changes
   useEffect(() => {
     const requiredKeys = [];
+    const optionalKeys = [];
     
     // Check which API keys are needed based on model
     if (modelConfig.provider === 'anthropic') {
       requiredKeys.push('anthropic');
+      optionalKeys.push('openai'); // OpenAI is optional when using Anthropic
     } else if (modelConfig.provider === 'openai') {
       requiredKeys.push('openai');
+      optionalKeys.push('anthropic'); // Anthropic is optional when using OpenAI
     }
     
-    // Check for MCP server keys
-    if (enabledServers) {
-      // Handle both Array and Set
-      const hasFirecrawl = Array.isArray(enabledServers) 
-        ? enabledServers.includes('firecrawl')
-        : enabledServers.has && enabledServers.has('firecrawl');
-      if (hasFirecrawl) {
-        requiredKeys.push('firecrawl');
-      }
-    }
+    // MCP server keys are always optional
+    optionalKeys.push('firecrawl');
     
     const missing = checkRequiredKeys(requiredKeys);
     // Only show the dialog once per session, not every time the effect runs
@@ -155,8 +182,9 @@ export function ChatInterface() {
       console.warn('⚠️ Missing API keys:', missing);
       setShowApiKeyDialog(true);
       setHasShownApiKeyDialog(true);
+      sessionStorage.setItem('hasShownApiKeyDialog', 'true');
     }
-  }, [modelConfig.provider, enabledServers, checkRequiredKeys, hasShownApiKeyDialog]);
+  }, [modelConfig.provider, checkRequiredKeys, hasShownApiKeyDialog]);
 
   // Force NLUX to re-render when active session changes
   useEffect(() => {
@@ -213,10 +241,10 @@ export function ChatInterface() {
          toolCall.tool === 'excel_write' || 
          toolCall.tool === 'excel_write_to_sheet')) {
       // Extract download info from response if available
-      const response = toolCall.response;
-      if (response?.downloadInfo) {
+      const responseAny: any = (toolCall as unknown as any).response || (toolCall as unknown as any).result;
+      if (responseAny?.downloadInfo) {
         setExcelDownloadInfo({
-          ...response.downloadInfo,
+          ...responseAny.downloadInfo,
           timestamp: Date.now()
         });
       }
@@ -290,11 +318,14 @@ export function ChatInterface() {
           hasExcelFiles={hasExcelFiles}
           toolCallsCount={toolCalls.length}
           onOpenToolMonitor={openWindow}
+          onOpenApiKeys={() => setShowApiKeyDialog(true)}
           onExportToExcel={handleExportToExcel}
           onTogglePDFPanel={pdfExtraction.togglePanel}
           mcpToolCallsCount={mcpToolCalls.length}
           onToggleMCPStatus={() => setMcpStatusVisible(!mcpStatusVisible)}
           onOpenFilePersistence={() => setShowFilePersistenceDialog(true)}
+          onToggleForceExecutor={() => setForceExecutor((v) => !v)}
+          forceExecutorEnabled={forceExecutor}
         >
           <DemoControls
             onRunHKDemo={runHKPassengerDemo}
@@ -302,6 +333,20 @@ export function ChatInterface() {
             disabled={!activeSessionId}
           />
         </ChatHeader>
+
+        {/* Model Compatibility Check */}
+        <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+          <ModelCompatibilityCheck 
+            modelConfig={modelConfig}
+            onModelFallback={(fallbackModel: string) => {
+              setModelConfig(prev => ({ 
+                ...prev, 
+                model: fallbackModel,
+                enableThinking: fallbackModel.includes('claude-4') || fallbackModel.includes('claude-3-7')
+              }));
+            }}
+          />
+        </div>
 
         {/* PDF Extraction Panel */}
         {pdfExtraction.showPanel && (
@@ -335,6 +380,11 @@ export function ChatInterface() {
           onSendMessage={streamText}
           maxFiles={5}
           maxFileSize={50 * 1024 * 1024} // 50MB
+          useDirectClaudeApi={useDirectClaudeApi}
+          onDirectClaudeApiChange={setUseDirectClaudeApi}
+          onFileUploadProgress={(fileId: string, progress: any) => {
+            setFileUploadProgress(prev => ({ ...prev, [fileId]: progress }));
+          }}
         />
       </div>
       
@@ -361,7 +411,8 @@ export function ChatInterface() {
       <ApiKeyManager
         isOpen={showApiKeyDialog}
         onClose={() => setShowApiKeyDialog(false)}
-        requiredKeys={missingKeys}
+        requiredKeys={modelConfig.provider === 'anthropic' ? ['anthropic'] : modelConfig.provider === 'openai' ? ['openai'] : []}
+        optionalKeys={['firecrawl', modelConfig.provider === 'anthropic' ? 'openai' : 'anthropic']}
         onKeysSet={(keys) => {
           updateApiKeys(keys);
           setShowApiKeyDialog(false);
@@ -383,6 +434,19 @@ export function ChatInterface() {
           onClose={() => setExcelDownloadInfo(null)}
         />
       )}
+      
+      {/* Workflow Generated Notification */}
+      <WorkflowGeneratedNotification
+        workflow={generatedWorkflow}
+        isVisible={showWorkflowNotification}
+        onView={() => {
+          // Open workflow builder or viewer
+          console.log('Opening workflow:', generatedWorkflow);
+          setShowWorkflowNotification(false);
+          // You can integrate with workflow store or navigation here
+        }}
+        onDismiss={() => setShowWorkflowNotification(false)}
+      />
     </div>
   );
 }

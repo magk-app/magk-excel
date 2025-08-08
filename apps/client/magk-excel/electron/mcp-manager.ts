@@ -4,11 +4,11 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { readFile, writeFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { excelMCPTool, ExcelMCPTool } from '../src/services/excel/ExcelMCPTool.js';
-import { pdfMCPTool, PDFMCPTool } from '../src/services/pdf/PDFMCPTool.js';
-import { executorMCPTool, ExecutorMCPTool } from '../src/services/executor/ExecutorMCPTool.js';
-import { persistenceMCPTool, PersistenceAccessTool } from '../src/services/persistence/PersistenceMCPTool.js';
-import { filesystemMCPTool, FilesystemMCPTool } from '../src/services/persistence/FilesystemMCPTool.js';
+import { excelMCPTool, ExcelMCPTool } from '../src/services/excel/ExcelMCPTool';
+import { pdfMCPTool, PDFMCPTool } from '../src/services/pdf/PDFMCPTool';
+import { executorMCPTool, ExecutorMCPTool } from '../src/services/executor/ExecutorMCPTool';
+import { persistenceMCPTool, PersistenceAccessTool } from '../src/services/persistence/PersistenceMCPTool';
+import { filesystemMCPTool, FilesystemMCPTool } from '../src/services/persistence/FilesystemMCPTool';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

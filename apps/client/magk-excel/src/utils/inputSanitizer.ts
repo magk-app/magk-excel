@@ -35,7 +35,7 @@ export function sanitizeInput(input: string): string {
   
   // Only escape HTML in content that looks like it contains HTML
   if (/<[^>]+>/.test(sanitized)) {
-    sanitized = sanitized.replace(/[<>&"'\/]/g, char => htmlEntities[char] || char);
+    sanitized = sanitized.replace(/[<>&"'/]/g, char => htmlEntities[char] || char);
   }
   
   return sanitized.trim();

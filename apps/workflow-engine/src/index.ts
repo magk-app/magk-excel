@@ -8,6 +8,7 @@ import { chatRoute } from './routes/chat.js';
 import { chatV2Route } from './routes/chat-v2.js';
 import { extractRoute } from './routes/extract.js';
 import { demoRoute } from './routes/demo.js';
+import { workflowRoute } from './routes/workflow-generation.js';
 
 const app = new Hono();
 
@@ -44,6 +45,7 @@ app.route('/api', chatRoute);  // Legacy chat at /api/chat
 app.route('/api/v2', chatV2Route);  // New chat at /api/v2/chat
 app.route('', extractRoute);
 app.route('', demoRoute);
+app.route('/api/workflow', workflowRoute);  // Workflow generation at /api/workflow
 
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 console.log(`🚀 MAGK Workflow Engine starting on http://localhost:${port}`);

@@ -271,7 +271,8 @@ export const useFilePersistenceStore = create<FilePersistenceState>()(
           files.push(file);
         });
         
-        return files;
+        // Sort by upload date (newest first) to ensure visibility
+        return files.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
       },
       
       // Get all persistent files
@@ -420,16 +421,20 @@ export const useFilePersistenceStore = create<FilePersistenceState>()(
         },
         setItem: (name, value) => {
           // Convert Maps to arrays for serialization
-          const state = { ...value };
+          const serializedState = {
+            ...value,
+            state: {
+              ...value.state,
+              temporaryFiles: value.state.temporaryFiles instanceof Map 
+                ? Array.from(value.state.temporaryFiles.entries())
+                : value.state.temporaryFiles,
+              persistentFiles: value.state.persistentFiles instanceof Map
+                ? Array.from(value.state.persistentFiles.entries())
+                : value.state.persistentFiles
+            }
+          };
           
-          if (state.state.temporaryFiles instanceof Map) {
-            state.state.temporaryFiles = Array.from(state.state.temporaryFiles.entries());
-          }
-          if (state.state.persistentFiles instanceof Map) {
-            state.state.persistentFiles = Array.from(state.state.persistentFiles.entries());
-          }
-          
-          localStorage.setItem(name, JSON.stringify(state));
+          localStorage.setItem(name, JSON.stringify(serializedState));
         },
         removeItem: (name) => localStorage.removeItem(name)
       }
