@@ -15,7 +15,7 @@
       "capabilities": ["pdf"],
       "timeout": 30000,
       "retries": 3,
-      "enabled": false
+      "enabled": true
     },
     "firecrawl": {
       "command": "echo",

@@ -252,7 +252,28 @@ chatV2Route.post('/chat/stream', async (c) => {
                   }
                 }
                 
-                // TODO: Add PDF tool calls when PDF tools are available
+                // Add PDF tool calls
+                if (pdfFiles.includes(attachment)) {
+                  // Add PDF tool calls
+                  const pdfExtractTool = request.mcpTools.find(t => t.server === 'pdf' && t.name === 'pdf_extract_tables');
+                  const pdfTextTool = request.mcpTools.find(t => t.server === 'pdf' && t.name === 'pdf_extract_text');
+                  
+                  if (pdfExtractTool) {
+                    mcpToolCalls.push({
+                      server: 'pdf',
+                      tool: 'pdf_extract_tables',
+                      args: { file_path: tempPath }
+                    });
+                  }
+                  
+                  if (pdfTextTool) {
+                    mcpToolCalls.push({
+                      server: 'pdf',
+                      tool: 'pdf_extract_text',
+                      args: { file_path: tempPath }
+                    });
+                  }
+                }
               }
             }
           }
@@ -469,7 +490,28 @@ chatV2Route.post('/chat', async (c) => {
               }
             }
             
-            // TODO: Add PDF tool calls when PDF tools are available
+            // Add PDF tool calls
+            if (pdfFiles.includes(attachment)) {
+              // Add PDF tool calls
+              const pdfExtractTool = request.mcpTools.find(t => t.server === 'pdf' && t.name === 'pdf_extract_tables');
+              const pdfTextTool = request.mcpTools.find(t => t.server === 'pdf' && t.name === 'pdf_extract_text');
+              
+              if (pdfExtractTool) {
+                mcpToolCalls.push({
+                  server: 'pdf',
+                  tool: 'pdf_extract_tables',
+                  args: { file_path: tempPath }
+                });
+              }
+              
+              if (pdfTextTool) {
+                mcpToolCalls.push({
+                  server: 'pdf',
+                  tool: 'pdf_extract_text',
+                  args: { file_path: tempPath }
+                });
+              }
+            }
           }
         }
       }

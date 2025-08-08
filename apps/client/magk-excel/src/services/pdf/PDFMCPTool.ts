@@ -71,50 +71,245 @@ export class PDFMCPTool {
   private async handleExtractTables(args: Record<string, any>): Promise<MCPToolResponse> {
     const filePath = this.resolvePath(args.file_path || args.filePath || args.file);
     
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
+    try {
+      console.log('📄 PDF MCP Tool: Extracting tables from:', filePath);
+      
+      // Read the PDF file and send it to the extraction API
+      const fs = await import('fs');
+      
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        return {
+          content: [{
+            type: 'text',
+            text: `❌ PDF file not found: ${filePath}`
+          }],
+          isError: true
+        };
+      }
+      const fileBuffer = fs.readFileSync(filePath);
+      const fileName = path.basename(filePath);
+      
+      // Create FormData for API request
+      const formData = new FormData();
+      const file = new File([fileBuffer], fileName, { type: 'application/pdf' });
+      formData.append('file', file);
+      formData.append('config', JSON.stringify({
+        chunkSize: 25,
+        fileName: fileName
+      }));
+
+      // Call the PDF extraction API
+      const response = await fetch('http://localhost:3001/api/pdf-extract', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'PDF extraction failed');
+      }
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'PDF extraction failed');
+      }
+
+      const result = data.result;
+      
+      // Create a clean, well-formatted table extraction summary
+      const financialTables = result.tables.filter((t: any) => t.tableType === 'financial');
+      const dataTables = result.tables.filter((t: any) => t.tableType === 'data');
+      const highConfidenceTables = result.tables.filter((t: any) => t.confidence > 0.8).slice(0, 2);
+      
+      let output = `## 📊 PDF Table Analysis Complete\n\n`;
+      output += `**File:** ${result.fileName}\n\n`;
+      
+      output += `### 📈 Extraction Summary\n`;
+      output += `- **Pages Processed:** ${result.totalPages}\n`;
+      output += `- **Tables Found:** ${result.tables.length}\n`;
+      output += `  - 💰 Financial: ${financialTables.length}\n`;
+      output += `  - 📊 Data: ${dataTables.length}\n`;
+      output += `- **Processing Time:** ${(result.extractionTime / 1000).toFixed(2)}s\n`;
+      
+      // Show document type if detected
+      if (financialTables.length > 5) {
+        output += `- **Document Type:** Financial report (10-Q, 10-K, etc.)\n`;
+      }
+      output += `\n`;
+      
+      // Show a preview of the most important tables
+      if (highConfidenceTables.length > 0) {
+        output += `### 🔍 Key Tables Preview\n\n`;
+        
+        highConfidenceTables.forEach((table: any) => {
+          const tableType = table.tableType === 'financial' ? '💰 Financial Data' : 
+                          table.tableType === 'data' ? '📊 Data Table' : '📋 Table';
+          
+          output += `#### ${tableType} (Page ${table.page})\n`;
+          output += `*Confidence: ${(table.confidence * 100).toFixed(1)}%*\n\n`;
+          
+          // Show table with limited rows
+          if (table.headers && table.headers.length > 0) {
+            output += '| ' + table.headers.join(' | ') + ' |\n';
+            output += '| ' + table.headers.map(() => '---').join(' | ') + ' |\n';
+          }
+          
+          if (table.rows && table.rows.length > 0) {
+            // Show only first 3 rows for preview
+            table.rows.slice(0, 3).forEach((row: string[]) => {
+              output += '| ' + row.join(' | ') + ' |\n';
+            });
+            
+            if (table.rows.length > 3) {
+              output += `\n*... and ${table.rows.length - 3} more rows*\n`;
+            }
+          }
+          output += `\n`;
+        });
+      }
+      
+      output += `### 🤖 What would you like me to analyze?\n\n`;
+      output += `- 🔍 **Specific metrics** - Revenue, expenses, ratios, etc.\n`;
+      output += `- 📊 **Export to Excel** - Selected tables or all data\n`;
+      output += `- 📋 **Focus on sections** - Balance sheet, income statement, etc.\n`;
+      output += `- 📈 **Compare periods** - Year-over-year or quarter-over-quarter\n`;
+      output += `- 💡 **Generate insights** - Key takeaways and analysis\n\n`;
+      output += `> 💡 **I have access to all ${result.tables.length} tables with full data. Just ask for what you need!**`
+
       return {
         content: [{
           type: 'text',
-          text: `❌ PDF file not found: ${filePath}`
+          text: output
+        }]
+      };
+      
+    } catch (error) {
+      console.error('❌ PDF extraction error:', error);
+      return {
+        content: [{
+          type: 'text',
+          text: `❌ Error extracting PDF: ${error instanceof Error ? error.message : 'Unknown error'}`
         }],
         isError: true
       };
     }
-
-    // For local files, we need to read and process them
-    // Since PDFExtractionService expects URLs, we'll need to handle this differently
-    // For now, we'll return a placeholder response
-    return {
-      content: [{
-        type: 'text',
-        text: `📄 **PDF Tables Extraction**\n\nFile: ${filePath}\n\n` +
-              `⚠️ PDF extraction requires server-side processing. Please use the PDF extraction panel in the UI or upload the file directly to the chat.`
-      }]
-    };
   }
 
   private async handleExtractText(args: Record<string, any>): Promise<MCPToolResponse> {
     const filePath = this.resolvePath(args.file_path || args.filePath || args.file);
     
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
+    try {
+      console.log('📄 PDF MCP Tool: Extracting text from:', filePath);
+      
+      // Read the PDF file and send it to the extraction API
+      const fs = await import('fs');
+      
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        return {
+          content: [{
+            type: 'text',
+            text: `❌ PDF file not found: ${filePath}`
+          }],
+          isError: true
+        };
+      }
+      const fileBuffer = fs.readFileSync(filePath);
+      const fileName = path.basename(filePath);
+      
+      // Create FormData for API request
+      const formData = new FormData();
+      const file = new File([fileBuffer], fileName, { type: 'application/pdf' });
+      formData.append('file', file);
+      formData.append('config', JSON.stringify({
+        chunkSize: 25,
+        fileName: fileName
+      }));
+
+      // Call the PDF extraction API
+      const response = await fetch('http://localhost:3001/api/pdf-extract', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'PDF extraction failed');
+      }
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'PDF extraction failed');
+      }
+
+      const result = data.result;
+      
+      // Create a clean, well-formatted text extraction summary
+      let output = `## 📄 PDF Text Extraction Complete\n\n`;
+      output += `**File:** ${result.fileName}\n\n`;
+      
+      output += `### 📊 Document Overview\n`;
+      output += `- **Pages:** ${result.totalPages}\n`;
+      output += `- **Characters:** ${result.text ? Math.round(result.text.length / 1000) : 0}K\n`;
+      output += `- **Processing Time:** ${(result.extractionTime / 1000).toFixed(2)}s\n`;
+      
+      if (result.tables && result.tables.length > 0) {
+        output += `- **Tables Found:** ${result.tables.length} (${result.tables.filter((t: any) => t.tableType === 'financial').length} financial)\n`;
+      }
+      output += `\n`;
+      
+      if (result.text && result.text.length > 0) {
+        // Show a clean preview of the first page
+        const pages = result.text.split(/\n=== PAGE \d+ ===\n/);
+        
+        if (pages.length > 1 && pages[1]) {
+          const firstPageContent = pages[1].trim();
+          if (firstPageContent) {
+            output += `### 📖 First Page Preview\n\n`;
+            const preview = firstPageContent.length > 600 ? firstPageContent.substring(0, 600).trim() + '...' : firstPageContent;
+            output += `\`\`\`\n${preview}\n\`\`\`\n\n`;
+            
+            if (pages.length > 2) {
+              output += `*📄 Document contains ${pages.length - 1} total pages*\n\n`;
+            }
+          }
+        } else {
+          // No page markers, show brief preview
+          const preview = result.text.length > 600 ? result.text.substring(0, 600).trim() + '...' : result.text;
+          output += `### 📖 Content Preview\n\n\`\`\`\n${preview}\n\`\`\`\n\n`;
+        }
+      } else {
+        output += `⚠️ No text content was extracted from the PDF.\n\n`;
+      }
+      
+      output += `### 🤖 How can I help you analyze this document?\n\n`;
+      output += `- 🔍 **Search** for specific information or keywords\n`;
+      output += `- 📝 **Summarize** sections, pages, or the entire document\n`;
+      output += `- 📊 **Extract** key insights and important data points\n`;
+      output += `- 📋 **Focus** on specific topics or sections\n`;
+      output += `- 💾 **Export** content in different formats\n\n`;
+      output += `> 💡 **I have access to all ${result.totalPages} pages of text content. Just ask for what you need!**`
+
       return {
         content: [{
           type: 'text',
-          text: `❌ PDF file not found: ${filePath}`
+          text: output
+        }]
+      };
+      
+    } catch (error) {
+      console.error('❌ PDF text extraction error:', error);
+      return {
+        content: [{
+          type: 'text',
+          text: `❌ Error extracting PDF text: ${error instanceof Error ? error.message : 'Unknown error'}`
         }],
         isError: true
       };
     }
-
-    return {
-      content: [{
-        type: 'text',
-        text: `📄 **PDF Text Extraction**\n\nFile: ${filePath}\n\n` +
-              `⚠️ PDF extraction requires server-side processing. Please use the PDF extraction panel in the UI or upload the file directly to the chat.`
-      }]
-    };
   }
 
   private async handleReadPDF(args: Record<string, any>): Promise<MCPToolResponse> {
