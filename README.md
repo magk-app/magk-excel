@@ -479,7 +479,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **AWS Chalice**: For the serverless framework
 - **PyQt**: For the desktop GUI framework
 - **Financial Analysts**: For domain expertise and feedback
-
----
-
-**Note**: This is a proof-of-concept demo project. For production use, additional security, compliance, and scalability considerations should be addressed.
