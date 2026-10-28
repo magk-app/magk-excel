@@ -1,0 +1,5 @@
+.analyst-demo .demo-md p { margin: 0.25rem 0; }
+.analyst-demo .demo-md ul { list-style: disc; margin: 0.35rem 0 0.35rem 1.25rem; }
+.analyst-demo .demo-md ol { list-style: decimal; margin: 0.35rem 0 0.35rem 1.25rem; }
+.analyst-demo .demo-md strong { font-weight: 700; }
+.analyst-demo .react-flow__node { cursor: default; }
