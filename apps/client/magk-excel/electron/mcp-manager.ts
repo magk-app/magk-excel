@@ -3,13 +3,34 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { readFile, writeFile } from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { excelMCPTool, ExcelMCPTool } from '../src/services/excel/ExcelMCPTool.js';
-import { pdfMCPTool, PDFMCPTool } from '../src/services/pdf/PDFMCPTool.js';
-import { persistenceMCPTool, PersistenceAccessTool } from '../src/services/persistence/PersistenceMCPTool.js';
-import { filesystemMCPTool, FilesystemMCPTool } from '../src/services/persistence/FilesystemMCPTool.js';
+import { excelMCPTool, ExcelMCPTool } from '../src/services/excel/ExcelMCPTool';
+import { pdfMCPTool, PDFMCPTool } from '../src/services/pdf/PDFMCPTool';
+import { persistenceMCPTool, PersistenceAccessTool } from '../src/services/persistence/PersistenceMCPTool';
+import { filesystemMCPTool, FilesystemMCPTool } from '../src/services/persistence/FilesystemMCPTool';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+function getModuleDir(): string {
+  if (typeof __dirname === 'string') {
+    return __dirname;
+  }
+
+  return path.join(process.env.APP_ROOT ?? process.cwd(), 'dist-electron');
+}
+
+export function isAllowedSmitheryUrl(url: unknown): url is string {
+  if (typeof url !== 'string') {
+    return false;
+  }
+
+  try {
+    const parsedUrl = new URL(url);
+    return parsedUrl.protocol === 'https:' &&
+      parsedUrl.hostname === 'server.smithery.ai' &&
+      !parsedUrl.username &&
+      !parsedUrl.password;
+  } catch {
+    return false;
+  }
+}
 
 export interface MCPServerConfig {
   command: string;
@@ -38,7 +59,7 @@ export class MCPManager {
   async loadConfig(): Promise<void> {
     try {
       // Look for .mcp.json in the apps/client/magk-excel directory
-      const configPath = path.join(__dirname, '../.mcp.json');
+      const configPath = path.join(getModuleDir(), '../.mcp.json');
       const configContent = await readFile(configPath, 'utf-8');
       this.config = JSON.parse(configContent);
       console.log('✅ MCP config loaded:', this.config);
@@ -53,11 +74,16 @@ export class MCPManager {
     const staticServer = this.config?.mcpServers[serverName];
     // Check if it's a Smithery server
     const smitheryServer = this.smitheryServers.get(serverName);
+    const isSmitheryConfig = !staticServer && !!smitheryServer;
     
     const serverConfig = staticServer || smitheryServer;
     
     if (!serverConfig) {
       throw new Error(`Server ${serverName} not found in config or Smithery registry`);
+    }
+
+    if (isSmitheryConfig && !isAllowedSmitheryUrl(serverConfig.url)) {
+      throw new Error(`Invalid Smithery URL for server ${serverName}`);
     }
     
     // If already connected, don't reconnect
@@ -72,7 +98,7 @@ export class MCPManager {
       let transport: StdioClientTransport | StreamableHTTPClientTransport;
       
       // Create appropriate transport based on server type
-      if (serverConfig.type === 'http' || serverConfig.url) {
+      if (isSmitheryConfig || serverConfig.type === 'http' || serverConfig.url) {
         // HTTP transport for Smithery hosted servers
         if (!serverConfig.url) {
           throw new Error(`HTTP server ${serverName} missing URL`);
@@ -447,17 +473,27 @@ export class MCPManager {
   async addSmitheryServer(serverName: string, config: MCPServerConfig): Promise<void> {
     console.log(`📝 Adding Smithery server: ${serverName}`);
     
-    // Validate required fields for Smithery servers
-    if (config.isSmithery && !config.url) {
-      throw new Error(`Smithery server ${serverName} must have a URL`);
+    const url = config?.url;
+    if (!isAllowedSmitheryUrl(url)) {
+      throw new Error(`Smithery server ${serverName} must have a valid HTTPS URL`);
     }
-    
-    // Store in Smithery servers map
-    this.smitheryServers.set(serverName, {
-      ...config,
+
+    const sanitizedConfig: MCPServerConfig = {
+      command: '',
+      type: 'http',
+      url,
       isSmithery: true,
-      type: config.type || 'http'
-    });
+    };
+    for (const field of ['qualifiedName', 'displayName', 'description'] as const) {
+      if (typeof config?.[field] === 'string') {
+        sanitizedConfig[field] = config[field];
+      }
+    }
+    if (config?.config !== undefined) {
+      sanitizedConfig.config = config.config;
+    }
+
+    this.smitheryServers.set(serverName, sanitizedConfig);
     
     // Persist to smithery config file
     await this.saveSmitheryConfig();
@@ -515,12 +551,16 @@ export class MCPManager {
    */
   private async loadSmitheryConfig(): Promise<void> {
     try {
-      const configPath = path.join(__dirname, '../.smithery.json');
+      const configPath = path.join(getModuleDir(), '../.smithery.json');
       const configContent = await readFile(configPath, 'utf-8');
       const smitheryConfig = JSON.parse(configContent);
       
       if (smitheryConfig.smitheryServers) {
         for (const [name, config] of Object.entries(smitheryConfig.smitheryServers)) {
+          if (!isAllowedSmitheryUrl((config as MCPServerConfig).url)) {
+            console.warn(`⚠️ Skipping Smithery server with invalid URL: ${name}`);
+            continue;
+          }
           this.smitheryServers.set(name, config as MCPServerConfig);
         }
         console.log(`✅ Loaded ${this.smitheryServers.size} Smithery servers`);
@@ -536,7 +576,7 @@ export class MCPManager {
    */
   private async saveSmitheryConfig(): Promise<void> {
     try {
-      const configPath = path.join(__dirname, '../.smithery.json');
+      const configPath = path.join(getModuleDir(), '../.smithery.json');
       const smitheryConfig = {
         smitheryServers: this.getSmitheryServers(),
         lastUpdated: new Date().toISOString()

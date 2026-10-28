@@ -4,6 +4,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import os from 'node:os'
 import { mcpManager } from './mcp-manager.js'
+import { isPathWithinRoots, resolveDirWithin, resolveWithin } from './pathSafety.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -79,18 +80,30 @@ function getAppDataDirectory(): string {
   return APP_DATA_DIR
 }
 
+function getExcelDirectory(): string {
+  const excelDir = process.env.EXCEL_FILES_PATH ||
+                   process.env.MAGK_EXCEL_PATH ||
+                   path.join(os.homedir(), 'Downloads', 'MAGK-Excel')
+
+  if (!fs.existsSync(excelDir)) {
+    fs.mkdirSync(excelDir, { recursive: true })
+  }
+
+  return excelDir
+}
+
 /**
  * Write a file to the persistent storage directory
  */
 function writeFileToPersistentStorage(fileName: string, content: string | Buffer, subDir?: string): string {
-  const targetDir = subDir ? path.join(APP_DATA_DIR, subDir) : APP_DATA_DIR
+  const filePath = resolveWithin(APP_DATA_DIR, subDir ?? '', fileName)
+  const targetDir = path.dirname(filePath)
   
   // Ensure target directory exists
   if (!fs.existsSync(targetDir)) {
     fs.mkdirSync(targetDir, { recursive: true })
   }
   
-  const filePath = path.join(targetDir, fileName)
   fs.writeFileSync(filePath, content)
   console.log('💾 Saved file to persistent storage:', filePath)
   return filePath
@@ -101,8 +114,7 @@ function writeFileToPersistentStorage(fileName: string, content: string | Buffer
  */
 function readFileFromPersistentStorage(fileName: string, subDir?: string): Buffer | null {
   try {
-    const targetDir = subDir ? path.join(APP_DATA_DIR, subDir) : APP_DATA_DIR
-    const filePath = path.join(targetDir, fileName)
+    const filePath = resolveWithin(APP_DATA_DIR, subDir ?? '', fileName)
     
     if (fs.existsSync(filePath)) {
       return fs.readFileSync(filePath)
@@ -344,6 +356,10 @@ function setupMCPHandlers() {
   // File download handlers
   ipcMain.handle('download-file', async (_, filePath: string) => {
     try {
+      if (!isPathWithinRoots(filePath, [APP_DATA_DIR, getExcelDirectory()])) {
+        return { success: false, error: 'File access denied' }
+      }
+
       // Check if file exists
       if (!fs.existsSync(filePath)) {
         return { success: false, error: 'File not found' }
@@ -373,8 +389,21 @@ function setupMCPHandlers() {
   
   ipcMain.handle('open-file', async (_, filePath: string) => {
     try {
+      if (!isPathWithinRoots(filePath, [APP_DATA_DIR, getExcelDirectory()])) {
+        return { success: false, error: 'File access denied' }
+      }
+
+      const allowedExtensions = ['.xlsx', '.xls', '.csv', '.pdf', '.txt', '.json']
+      if (!allowedExtensions.includes(path.extname(filePath).toLowerCase())) {
+        return { success: false, error: 'File type not allowed' }
+      }
+
       // Open file with default application
-      await shell.openPath(filePath)
+      const openError = await shell.openPath(filePath)
+      if (openError) {
+        return { success: false, error: openError }
+      }
+
       return { success: true }
     } catch (error) {
       console.error('Open file error:', error)
@@ -395,16 +424,7 @@ function setupMCPHandlers() {
   
   // Get default Excel files directory
   ipcMain.handle('get-excel-directory', async () => {
-    const excelDir = process.env.EXCEL_FILES_PATH || 
-                     process.env.MAGK_EXCEL_PATH ||
-                     path.join(os.homedir(), 'Downloads', 'MAGK-Excel')
-    
-    // Ensure directory exists
-    if (!fs.existsSync(excelDir)) {
-      fs.mkdirSync(excelDir, { recursive: true })
-    }
-    
-    return excelDir
+    return getExcelDirectory()
   })
 
   // File persistence handlers
@@ -447,7 +467,7 @@ function setupMCPHandlers() {
 
   ipcMain.handle('list-persistent-files', async (_, subDir?: string) => {
     try {
-      const targetDir = subDir ? path.join(APP_DATA_DIR, subDir) : APP_DATA_DIR
+      const targetDir = resolveDirWithin(APP_DATA_DIR, subDir)
       
       if (!fs.existsSync(targetDir)) {
         return { success: true, files: [] }
@@ -476,8 +496,7 @@ function setupMCPHandlers() {
 
   ipcMain.handle('delete-persistent-file', async (_, fileName: string, subDir?: string) => {
     try {
-      const targetDir = subDir ? path.join(APP_DATA_DIR, subDir) : APP_DATA_DIR
-      const filePath = path.join(targetDir, fileName)
+      const filePath = resolveWithin(APP_DATA_DIR, subDir ?? '', fileName)
       
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath)

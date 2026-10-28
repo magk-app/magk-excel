@@ -1,5 +1,6 @@
 import { MCPManager } from '../mcp-manager';
 import { readFile } from 'fs/promises';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 // Mock the MCP SDK
 jest.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
@@ -197,13 +198,12 @@ describe('MCPManager', () => {
     });
 
     it('should list tools from enabled servers', async () => {
-      const tools = await mcpManager.listTools();
+      const tools = await mcpManager.listTools('test-server');
       
       expect(tools).toHaveLength(1);
       expect(tools[0]).toEqual({
         name: 'test-tool',
-        description: 'Test tool',
-        server: 'test-server'
+        description: 'Test tool'
       });
     });
 
@@ -238,6 +238,63 @@ describe('MCPManager', () => {
       
       await expect(mcpManager.callTool('unknown-server', 'tool', {}))
         .rejects.toThrow('Not connected to server: unknown-server');
+    });
+  });
+
+  describe('Smithery server security', () => {
+    it.each([
+      undefined,
+      'http://server.smithery.ai/x',
+      'https://evil.com/server.smithery.ai',
+      'https://server.smithery.ai.evil.com/x',
+      'https://user:pw@server.smithery.ai/x'
+    ])('rejects invalid URL %s', async url => {
+      await expect(mcpManager.addSmitheryServer('invalid', {
+        command: 'calc.exe',
+        isSmithery: false,
+        url
+      })).rejects.toThrow();
+    });
+
+    it('stores only a sanitized Smithery configuration', async () => {
+      await mcpManager.addSmitheryServer('accepted', {
+        command: 'calc.exe',
+        args: ['--arbitrary-command'],
+        env: { SECRET: 'value' },
+        isSmithery: false,
+        url: 'https://server.smithery.ai/server/mcp',
+        qualifiedName: 'owner/server',
+        displayName: 'Server',
+        description: 'Description',
+        config: { option: 'value' }
+      });
+
+      const storedConfig = mcpManager.getSmitheryServers().accepted;
+      expect(storedConfig).toEqual(expect.objectContaining({
+        command: '',
+        type: 'http',
+        url: 'https://server.smithery.ai/server/mcp',
+        isSmithery: true,
+        qualifiedName: 'owner/server',
+        displayName: 'Server',
+        description: 'Description',
+        config: { option: 'value' }
+      }));
+      expect(storedConfig).not.toHaveProperty('args');
+      expect(storedConfig).not.toHaveProperty('env');
+    });
+
+    it('rejects tampered Smithery entries without creating a stdio transport', async () => {
+      (mcpManager as any).smitheryServers.set('tampered', {
+        command: '/bin/sh',
+        args: ['-c', 'touch /tmp/pwned'],
+        type: 'stdio',
+        url: 'https://evil.example/mcp',
+        isSmithery: true
+      });
+
+      await expect(mcpManager.connectToServer('tampered')).rejects.toThrow('Invalid Smithery URL');
+      expect(StdioClientTransport).not.toHaveBeenCalled();
     });
   });
 });

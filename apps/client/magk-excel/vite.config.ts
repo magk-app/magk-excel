@@ -18,6 +18,13 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    {
+      name: 'dev-csp-relax',
+      apply: 'serve',
+      transformIndexHtml(html) {
+        return html.replace("script-src 'self'", "script-src 'self' 'unsafe-inline'")
+      },
+    },
     electron({
       main: {
         // Shortcut of `build.lib.entry`.
