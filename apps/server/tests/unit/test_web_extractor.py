@@ -1,5 +1,6 @@
 import pytest
 import os
+import socket
 from unittest.mock import Mock, patch
 from selenium.common.exceptions import TimeoutException, WebDriverException
 import sys
@@ -10,6 +11,20 @@ from chalicelib.web_extractor import (
     WebExtractor, extract_web_table, WebExtractionError, 
     TimeoutError, ElementNotFoundError
 )
+from chalicelib.url_safety import UnsafeURLError
+from chalicelib import url_safety
+
+
+@pytest.fixture(autouse=True)
+def mock_public_dns(monkeypatch):
+    monkeypatch.setattr(
+        url_safety.socket,
+        'getaddrinfo',
+        lambda hostname, port, *args, **kwargs: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, '',
+             ('93.184.215.14', port))
+        ],
+    )
 
 
 class TestWebExtractor:
@@ -212,12 +227,93 @@ class TestWebExtractor:
         mock_strategy_factory.return_value = mock_strategy
         
         self.extractor.driver = Mock()
+        self.extractor.driver.current_url = "https://example.com"
 
         result = self.extractor.extract_table("https://example.com", "test-table")
 
         assert result == [["Header"], ["Data"]]
         mock_setup.assert_called_once()
         mock_cleanup.assert_called_once()
+
+    @patch('chalicelib.web_extractor.webdriver.Chrome')
+    def test_unsafe_url_does_not_construct_chrome(self, mock_chrome):
+        with pytest.raises(UnsafeURLError):
+            self.extractor.extract_table('file:///tmp', 'x')
+
+        mock_chrome.assert_not_called()
+
+    @patch('chalicelib.web_extractor.webdriver.Chrome')
+    def test_chrome_options_disable_web_security_removed(self, mock_chrome):
+        mock_chrome.return_value = Mock()
+        self.extractor._pinned_target = type(
+            'Target', (), {
+                'hostname': 'example.com',
+                'address': '93.184.215.14',
+            })()
+
+        self.extractor._setup_driver()
+
+        options = mock_chrome.call_args.kwargs['options']
+        assert '--disable-web-security' not in options.arguments
+
+    @patch('chalicelib.web_extractor.webdriver.Chrome')
+    def test_chrome_options_pin_validated_hostname(self, mock_chrome):
+        mock_chrome.return_value = Mock()
+        self.extractor._pinned_target = type(
+            'Target', (), {
+                'hostname': 'example.com',
+                'address': '93.184.215.14',
+            })()
+
+        self.extractor._setup_driver()
+
+        options = mock_chrome.call_args.kwargs['options']
+        assert (
+            '--host-resolver-rules=MAP example.com 93.184.215.14'
+            in options.arguments
+        )
+
+    @patch('chalicelib.web_extractor.webdriver.Chrome')
+    @patch('chalicelib.web_extractor.StrategyFactory.get_strategy')
+    def test_navigation_to_other_host_is_rejected(
+            self, mock_strategy_factory, mock_chrome):
+        mock_driver = Mock()
+        mock_driver.current_url = 'https://example.com'
+
+        def navigate_to_private_host(url):
+            mock_driver.current_url = 'http://127.0.0.1:9001/'
+
+        mock_driver.get.side_effect = navigate_to_private_host
+        mock_chrome.return_value = mock_driver
+        mock_strategy = Mock()
+        mock_strategy.extract.side_effect = lambda driver, url: driver.get(url)
+        mock_strategy_factory.return_value = mock_strategy
+
+        with pytest.raises(UnsafeURLError):
+            self.extractor.extract_table('https://example.com', 'x')
+
+    @patch('chalicelib.web_extractor.webdriver.Chrome')
+    @patch('chalicelib.web_extractor.StrategyFactory.get_strategy')
+    def test_post_extraction_navigation_to_other_host_is_rejected(
+            self, mock_strategy_factory, mock_chrome):
+        mock_driver = Mock()
+        mock_driver.current_url = 'https://example.com'
+        mock_chrome.return_value = mock_driver
+        mock_strategy = Mock()
+
+        def extract_and_navigate(driver, url):
+            mock_driver.current_url = 'http://127.0.0.1:9001/'
+            return {
+                'type': 'table',
+                'headers': ['Header'],
+                'data': [['Data']],
+            }
+
+        mock_strategy.extract.side_effect = extract_and_navigate
+        mock_strategy_factory.return_value = mock_strategy
+
+        with pytest.raises(UnsafeURLError):
+            self.extractor.extract_table('https://example.com', 'x')
 
     @pytest.mark.integration
     def test_singapore_statistics_javascript_required(self):

@@ -1,9 +1,17 @@
 import logging
 import tempfile
 import os
+import hmac
 from datetime import datetime, timedelta
-from chalice import Chalice, Response, BadRequestError, ChaliceViewError
+from chalice import (
+    AuthResponse,
+    BadRequestError,
+    Chalice,
+    ChaliceViewError,
+    Response,
+)
 from chalicelib.web_extractor import extract_web_table
+from chalicelib.url_safety import UnsafeURLError, validate_public_url
 from chalicelib.HKtableextract import scrape_manually_reconstruct
 
 # Set up logging
@@ -11,6 +19,17 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Chalice(app_name='magk-excel-backend')
+
+
+@app.authorizer()
+def api_token_auth(auth_request):
+    expected = os.environ.get('MAGK_API_TOKEN', '')
+    token = auth_request.token or ''
+    if token.startswith('Bearer '):
+        token = token[len('Bearer '):]
+    if expected and hmac.compare_digest(token.encode(), expected.encode()):
+        return AuthResponse(routes=['*'], principal_id='magk-client')
+    return AuthResponse(routes=[], principal_id='anonymous')
 
 
 @app.route('/')
@@ -23,7 +42,7 @@ def health():
     return {'status': 'healthy', 'service': 'magk-excel-backend'}
 
 
-@app.route('/execute-workflow', methods=['POST'])
+@app.route('/execute-workflow', methods=['POST'], authorizer=api_token_auth)
 def execute_workflow():
     """Execute data extraction workflow based on WorkflowConfig."""
     try:
@@ -54,8 +73,16 @@ def execute_workflow():
         if source_type == 'web':
             logger.info(f"Processing web extraction for URL: {source_uri}")
 
+            try:
+                validate_public_url(source_uri)
+            except UnsafeURLError as error:
+                raise BadRequestError(f"Invalid sourceUri: {error}")
+
             # Extract table data
-            table_data = extract_web_table(source_uri, data_identifier)
+            try:
+                table_data = extract_web_table(source_uri, data_identifier)
+            except UnsafeURLError as error:
+                raise BadRequestError(f"Invalid sourceUri: {error}")
 
             if not table_data:
                 raise ChaliceViewError(
@@ -85,15 +112,14 @@ def execute_workflow():
             raise BadRequestError(
                 f"Unsupported source type: {source_type}")
 
-    except BadRequestError:
-        # Re-raise BadRequestError as-is
+    except ChaliceViewError:
         raise
-    except Exception as e:
-        logger.error(f"Error processing workflow: {str(e)}")
-        raise ChaliceViewError(f"Internal server error: {str(e)}")
+    except Exception:
+        logger.exception("Error processing workflow")
+        raise ChaliceViewError("Internal server error")
 
 
-@app.route('/extract-hk-immigration', methods=['POST'])
+@app.route('/extract-hk-immigration', methods=['POST'], authorizer=api_token_auth)
 def extract_hk_immigration():
     """Extract HK Immigration passenger statistics for a date range."""
     try:

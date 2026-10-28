@@ -1,4 +1,5 @@
 import logging
+import ipaddress
 import os
 import time
 import re
@@ -15,6 +16,12 @@ from selenium.common.exceptions import (
 )
 from selenium.webdriver.chrome.service import Service
 from .extraction_strategies import StrategyFactory
+from .url_safety import (
+    UnsafeURLError,
+    ValidatedURL,
+    host_matches,
+    validate_public_url,
+)
 
 from dotenv import load_dotenv
 import os
@@ -46,6 +53,27 @@ class TimeoutError(WebExtractionError):
 class ElementNotFoundError(WebExtractionError):
     """Exception raised when required elements cannot be found."""
     pass
+
+
+class _HostLockedDriver:
+    """Delegate WebDriver operations while locking navigation to one host."""
+
+    def __init__(self, driver, hostname):
+        self._driver = driver
+        self._hostname = hostname
+
+    def __getattr__(self, name):
+        return getattr(self._driver, name)
+
+    def get(self, url):
+        if not host_matches(url, self._hostname):
+            raise UnsafeURLError("Page navigated away from the requested host")
+        self._driver.get(url)
+        self.assert_on_host()
+
+    def assert_on_host(self):
+        if not host_matches(self._driver.current_url, self._hostname):
+            raise UnsafeURLError("Page navigated away from the requested host")
 
 
 def cleanup_all_drivers():
@@ -124,6 +152,7 @@ class WebExtractor:
         self.max_retries = max_retries
         self.driver = None
         self._unified_wait = None
+        self._pinned_target: Optional[ValidatedURL] = None
 
     def extract_table(self, url: str, table_identifier: str = None
                       ) -> List[List[str]]:
@@ -143,6 +172,8 @@ class WebExtractor:
             TimeoutException: If the page or table takes too long to load
             ValueError: If the table cannot be found
         """
+        target = validate_public_url(url)
+        self._pinned_target = target
         try:
             logger.info(f"Starting extraction from URL: {url}")
             self._setup_driver()
@@ -152,7 +183,9 @@ class WebExtractor:
             logger.info(f"Using strategy: {strategy.__class__.__name__}")
 
             # Extract data using strategy
-            result = strategy.extract(self.driver, url)
+            locked_driver = _HostLockedDriver(self.driver, target.hostname)
+            result = strategy.extract(locked_driver, url)
+            locked_driver.assert_on_host()
 
             if result is None:
                 raise WebExtractionError("No data extracted from the page")
@@ -181,6 +214,8 @@ class WebExtractor:
         except WebDriverException as e:
             logger.error(f"WebDriver error during extraction: {str(e)}")
             raise WebExtractionError(f"WebDriver error: {str(e)}")
+        except UnsafeURLError:
+            raise
         except Exception as e:
             logger.error(f"Unexpected error during extraction: {str(e)}")
             raise WebExtractionError(f"Extraction failed: {str(e)}")
@@ -204,6 +239,8 @@ class WebExtractor:
             TimeoutException: If the page or table takes too long to load
             ValueError: If the data cannot be found
         """
+        target = validate_public_url(url)
+        self._pinned_target = target
         try:
             logger.info(f"Starting advanced extraction from URL: {url}")
             self._setup_driver()
@@ -213,7 +250,9 @@ class WebExtractor:
             logger.info(f"Using strategy: {strategy.__class__.__name__}")
 
             # Extract data using strategy
-            result = strategy.extract(self.driver, url)
+            locked_driver = _HostLockedDriver(self.driver, target.hostname)
+            result = strategy.extract(locked_driver, url)
+            locked_driver.assert_on_host()
 
             if result is None:
                 raise WebExtractionError("No data extracted from the page")
@@ -229,6 +268,8 @@ class WebExtractor:
         except WebDriverException as e:
             logger.error(f"WebDriver error during advanced extraction: {str(e)}")
             raise WebExtractionError(f"WebDriver error: {str(e)}")
+        except UnsafeURLError:
+            raise
         except Exception as e:
             logger.error(f"Unexpected error during advanced extraction: {str(e)}")
             raise WebExtractionError(f"Advanced extraction failed: {str(e)}")
@@ -249,11 +290,22 @@ class WebExtractor:
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument('--disable-gpu')
-            options.add_argument('--disable-web-security')
             options.add_argument('--single-process')
             options.add_argument('--disable-dev-tools')
             options.add_argument('--no-zygote')
             options.add_argument('--window-size=1920,1080')
+
+            if self._pinned_target:
+                try:
+                    ipaddress.ip_address(self._pinned_target.hostname)
+                except ValueError:
+                    address = self._pinned_target.address
+                    if ":" in address:
+                        address = f"[{address}]"
+                    options.add_argument(
+                        "--host-resolver-rules="
+                        f"MAP {self._pinned_target.hostname} {address}"
+                    )
             
             # Add user agent for better compatibility
             options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
@@ -326,7 +378,12 @@ class WebExtractor:
             if not self.driver:
                 raise WebExtractionError("WebDriver not initialized")
             logger.info(f"Navigating to URL: {url}")
-            self.driver.get(url)
+            if self._pinned_target:
+                _HostLockedDriver(
+                    self.driver, self._pinned_target.hostname
+                ).get(url)
+            else:
+                self.driver.get(url)
 
             # Wait for page to be ready using unified wait
             self._unified_wait.until(

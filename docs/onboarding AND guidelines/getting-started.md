@@ -312,8 +312,12 @@ curl http://localhost:8000/health
 # Test workflow endpoint (example)
 curl -X POST http://localhost:8000/execute-workflow \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MAGK_API_TOKEN" \
   -d '{"sourceType": "web", "sourceUri": "https://example.com", "dataIdentifier": "table"}'
 ```
+
+The server requires `MAGK_API_TOKEN`, for example in `apps/server/.env`, which
+`load_dotenv` loads.
 
 ## Verification
 
